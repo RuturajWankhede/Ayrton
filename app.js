@@ -7,7 +7,7 @@ class TelemetryAnalysisApp {
         this.referenceData = null;
         this.currentData = null;
         this.analysisResults = null;
-        this.webhookUrl = localStorage.getItem('n8n_webhook_url') || '';
+        this.webhookUrl = localStorage.getItem('n8n_webhook_url') || 'https://ruturajw.app.n8n.cloud/webhook/';
         
         this.init();
     }
