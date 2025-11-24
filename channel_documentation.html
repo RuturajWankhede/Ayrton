@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telemetry Channel Documentation - CSV Format Guide</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .channel-card {
+            transition: all 0.3s ease;
+        }
+        .channel-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .required {
+            border-left: 4px solid #ef4444;
+        }
+        .optional {
+            border-left: 4px solid #3b82f6;
+        }
+        .advanced {
+            border-left: 4px solid #8b5cf6;
+        }
+        code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        .copy-btn {
+            transition: all 0.2s ease;
+        }
+        .copy-btn:hover {
+            background: #e5e7eb;
+        }
+        .copy-btn.copied {
+            background: #10b981;
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-purple-600 to-blue-600 text-white py-8 shadow-lg">
+        <div class="container mx-auto px-4">
+            <h1 class="text-4xl font-bold mb-2">
+                <i class="fas fa-table mr-3"></i>Telemetry CSV Format Guide
+            </h1>
+            <p class="text-purple-100 text-lg">
+                Channel naming conventions and data format documentation
+            </p>
+        </div>
+    </header>
+
+    <!-- Quick Info Banner -->
+    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 container mx-auto">
+        <div class="flex items-center">
+            <i class="fas fa-info-circle text-blue-500 text-2xl mr-3"></i>
+            <div>
+                <p class="text-lg font-semibold">Intelligent Channel Detection</p>
+                <p class="text-gray-700">The system automatically detects your column names. Only <strong>Time</strong>, <strong>Distance</strong>, and <strong>Speed</strong> are required!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-4 pb-12">
+        
+        <!-- Required Channels Section -->
+        <section class="mb-12">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800">
+                <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>Required Channels (Minimum 3)
+            </h2>
+            <div class="grid md:grid-cols-3 gap-6">
+                <!-- Time Channel -->
+                <div class="channel-card bg-white rounded-lg shadow p-6 required">
+                    <h3 class="text-xl font-bold text-red-600 mb-2">Time</h3>
+                    <p class="text-gray-600 mb-3">Elapsed time since session start</p>
+                    <div class="mb-3">
+                        <p class="text-sm font-semibold text-gray-700">Accepted Names:</p>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            <code>Time</code>
+                            <code>time</code>
+                            <code>Elapsed Time</code>
+                            <code>Session Time</code>
+                            <code>t</code>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <p class="text-sm font-semibold text-gray-700">Unit:</p>
+                        <p class="text-sm">Seconds (e.g., 45.123)</p>
+                    </div>
+                    <div class="bg-gray-50 p-2 rounded">
+                        <p class="text-xs font-mono">Example: 87.654</p>
+                    </div>
+                </div>
+
+                <!-- Distance Channel -->
+                <div class="channel-card bg-white rounded-lg shadow p-6 required">
+                    <h3 class="text-xl font-bold text-red-600 mb-2">Distance</h3>
+                    <p class="text-gray-600 mb-3">Distance traveled in current lap</p>
+                    <div class="mb-3">
+                        <p class="text-sm font-semibold text-gray-700">Accepted Names:</p>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            <code>Distance</code>
+                            <code>Lap Distance</code>
+                            <code>Dist</code>
+                            <code>LapDist</code>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <p class="text-sm font-semibold text-gray-700">Unit:</p>
+                        <p class="text-sm">Meters (e.g., 1234.5)</p>
+                    </div>
+                    <div class="bg-gray-50 p-2 rounded">
+                        <p class="text-xs font-mono">Example: 2847.3</p>
+                    </div>
+                </div>
+
+                <!-- Speed Channel -->
+                <div class="channel-card bg-white rounded-lg shadow p-6 required">
+                    <h3 class="text-xl font-bold text-red-600 mb-2">Speed</h3>
+                    <p class="text-gray-600 mb-3">Vehicle speed</p>
+                    <div class="mb-3">
+                        <p class="text-sm font-semibold text-gray-700">Accepted Names:</p>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            <code>Speed</code>
+                            <code>Ground Speed</code>
+                            <code>Vehicle Speed</code>
+                            <code>GPS Speed</code>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <p class="text-sm font-semibold text-gray-700">Unit:</p>
+                        <p class="text-sm">km/h or mph</p>
+                    </div>
+                    <div class="bg-gray-50 p-2 rounded">
+                        <p class="text-xs font-mono">Example: 185.7</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Basic Channels Section -->
+        <section class="mb-12">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800">
+                <i class="fas fa-tachometer-alt text-blue-500 mr-2"></i>Basic Channels (Enhance Analysis)
+            </h2>
+            <p class="text-gray-600 mb-6">Adding these channels enables driver input analysis and basic vehicle dynamics</p>
+            
+            <div class="grid md:grid-cols-3 gap-6">
+                <!-- Throttle -->
+                <div class="channel-card bg-white rounded-lg shadow p-6 optional">
+                    <h3 class="text-xl font-bold text-blue-600 mb-2">Throttle</h3>
+                    <p class="text-gray-600 mb-3">Throttle position</p>
+                    <div class="mb-2">
+                        <p class="text-sm font-semibold text-gray-700">Accepted Names:</p>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            <code>Throttle</code>
+                            <code>Throttle Pos</code>
+                            <code>TPS</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500">Unit: 0-100% or 0-1</p>
+                    <div class="mt-3 p-2 bg-green-50 rounded">
+                        <p class="text-xs text-green-700">
+                            <i class="fas fa-unlock mr-1"></i>Enables: Throttle application analysis
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Brake -->
+                <div class="channel-card bg-white rounded-lg shadow p-6 optional">
+                    <h3 class="text-xl font-bold text-blue-600 mb-2">Brake</h3>
+                    <p class="text-gray-600 mb-3">Brake pressure or position</p>
+                    <div class="mb-2">
+                        <p class="text-sm font-semibold text-gray-700">Accepted Names:</p>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            <code>Brake</code>
+                            <code>Brake Pressure</code>
+                            <code>Brake Pres Front</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500">Unit: bar, psi, or %</p>
+                    <div class="mt-3 p-2 bg-green-50 rounded">
+                        <p class="text-xs text-green-700">
+                            <i class="fas fa-unlock mr-1"></i>Enables: Braking analysis, trail braking
+                        </p>
+                    </div>
+                </div>
+
+                <!-- RPM -->
+                <div class="channel-card bg-white rounded-lg shadow p-6 optional">
+                    <h3 class="text-xl font-bold text-blue-600 mb-2">RPM</h3>
+                    <p class="text-gray-600 mb-3">Engine speed</p>
+                    <div class="mb-2">
+                        <p class="text-sm font-semibold text-gray-700">Accepted Names:</p>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            <code>RPM</code>
+                            <code>Engine RPM</code>
+                            <code>EngineSpeed</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500">Unit: Revolutions per minute</p>
+                    <div class="mt-3 p-2 bg-green-50 rounded">
+                        <p class="text-xs text-green-700">
+                            <i class="fas fa-unlock mr-1"></i>Enables: Shift point analysis
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Gear -->
+                <div class="channel-card bg-white rounded-lg shadow p-6 optional">
+                    <h3 class="text-xl font-bold text-blue-600 mb-2">Gear</h3>
+                    <p class="text-gray-600 mb-3">Current gear</p>
+                    <div class="mb-2">
+                        <p class="text-sm font-semibold text-gray-700">Accepted Names:</p>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            <code>Gear</code>
+                            <code>Gear Position</code>
+                            <code>Gear Pos</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500">Unit: Number (1-8)</p>
+                    <div class="mt-3 p-2 bg-green-50 rounded">
+                        <p class="text-xs text-green-700">
+                            <i class="fas fa-unlock mr-1"></i>Enables: Gear usage optimization
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Steering -->
+                <div class="channel-card bg-white rounded-lg shadow p-6 optional">
+                    <h3 class="text-xl font-bold text-blue-600 mb-2">Steering</h3>
+                    <p class="text-gray-600 mb-3">Steering wheel angle</p>
+                    <div class="mb-2">
+                        <p class="text-sm font-semibold text-gray-700">Accepted Names:</p>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            <code>Steering</code>
+                            <code>Steering Angle</code>
+                            <code>Steered Angle</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500">Unit: Degrees</p>
+                    <div class="mt-3 p-2 bg-green-50 rounded">
+                        <p class="text-xs text-green-700">
+                            <i class="fas fa-unlock mr-1"></i>Enables: Steering smoothness analysis
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Lap Time -->
+                <div class="channel-card bg-white rounded-lg shadow p-6 optional">
+                    <h3 class="text-xl font-bold text-blue-600 mb-2">Lap Time</h3>
+                    <p class="text-gray-600 mb-3">Current lap time</p>
+                    <div class="mb-2">
+                        <p class="text-sm font-semibold text-gray-700">Accepted Names:</p>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            <code>Lap Time</code>
+                            <code>LapTime</code>
+                            <code>Running Lap Time</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500">Unit: Seconds</p>
+                    <div class="mt-3 p-2 bg-green-50 rounded">
+                        <p class="text-xs text-green-700">
+                            <i class="fas fa-unlock mr-1"></i>Enables: Sector time analysis
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Advanced Channels Section -->
+        <section class="mb-12">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800">
+                <i class="fas fa-chart-line text-purple-500 mr-2"></i>Advanced Channels (Professional Analysis)
+            </h2>
+            <p class="text-gray-600 mb-6">Professional telemetry channels for comprehensive vehicle dynamics analysis</p>
+
+            <!-- G-Force Sensors -->
+            <div class="mb-8">
+                <h3 class="text-2xl font-semibold mb-4 text-gray-700">
+                    <i class="fas fa-compress-arrows-alt mr-2"></i>G-Force Sensors
+                </h3>
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div class="channel-card bg-white rounded-lg shadow p-4 advanced">
+                        <h4 class="font-bold text-purple-600">Lateral G</h4>
+                        <p class="text-sm text-gray-600 mb-2">Side-to-side forces</p>
+                        <div class="text-xs">
+                            <p><strong>Names:</strong> <code>G Force Lat</code>, <code>Lateral G</code></p>
+                            <p><strong>Range:</strong> ±3.0 G typical</p>
+                        </div>
+                    </div>
+                    <div class="channel-card bg-white rounded-lg shadow p-4 advanced">
+                        <h4 class="font-bold text-purple-600">Longitudinal G</h4>
+                        <p class="text-sm text-gray-600 mb-2">Acceleration/braking forces</p>
+                        <div class="text-xs">
+                            <p><strong>Names:</strong> <code>G Force Long</code>, <code>Longitudinal G</code></p>
+                            <p><strong>Range:</strong> ±2.0 G typical</p>
+                        </div>
+                    </div>
+                    <div class="channel-card bg-white rounded-lg shadow p-4 advanced">
+                        <h4 class="font-bold text-purple-600">Vertical G</h4>
+                        <p class="text-sm text-gray-600 mb-2">Vertical forces</p>
+                        <div class="text-xs">
+                            <p><strong>Names:</strong> <code>G Force Vert</code>, <code>Vertical G</code></p>
+                            <p><strong>Range:</strong> 0.5-2.0 G typical</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 p-3 bg-purple-50 rounded">
+                    <p class="text-sm text-purple-700">
+                        <i class="fas fa-chart-pie mr-2"></i><strong>Enables:</strong> Traction circle analysis, grip utilization, weight transfer calculations
+                    </p>
+                </div>
+            </div>
+
+            <!-- Suspension Sensors -->
+            <div class="mb-8">
+                <h3 class="text-2xl font-semibold mb-4 text-gray-700">
+                    <i class="fas fa-car mr-2"></i>Suspension Sensors (Damper Potentiometers)
+                </h3>
+                <div class="grid md:grid-cols-4 gap-4">
+                    <div class="channel-card bg-white rounded-lg shadow p-4 advanced">
+                        <h4 class="font-bold text-purple-600">Front Left</h4>
+                        <div class="text-xs">
+                            <p><strong>Names:</strong> <code>Susp Pos FL</code></p>
+                            <p><strong>Unit:</strong> mm</p>
+                        </div>
+                    </div>
+                    <div class="channel-card bg-white rounded-lg shadow p-4 advanced">
+                        <h4 class="font-bold text-purple-600">Front Right</h4>
+                        <div class="text-xs">
+                            <p><strong>Names:</strong> <code>Susp Pos FR</code></p>
+                            <p><strong>Unit:</strong> mm</p>
+                        </div>
+                    </div>
+                    <div class="channel-card bg-white rounded-lg shadow p-4 advanced">
+                        <h4 class="font-bold text-purple-600">Rear Left</h4>
+                        <div class="text-xs">
+                            <p><strong>Names:</strong> <code>Susp Pos RL</code></p>
+                            <p><strong>Unit:</strong> mm</p>
+                        </div>
+                    </div>
+                    <div class="channel-card bg-white rounded-lg shadow p-4 advanced">
+                        <h4 class="font-bold text-purple-600">Rear Right</h4>
+                        <div class="text-xs">
+                            <p><strong>Names:</strong> <code>Susp Pos RR</code></p>
+                            <p><strong>Unit:</strong> mm</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 p-3 bg-purple-50 rounded">
+                    <p class="text-sm text-purple-700">
+                        <i class="fas fa-chart-pie mr-2"></i><strong>Enables:</strong> Ride height analysis, pitch/roll calculations, platform control, bottoming detection
+                    </p>
+                </div>
+            </div>
+
+            <!-- Tire Temperature Sensors -->
+            <div class="mb-8">
+                <h3 class="text-2xl font-semibold mb-4 text-gray-700">
+                    <i class="fas fa-thermometer-half mr-2"></i>Tire Temperature Sensors (3-Zone)
+                </h3>
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div class="channel-card bg-white rounded-lg shadow p-4 advanced">
+                        <h4 class="font-bold text-purple-600">Inner Zone</h4>
+                        <div class="text-xs">
+                            <p><strong>FL:</strong> <code>Tyre Temp FL Inner</code></p>
+                            <p><strong>FR:</strong> <code>Tyre Temp FR Inner</code></p>
+                            <p><strong>Range:</strong> 60-120°C</p>
+                        </div>
+                    </div>
+                    <div class="channel-card bg-white rounded-lg shadow p-4 advanced">
+                        <h4 class="font-bold text-purple-600">Center Zone</h4>
+                        <div class="text-xs">
+                            <p><strong>FL:</strong> <code>Tyre Temp FL Centre</code></p>
+                            <p><strong>FR:</strong> <code>Tyre Temp FR Center</code></p>
+                            <p><strong>Optimal:</strong> 85-100°C</p>
+                        </div>
+                    </div>
+                    <div class="channel-card bg-white rounded-lg shadow p-4 advanced">
+                        <h4 class="font-bold text-purple-600">Outer Zone</h4>
+                        <div class="text-xs">
+                            <p><strong>FL:</strong> <code>Tyre Temp FL Outer</code></p>
+                            <p><strong>FR:</strong> <code>Tyre Temp FR Outer</code></p>
+                            <p><strong>Spread:</strong> <10°C ideal</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 p-3 bg-purple-50 rounded">
+                    <p class="text-sm text-purple-700">
+                        <i class="fas fa-chart-pie mr-2"></i><strong>Enables:</strong> Camber optimization, pressure adjustment, wear analysis
+                    </p>
+                    <p class="text-sm text-purple-700 mt-2">
+                        <strong>Setup Clues:</strong> Outer > Inner = too much negative camber | Center > Edges = over-inflated
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- CSV Examples Section -->
+        <section class="mb-12">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800">
+                <i class="fas fa-file-csv text-green-500 mr-2"></i>CSV Format Examples
+            </h2>
+            
+            <!-- Minimal Example -->
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold mb-3">Minimal CSV (Required channels only)</h3>
+                <div class="bg-gray-900 text-green-400 p-4 rounded-lg relative">
+                    <button onclick="copyToClipboard('minimal-csv')" class="copy-btn absolute top-2 right-2 bg-gray-700 text-white px-3 py-1 rounded text-sm">
+                        <i class="fas fa-copy mr-1"></i>Copy
+                    </button>
+                    <pre id="minimal-csv" class="text-sm overflow-x-auto">Time,Distance,Speed
+0.000,0.0,0.0
+0.100,5.2,52.0
+0.200,10.5,105.0
+0.300,16.2,162.0
+0.400,22.5,185.5
+0.500,29.1,192.3</pre>
+                </div>
+            </div>
+
+            <!-- Basic Example -->
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold mb-3">Basic CSV (With driver inputs)</h3>
+                <div class="bg-gray-900 text-green-400 p-4 rounded-lg relative">
+                    <button onclick="copyToClipboard('basic-csv')" class="copy-btn absolute top-2 right-2 bg-gray-700 text-white px-3 py-1 rounded text-sm">
+                        <i class="fas fa-copy mr-1"></i>Copy
+                    </button>
+                    <pre id="basic-csv" class="text-sm overflow-x-auto">Time,Distance,Speed,Throttle,Brake,RPM,Gear,Steering Angle
+0.000,0.0,0.0,0,0,2500,1,0
+0.100,5.2,52.0,45,0,4500,1,0
+0.200,10.5,105.0,85,0,6800,2,5
+0.300,16.2,162.0,100,0,7200,3,-15
+0.400,22.5,185.5,60,20,6500,3,-25
+0.500,29.1,192.3,80,0,7000,4,-10</pre>
+                </div>
+            </div>
+
+            <!-- Professional Example -->
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold mb-3">Professional CSV (Full telemetry)</h3>
+                <div class="bg-gray-900 text-green-400 p-4 rounded-lg relative">
+                    <button onclick="copyToClipboard('pro-csv')" class="copy-btn absolute top-2 right-2 bg-gray-700 text-white px-3 py-1 rounded text-sm">
+                        <i class="fas fa-copy mr-1"></i>Copy
+                    </button>
+                    <pre id="pro-csv" class="text-sm overflow-x-auto">Time,Distance,Speed,Throttle Pos,Brake Pres Front,G Force Lat,G Force Long,Susp Pos FL,Susp Pos FR,Susp Pos RL,Susp Pos RR,Tyre Temp FL Inner,Tyre Temp FL Centre,Tyre Temp FL Outer
+0.000,0.0,0.0,0,0,0.0,0.0,50,50,45,45,75,75,75
+0.100,5.2,52.0,45,0,0.1,0.8,48,48,43,43,78,80,79
+0.200,10.5,105.0,85,0,0.3,0.4,46,47,42,42,82,85,83
+0.300,16.2,162.0,100,0,-1.2,0.1,44,48,40,41,85,92,88
+0.400,22.5,185.5,60,35,-1.8,-1.2,42,45,38,39,88,95,90
+0.500,29.1,192.3,80,0,-0.5,0.6,45,46,41,41,86,93,89</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Analysis Capabilities -->
+        <section class="mb-12">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800">
+                <i class="fas fa-magic text-yellow-500 mr-2"></i>What Analysis You'll Get
+            </h2>
+            
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-3xl text-blue-500 mb-3">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">With Basic Channels</h3>
+                    <ul class="text-sm text-gray-600 space-y-1">
+                        <li><i class="fas fa-check text-green-500 mr-1"></i> Lap time comparison</li>
+                        <li><i class="fas fa-check text-green-500 mr-1"></i> Speed trace analysis</li>
+                        <li><i class="fas fa-check text-green-500 mr-1"></i> Corner detection</li>
+                        <li><i class="fas fa-check text-green-500 mr-1"></i> Sector performance</li>
+                        <li><i class="fas fa-check text-green-500 mr-1"></i> Basic coaching tips</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-3xl text-purple-500 mb-3">
+                        <i class="fas fa-cogs"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">With G-Force & Suspension</h3>
+                    <ul class="text-sm text-gray-600 space-y-1">
+                        <li><i class="fas fa-check text-green-500 mr-1"></i> Traction circle analysis</li>
+                        <li><i class="fas fa-check text-green-500 mr-1"></i> Weight transfer</li>
+                        <li><i class="fas fa-check text-green-500 mr-1"></i> Platform control</li>
+                        <li><i class="fas fa-check text-green-500 mr-1"></i> Ride height optimization</li>
+                        <li><i class="fas fa-check text-green-500 mr-1"></i> Setup recommendations</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-3xl text-red-500 mb-3">
+                        <i class="fas fa-temperature-high"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">With Tire Temps</h3>
+                    <ul class="text-sm text-gray-600 space-y-1">
+                        <li><i class="fas fa-check text-green-500 mr-1"></i> Camber analysis</li>
+                        <li><i class="fas fa-check text-green-500 mr-1"></i> Pressure optimization</li>
+                        <li><i class="fas fa-check text-green-500 mr-1"></i> Wear predictions</li>
+                        <li><i class="fas fa-check text-green-500 mr-1"></i> Temperature management</li>
+                        <li><i class="fas fa-check text-green-500 mr-1"></i> Setup adjustments</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tips Section -->
+        <section>
+            <h2 class="text-3xl font-bold mb-6 text-gray-800">
+                <i class="fas fa-lightbulb text-yellow-400 mr-2"></i>Pro Tips
+            </h2>
+            
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                <ul class="space-y-2">
+                    <li class="flex items-start">
+                        <i class="fas fa-arrow-right text-yellow-600 mr-2 mt-1"></i>
+                        <span><strong>Channel names are flexible:</strong> The system will detect variations like "Throttle", "Throttle Pos", "TPS", etc.</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-arrow-right text-yellow-600 mr-2 mt-1"></i>
+                        <span><strong>Units are auto-detected:</strong> Use km/h or mph for speed, degrees or radians for angles</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-arrow-right text-yellow-600 mr-2 mt-1"></i>
+                        <span><strong>More channels = better analysis:</strong> Each additional channel unlocks new insights</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-arrow-right text-yellow-600 mr-2 mt-1"></i>
+                        <span><strong>Sample rate matters:</strong> 10-100 Hz is ideal for most analysis</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fas fa-arrow-right text-yellow-600 mr-2 mt-1"></i>
+                        <span><strong>Both laps should have same channels:</strong> Reference and current lap must match</span>
+                    </li>
+                </ul>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-6 mt-12">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-gray-400">Racing Telemetry AI Coach - Professional Data Analysis</p>
+            <p class="text-sm text-gray-500 mt-2">The system adapts to your available channels automatically</p>
+        </div>
+    </footer>
+
+    <script>
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                // Find the button that was clicked
+                const button = event.target.closest('button');
+                button.classList.add('copied');
+                button.innerHTML = '<i class="fas fa-check mr-1"></i>Copied!';
+                
+                setTimeout(() => {
+                    button.classList.remove('copied');
+                    button.innerHTML = '<i class="fas fa-copy mr-1"></i>Copy';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
