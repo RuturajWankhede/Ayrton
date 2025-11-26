@@ -1,13 +1,13 @@
-// Racing Telemetry Analysis Frontend Application
-// Connects to N8N backend for professional telemetry analysis
+// Complete Racing Telemetry Analysis Frontend Application
+// Updated to properly store and pass session data for chat functionality
 
 class TelemetryAnalysisApp {
     constructor() {
         this.sessionId = null;
+        this.sessionData = null;
         this.referenceData = null;
         this.currentData = null;
         this.analysisResults = null;
-        // Fixed webhook URL configuration
         this.webhookUrl = localStorage.getItem('n8n_webhook_url') || 'https://ruturajw.app.n8n.cloud';
         
         this.init();
@@ -130,25 +130,21 @@ class TelemetryAnalysisApp {
     }
 
     validateAndDetectChannels() {
-        // Detect available channels
         if (!this.referenceData || this.referenceData.length === 0) return;
         
         const columns = Object.keys(this.referenceData[0]);
         const detectedChannels = this.detectChannels(columns);
         
-        // Display detection results
         this.displayChannelDetection(detectedChannels);
     }
 
     detectChannels(columns) {
-        // Core required channels
         const requiredChannels = {
             time: ['Time', 'time', 'Elapsed Time', 'Session Time', 't'],
             distance: ['Distance', 'Lap Distance', 'Dist', 'distance', 'LapDist'],
             speed: ['Speed', 'Ground Speed', 'Vehicle Speed', 'GPS Speed', 'speed']
         };
         
-        // Optional channels that enhance analysis
         const optionalChannels = {
             throttle: ['Throttle', 'Throttle Pos', 'TPS', 'throttle'],
             brake: ['Brake', 'Brake Pressure', 'Brake Pres Front', 'brake'],
@@ -156,9 +152,7 @@ class TelemetryAnalysisApp {
             rpm: ['RPM', 'rpm', 'Engine Speed'],
             steer: ['Steering Angle', 'Steer', 'steer', 'Steering'],
             gLateral: ['G Force Lat', 'Lateral G', 'LatG', 'G_Lat', 'g_lat'],
-            gLongitudinal: ['G Force Long', 'Longitudinal G', 'LongG', 'G_Long', 'g_long'],
-            suspensionFL: ['Susp Pos FL', 'Suspension FL', 'Damper FL'],
-            tireTempFL: ['Tyre Temp FL Centre', 'Tire Temp FL Center']
+            gLongitudinal: ['G Force Long', 'Longitudinal G', 'LongG', 'G_Long', 'g_long']
         };
         
         const detected = {
@@ -200,9 +194,6 @@ class TelemetryAnalysisApp {
         if (detected.optional.gLateral && detected.optional.gLongitudinal) {
             detected.capabilities.push('G-force and traction analysis');
         }
-        if (detected.optional.suspensionFL) {
-            detected.capabilities.push('Suspension dynamics');
-        }
         
         return detected;
     }
@@ -212,26 +203,19 @@ class TelemetryAnalysisApp {
         
         if (detected.missing.length > 0) {
             this.showNotification(
-                `Missing required channels: ${detected.missing.join(', ')}. Check channel documentation for accepted names.`, 
+                `Missing required channels: ${detected.missing.join(', ')}. Check channel documentation.`, 
                 'error'
             );
             document.getElementById('analyze-btn').disabled = true;
             
-            // Show link to documentation
             message = '<a href="channel_documentation.html" target="_blank" class="text-blue-600 underline">View Channel Documentation</a>';
         } else {
             const channelCount = Object.keys(detected.required).length + Object.keys(detected.optional).length;
             message = `✅ Detected ${channelCount} channels. Analysis capabilities: ${detected.capabilities.join(', ')}`;
             
-            if (Object.keys(detected.optional).length < 3) {
-                message += '<br><span class="text-sm text-gray-600">Add more channels for advanced analysis. ';
-                message += '<a href="channel_documentation.html" target="_blank" class="text-blue-600 underline">View Documentation</a></span>';
-            }
-            
             this.showNotification(`Channels detected successfully! ${detected.capabilities.length} analysis types available.`, 'success');
         }
         
-        // Display detection info near upload area
         const infoDiv = document.createElement('div');
         infoDiv.className = 'mt-4 p-3 bg-blue-50 rounded text-sm';
         infoDiv.innerHTML = message;
@@ -255,10 +239,8 @@ class TelemetryAnalysisApp {
         document.getElementById('loading-overlay').classList.add('flex');
 
         try {
-            // Generate session ID
             const sessionId = this.generateSessionId();
             
-            // Prepare data for N8N
             const payload = {
                 reference_lap: this.referenceData,
                 current_lap: this.currentData,
@@ -269,12 +251,9 @@ class TelemetryAnalysisApp {
             };
 
             console.log('Sending payload to:', `${this.webhookUrl}/webhook/telemetry-analysis`);
-            console.log('Payload:', payload);
 
-            // Construct the full webhook URL
             const url = `${this.webhookUrl}/webhook/telemetry-analysis`;
 
-            // Send to N8N webhook
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -286,14 +265,32 @@ class TelemetryAnalysisApp {
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error('Response error:', errorText);
-                throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const results = await response.json();
+            // Get response text first to debug
+            const responseText = await response.text();
+            console.log('Raw response length:', responseText.length);
+            
+            // Try to parse JSON
+            let results;
+            try {
+                results = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error('JSON Parse Error:', parseError);
+                console.error('Response was:', responseText.substring(0, 500));
+                throw new Error('Invalid JSON response from server');
+            }
+
             console.log('Analysis results:', results);
 
-            this.analysisResults = results.analysis || results.ai_analysis || {};
+            // CRITICAL: Store session data for chat
             this.sessionId = results.session_id || sessionId;
+            this.sessionData = results.session_data || results.analysis || {};
+            this.analysisResults = results.analysis || results.ai_analysis || {};
+            
+            console.log('Session stored with ID:', this.sessionId);
+            console.log('Session data stored:', this.sessionData);
 
             // Display results
             this.displayAnalysisResults(results);
@@ -304,7 +301,7 @@ class TelemetryAnalysisApp {
 
             // Add Ayrton's initial message
             const ayrtonMessage = results.ayrton_says || results.initial_message || 
-                "Listen. I've analyzed every data point from your lap. The numbers don't lie, but they don't show heart either. I see both. What do you want to know?";
+                "Listen. I've analyzed your data. What do you want to know?";
             this.addAyrtonMessage(ayrtonMessage);
 
             // If AI insights are available, display them
@@ -321,28 +318,24 @@ class TelemetryAnalysisApp {
     }
 
     displayAnalysisResults(results) {
-        // Display key metrics
         const analysis = results.analysis || results.ai_analysis || {};
         
         // Lap time delta
-        const lapDelta = analysis.timeDelta || analysis.lapTimeAnalysis?.totalDelta || 
-                        analysis.prediction?.currentLap || 0;
+        const lapDelta = analysis.timeDelta || 0;
         document.getElementById('lap-delta').textContent = 
             lapDelta > 0 ? `+${lapDelta.toFixed(3)}s` : `${lapDelta.toFixed(3)}s`;
         
-        // G-force usage or style score
+        // G-force usage or efficiency
         const gForceUsage = analysis.vehicleDynamics?.averageUtilization || 
-                          (analysis.drivingStyle?.scores?.efficiency * 100) || 75;
+                          (analysis.efficiency * 100) || 75;
         document.getElementById('g-force-usage').textContent = `${gForceUsage.toFixed(0)}%`;
         
-        // Driving style or tire status
-        const tireStatus = analysis.drivingStyle?.primaryStyle || 
-                         analysis.tireAnalysis?.status || 'Analyzing';
+        // Tire status or style
+        const tireStatus = analysis.drivingStyle?.primaryStyle || 'Analyzing';
         document.getElementById('tire-status').textContent = tireStatus;
         
-        // Setup issues or anomalies
-        const setupIssues = analysis.anomalies?.criticalCount || 
-                          analysis.setupRecommendations?.priority_changes?.length || 0;
+        // Setup issues
+        const setupIssues = analysis.anomalies?.criticalCount || 0;
         document.getElementById('setup-issue').textContent = `${setupIssues} Issues`;
 
         // Generate graphs if data available
@@ -350,7 +343,7 @@ class TelemetryAnalysisApp {
             this.generateGraphs(analysis);
         }
         
-        // Display setup recommendations if available
+        // Display setup recommendations
         if (analysis.racingLine || analysis.setupRecommendations) {
             this.displaySetupRecommendations(analysis);
         }
@@ -360,7 +353,6 @@ class TelemetryAnalysisApp {
     }
 
     displayAIInsights(insights) {
-        // Create AI insights display if it doesn't exist
         const resultsSection = document.getElementById('results-section');
         let insightsDiv = document.getElementById('ai-insights');
         
@@ -393,104 +385,55 @@ class TelemetryAnalysisApp {
                         <p class="text-sm mt-1">Analysis accuracy</p>
                     </div>
                 </div>
-                ${insights.immediate_focus ? `
-                <div class="mt-4 p-3 bg-purple-700 rounded">
-                    <p class="text-sm text-purple-200">Immediate Focus:</p>
-                    <p class="font-medium">${JSON.stringify(insights.immediate_focus)}</p>
-                </div>
-                ` : ''}
             </div>
         `;
     }
 
     generateGraphs(analysis) {
         // Speed trace
-        if (analysis.speedTrace || analysis.sectors) {
+        if (analysis.sectors) {
             const speedTrace = {
-                x: analysis.speedTrace?.distance || analysis.sectors?.map((s, i) => i),
-                y: analysis.speedTrace?.speed || analysis.sectors?.map(s => s.avgSpeedDelta || 0),
-                type: 'scatter',
-                name: 'Speed',
-                line: { color: 'blue' }
-            };
-            
-            const speedDelta = {
-                x: analysis.speedTrace?.distance || analysis.sectors?.map((s, i) => i),
-                y: analysis.speedTrace?.delta || analysis.sectors?.map(s => s.timeDelta || 0),
-                type: 'scatter',
-                name: 'Delta',
-                yaxis: 'y2',
-                line: { color: 'red' }
-            };
-
-            const layout = {
-                title: 'Speed Comparison',
-                xaxis: { title: 'Distance (m) / Sector' },
-                yaxis: { title: 'Speed (km/h)' },
-                yaxis2: {
-                    title: 'Delta',
-                    overlaying: 'y',
-                    side: 'right'
+                x: analysis.sectors.map((s, i) => `Sector ${i + 1}`),
+                y: analysis.sectors.map(s => s.avgSpeedDelta || 0),
+                type: 'bar',
+                name: 'Speed Delta',
+                marker: {
+                    color: analysis.sectors.map(s => s.avgSpeedDelta < 0 ? 'red' : 'green')
                 }
             };
 
-            Plotly.newPlot('speed-trace', [speedTrace, speedDelta], layout);
-        }
+            const layout = {
+                title: 'Sector Speed Comparison',
+                xaxis: { title: 'Sector' },
+                yaxis: { title: 'Speed Delta (km/h)' }
+            };
 
-        // Other graphs remain the same...
-        // (keeping existing graph generation code)
+            Plotly.newPlot('speed-trace', [speedTrace], layout);
+        }
     }
 
     displaySetupRecommendations(analysis) {
         const container = document.getElementById('setup-recommendations');
         container.innerHTML = '';
 
-        // AI-based recommendations
-        if (analysis.racingLine?.optimizations) {
+        if (analysis.sectors) {
             const section = document.createElement('div');
             section.className = 'bg-white rounded-lg p-4 shadow mb-4';
             
             section.innerHTML = `
-                <h3 class="font-bold text-lg mb-3">AI Racing Line Optimizations</h3>
+                <h3 class="font-bold text-lg mb-3">Sector Analysis</h3>
                 <div class="space-y-2">
-                    ${analysis.racingLine.optimizations.slice(0, 3).map(opt => `
-                        <div class="border-l-4 border-purple-500 pl-3">
-                            <p class="font-medium">${opt.corner} at ${opt.location}m</p>
-                            <p class="text-sm text-gray-600">${opt.adjustments.join(', ')}</p>
-                            <p class="text-xs text-green-600">Potential gain: ${opt.timeGain.toFixed(3)}s</p>
+                    ${analysis.sectors.map(s => `
+                        <div class="border-l-4 ${s.avgSpeedDelta < 0 ? 'border-red-500' : 'border-green-500'} pl-3">
+                            <p class="font-medium">Sector ${s.sector}</p>
+                            <p class="text-sm text-gray-600">Speed Delta: ${s.avgSpeedDelta.toFixed(1)} km/h</p>
+                            <p class="text-xs text-gray-500">Time Delta: ${s.timeDelta.toFixed(3)}s</p>
                         </div>
                     `).join('')}
                 </div>
             `;
             
             container.appendChild(section);
-        }
-
-        // Traditional setup recommendations
-        if (analysis.setupRecommendations) {
-            const categories = ['suspension', 'tires', 'aero', 'brake_balance', 'differential'];
-            
-            categories.forEach(category => {
-                if (analysis.setupRecommendations[category] && analysis.setupRecommendations[category].length > 0) {
-                    const section = document.createElement('div');
-                    section.className = 'bg-white rounded-lg p-4 shadow mb-4';
-                    
-                    section.innerHTML = `
-                        <h3 class="font-bold text-lg mb-3 capitalize">${category.replace('_', ' ')}</h3>
-                        <div class="space-y-2">
-                            ${analysis.setupRecommendations[category].map(rec => `
-                                <div class="border-l-4 ${rec.priority === 'HIGH' ? 'border-red-500' : 'border-yellow-500'} pl-3">
-                                    <p class="font-medium">${rec.change}</p>
-                                    <p class="text-sm text-gray-600">${rec.expected_impact}</p>
-                                    <p class="text-xs text-gray-500">Issue: ${rec.issue}</p>
-                                </div>
-                            `).join('')}
-                        </div>
-                    `;
-                    
-                    container.appendChild(section);
-                }
-            });
         }
     }
 
@@ -501,29 +444,12 @@ class TelemetryAnalysisApp {
             <h2 class="text-2xl font-bold mb-4">Telemetry Analysis Report</h2>
             
             <h3 class="text-xl font-bold mt-6 mb-3">Executive Summary</h3>
-            <p>Analysis type: ${analysis.drivingStyle ? 'AI-Enhanced' : 'Standard'}</p>
-            <p>Total lap time delta: ${(analysis.timeDelta || analysis.prediction?.currentLap || 0).toFixed(3)}s</p>
-            ${analysis.prediction ? `<p>Theoretical best: ${analysis.prediction.theoreticalBest.toFixed(3)}s</p>` : ''}
-            ${analysis.drivingStyle ? `<p>Driving style: ${analysis.drivingStyle.primaryStyle}</p>` : ''}
-            <p>Critical issues identified: ${analysis.anomalies?.criticalCount || 0}</p>
+            <p>Total lap time delta: ${(analysis.timeDelta || 0).toFixed(3)}s</p>
+            <p>Average speed current: ${(analysis.avgSpeedCurr || 0).toFixed(1)} km/h</p>
+            <p>Average speed reference: ${(analysis.avgSpeedRef || 0).toFixed(1)} km/h</p>
             
             <h3 class="text-xl font-bold mt-6 mb-3">Sector Analysis</h3>
-            ${this.generateSectorTable(analysis.sectors || analysis.sectorAnalysis)}
-            
-            ${analysis.corners ? `
-            <h3 class="text-xl font-bold mt-6 mb-3">Corner Classification</h3>
-            ${this.generateCornerTable(analysis.corners)}
-            ` : ''}
-            
-            ${analysis.drivingStyle ? `
-            <h3 class="text-xl font-bold mt-6 mb-3">Driving Style Analysis</h3>
-            ${this.generateStyleReport(analysis.drivingStyle)}
-            ` : ''}
-            
-            ${analysis.anomalies ? `
-            <h3 class="text-xl font-bold mt-6 mb-3">Anomaly Detection</h3>
-            ${this.generateAnomalyReport(analysis.anomalies)}
-            ` : ''}
+            ${this.generateSectorTable(analysis.sectors)}
             
             <h3 class="text-xl font-bold mt-6 mb-3">Recommendations</h3>
             ${this.generateRecommendationsList(analysis)}
@@ -532,116 +458,43 @@ class TelemetryAnalysisApp {
         reportContainer.innerHTML = reportHTML;
     }
 
-    generateSectorTable(sectorAnalysis) {
-        if (!sectorAnalysis || sectorAnalysis.length === 0) return '<p>No sector data available</p>';
+    generateSectorTable(sectors) {
+        if (!sectors || sectors.length === 0) return '<p>No sector data available</p>';
         
         return `
             <table class="w-full border-collapse">
                 <thead>
                     <tr class="bg-gray-100">
                         <th class="border p-2">Sector</th>
-                        <th class="border p-2">Time Delta</th>
                         <th class="border p-2">Speed Delta</th>
-                        <th class="border p-2">Focus Area</th>
+                        <th class="border p-2">Time Delta</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${sectorAnalysis.map(sector => `
+                    ${sectors.map(sector => `
                         <tr>
                             <td class="border p-2">${sector.sector}</td>
-                            <td class="border p-2">${(sector.timeDelta || sector.delta || 0).toFixed(3)}s</td>
-                            <td class="border p-2">${(sector.avgSpeedDelta || sector.speedDelta || 0).toFixed(1)} km/h</td>
-                            <td class="border p-2">${sector.improvementArea || sector.issues?.join(', ') || 'Maintain pace'}</td>
+                            <td class="border p-2">${(sector.avgSpeedDelta || 0).toFixed(1)} km/h</td>
+                            <td class="border p-2">${(sector.timeDelta || 0).toFixed(3)}s</td>
                         </tr>
                     `).join('')}
                 </tbody>
             </table>
-        `;
-    }
-
-    generateCornerTable(corners) {
-        if (!corners || corners.length === 0) return '<p>No corner classification available</p>';
-        
-        return `
-            <table class="w-full border-collapse">
-                <thead>
-                    <tr class="bg-gray-100">
-                        <th class="border p-2">Corner Type</th>
-                        <th class="border p-2">Location</th>
-                        <th class="border p-2">Key Advice</th>
-                        <th class="border p-2">Confidence</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${corners.slice(0, 5).map(corner => `
-                        <tr>
-                            <td class="border p-2 capitalize">${corner.type.replace('_', ' ')}</td>
-                            <td class="border p-2">${corner.entry.toFixed(0)}m - ${corner.exit.toFixed(0)}m</td>
-                            <td class="border p-2 text-sm">${corner.keyAdvice}</td>
-                            <td class="border p-2">${(corner.confidence * 100).toFixed(0)}%</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `;
-    }
-
-    generateStyleReport(style) {
-        return `
-            <div class="space-y-2">
-                <p><strong>Primary Style:</strong> ${style.primaryStyle}</p>
-                <p><strong>Archetype:</strong> ${style.archetype}</p>
-                <div class="grid grid-cols-5 gap-2 mt-3">
-                    ${Object.entries(style.scores || {}).map(([key, value]) => `
-                        <div class="text-center">
-                            <p class="text-xs text-gray-600 capitalize">${key}</p>
-                            <div class="bg-gray-200 h-20 relative rounded">
-                                <div class="bg-purple-600 absolute bottom-0 w-full rounded" 
-                                     style="height: ${value * 100}%"></div>
-                            </div>
-                            <p class="text-sm font-bold">${(value * 100).toFixed(0)}%</p>
-                        </div>
-                    `).join('')}
-                </div>
-                <p class="mt-3"><strong>Focus:</strong> ${style.coachingFocus}</p>
-                <p><strong>Strengths:</strong> ${style.strengths?.join(', ')}</p>
-                <p><strong>Weaknesses:</strong> ${style.weaknesses?.join(', ')}</p>
-            </div>
-        `;
-    }
-
-    generateAnomalyReport(anomalies) {
-        return `
-            <div class="space-y-2">
-                <p><strong>Total Anomalies:</strong> ${anomalies.pointAnomalies?.length || 0}</p>
-                <p><strong>Critical Issues:</strong> ${anomalies.criticalCount || 0}</p>
-                <p><strong>Telemetry Health:</strong> ${((anomalies.overallHealth || 0.5) * 100).toFixed(0)}%</p>
-                ${anomalies.pointAnomalies?.slice(0, 3).map(a => `
-                    <div class="border-l-4 ${a.severity === 'critical' ? 'border-red-500' : 'border-yellow-500'} pl-3">
-                        <p class="font-medium">${a.channel} anomaly at ${a.location}m</p>
-                        <p class="text-sm text-gray-600">${a.recommendation}</p>
-                    </div>
-                `).join('') || ''}
-            </div>
         `;
     }
 
     generateRecommendationsList(analysis) {
         const recommendations = [];
         
-        // Collect all recommendations
-        if (analysis.racingLine?.executionPlan) {
-            analysis.racingLine.executionPlan.forEach(step => {
-                recommendations.push({
-                    area: `Step ${step.step}`,
-                    recommendation: step.action,
-                    expectedGain: step.expectedGain
-                });
+        if (analysis.sectors) {
+            const worstSector = analysis.sectors.reduce((prev, curr) => 
+                curr.avgSpeedDelta < prev.avgSpeedDelta ? curr : prev
+            );
+            
+            recommendations.push({
+                area: `Focus on Sector ${worstSector.sector}`,
+                recommendation: `You're losing ${Math.abs(worstSector.avgSpeedDelta).toFixed(1)} km/h here`
             });
-        }
-        
-        if (analysis.drivingCoaching) {
-            analysis.drivingCoaching.forEach(item => recommendations.push(item));
         }
         
         if (recommendations.length === 0) {
@@ -649,14 +502,13 @@ class TelemetryAnalysisApp {
         }
         
         return `
-            <ol class="list-decimal pl-5 space-y-2">
+            <ul class="list-disc pl-5 space-y-2">
                 ${recommendations.map(item => `
                     <li>
                         <strong>${item.area}</strong>: ${item.recommendation}
-                        ${item.expectedGain ? `<span class="text-sm text-gray-600">(${item.expectedGain})</span>` : ''}
                     </li>
                 `).join('')}
-            </ol>
+            </ul>
         `;
     }
 
@@ -674,12 +526,12 @@ class TelemetryAnalysisApp {
         this.showTypingIndicator();
         
         try {
-            // Construct chat webhook URL
             const url = `${this.webhookUrl}/webhook/ayrton-chat`;
             
-            console.log('Sending chat to:', url);
+            console.log('Sending chat with session:', this.sessionId);
+            console.log('Session data available:', !!this.sessionData);
 
-            // Send to N8N chat webhook
+            // CRITICAL: Send session data with chat request
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -688,6 +540,7 @@ class TelemetryAnalysisApp {
                 body: JSON.stringify({
                     session_id: this.sessionId,
                     message: message,
+                    session_data: this.sessionData,  // Pass the actual analysis data
                     context: {
                         analysis: this.analysisResults,
                         driver: document.getElementById('driver-name').value,
@@ -710,11 +563,6 @@ class TelemetryAnalysisApp {
             const responseMessage = result.ayrton_says || result.response || result.message || 
                                   'I need to analyze your data first. Upload your telemetry.';
             this.addAyrtonMessage(responseMessage);
-            
-            // If there are visualizations, update them
-            if (result.visualizations) {
-                this.updateVisualizations(result.visualizations);
-            }
             
         } catch (error) {
             console.error('Chat error:', error);
@@ -760,7 +608,6 @@ class TelemetryAnalysisApp {
     }
 
     formatAyrtonMessage(message) {
-        // Format Ayrton's message with proper styling
         return message
             .replace(/\*\*(.*?)\*\*/g, '<strong class="text-yellow-300">$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -769,11 +616,6 @@ class TelemetryAnalysisApp {
             .replace(/^/, '<p>')
             .replace(/$/, '</p>')
             .replace(/"([^"]+)"/g, '<span class="text-yellow-200 italic">"$1"</span>');
-    }
-
-    addAIMessage(message) {
-        // Redirect to Ayrton format
-        this.addAyrtonMessage(message);
     }
 
     showTypingIndicator() {
@@ -799,15 +641,12 @@ class TelemetryAnalysisApp {
     }
 
     switchTab(tabName) {
-        // Hide all tabs
         document.querySelectorAll('.tab-content').forEach(tab => {
             tab.classList.add('hidden');
         });
         
-        // Show selected tab
         document.getElementById(`${tabName}-tab`).classList.remove('hidden');
         
-        // Update tab buttons
         document.querySelectorAll('.tab-btn').forEach(btn => {
             if (btn.dataset.tab === tabName) {
                 btn.classList.add('border-purple-500', 'text-purple-600');
@@ -819,18 +658,7 @@ class TelemetryAnalysisApp {
         });
     }
 
-    updateVisualizations(visualizations) {
-        // Update graphs based on new data from chat response
-        if (visualizations.speedTrace) {
-            this.updateSpeedTrace(visualizations.speedTrace);
-        }
-        if (visualizations.cornerAnalysis) {
-            this.updateCornerAnalysis(visualizations.cornerAnalysis);
-        }
-    }
-
     showNotification(message, type = 'info') {
-        // Create notification element
         const notification = document.createElement('div');
         notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
             type === 'success' ? 'bg-green-500' :
@@ -853,7 +681,6 @@ class TelemetryAnalysisApp {
         
         document.body.appendChild(notification);
         
-        // Auto remove after 3 seconds
         setTimeout(() => {
             notification.remove();
         }, 3000);
