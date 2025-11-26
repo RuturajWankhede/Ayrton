@@ -3,327 +3,243 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Racing Telemetry Analysis - AI Coach</title>
+    <title>Racing Telemetry AI Coach</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        .chat-container {
-            height: 500px;
-            overflow-y: auto;
-        }
-        .message {
-            animation: fadeIn 0.3s ease-in;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .loader {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .upload-area {
-            border: 2px dashed #cbd5e0;
-            transition: all 0.3s ease;
-        }
-        .upload-area.dragover {
-            border-color: #667eea;
-            background-color: #f7fafc;
-        }
-        .metric-card {
-            transition: transform 0.2s ease;
-        }
-        .metric-card:hover {
-            transform: translateY(-2px);
-        }
+        .dragover { background-color: #e5e7eb; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
     </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-gray-100">
     <!-- Header -->
-    <header class="gradient-bg text-white py-6 shadow-lg">
-        <div class="container mx-auto px-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                    <i class="fas fa-flag-checkered text-3xl"></i>
-                    <div>
-                        <h1 class="text-3xl font-bold">Racing Telemetry AI Coach</h1>
-                        <p class="text-purple-100">Professional Data Analysis & Coaching</p>
-                    </div>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <span id="connection-status" class="flex items-center">
-                        <i class="fas fa-circle text-green-400 mr-2"></i>
-                        <span>Ready</span>
-                    </span>
+    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 shadow-lg">
+        <div class="container mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <i class="fas fa-flag-checkered text-3xl"></i>
+                <div>
+                    <h1 class="text-2xl font-bold">Racing Telemetry AI Coach</h1>
+                    <p class="text-purple-200">Professional Data Analysis & Coaching</p>
                 </div>
             </div>
+            <div class="flex items-center space-x-2">
+                <span class="bg-green-500 px-3 py-1 rounded-full text-sm">Ready</span>
+            </div>
         </div>
-    </header>
+    </div>
 
     <!-- Main Container -->
-    <div class="container mx-auto px-4 py-8">
-        <!-- File Upload Section -->
+    <div class="container mx-auto p-6">
+        <!-- Upload Section -->
         <div id="upload-section" class="mb-8">
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-2xl font-bold mb-4 text-gray-800">
-                    <i class="fas fa-upload mr-2"></i>Upload Telemetry Data
-                </h2>
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-bold mb-4">Upload Telemetry Data</h2>
                 
+                <!-- Driver Info -->
+                <div class="grid md:grid-cols-2 gap-4 mb-6">
+                    <input type="text" id="driver-name" placeholder="Driver Name" 
+                           class="border rounded px-3 py-2 w-full">
+                    <input type="text" id="track-name" placeholder="Track Name" 
+                           class="border rounded px-3 py-2 w-full">
+                </div>
+                
+                <!-- File Upload Areas -->
                 <div class="grid md:grid-cols-2 gap-6">
                     <!-- Reference Lap Upload -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Reference Lap (Best/Target)
-                        </label>
-                        <div id="ref-upload" class="upload-area rounded-lg p-8 text-center cursor-pointer">
-                            <i class="fas fa-file-csv text-4xl text-gray-400 mb-2"></i>
-                            <p class="text-gray-600">Drop CSV file here or click to browse</p>
-                            <p class="text-sm text-gray-500 mt-2">Professional telemetry format</p>
-                            <input type="file" id="ref-file" accept=".csv" class="hidden">
-                            <div id="ref-file-info" class="mt-4 hidden">
-                                <p class="text-green-600 font-medium">
-                                    <i class="fas fa-check-circle mr-1"></i>
-                                    <span id="ref-file-name"></span>
-                                </p>
-                                <p class="text-sm text-gray-500" id="ref-file-size"></p>
-                            </div>
+                        <h3 class="font-semibold mb-2">Reference Lap (Best/Target)</h3>
+                        <div id="ref-upload" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:bg-gray-50 transition">
+                            <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-2"></i>
+                            <p class="text-gray-600">Click or drag CSV file here</p>
+                            <input type="file" id="ref-file" accept=".csv" style="display: none;">
+                        </div>
+                        <div id="ref-file-info" class="hidden mt-2 text-sm text-gray-600">
+                            <span id="ref-file-name"></span> (<span id="ref-file-size"></span>)
                         </div>
                     </div>
-
+                    
                     <!-- Current Lap Upload -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Current Lap (Your Performance)
-                        </label>
-                        <div id="curr-upload" class="upload-area rounded-lg p-8 text-center cursor-pointer">
-                            <i class="fas fa-file-csv text-4xl text-gray-400 mb-2"></i>
-                            <p class="text-gray-600">Drop CSV file here or click to browse</p>
-                            <p class="text-sm text-gray-500 mt-2">Same format as reference</p>
-                            <input type="file" id="curr-file" accept=".csv" class="hidden">
-                            <div id="curr-file-info" class="mt-4 hidden">
-                                <p class="text-green-600 font-medium">
-                                    <i class="fas fa-check-circle mr-1"></i>
-                                    <span id="curr-file-name"></span>
-                                </p>
-                                <p class="text-sm text-gray-500" id="curr-file-size"></p>
-                            </div>
+                        <h3 class="font-semibold mb-2">Current Lap (Your Lap)</h3>
+                        <div id="curr-upload" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:bg-gray-50 transition">
+                            <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-2"></i>
+                            <p class="text-gray-600">Click or drag CSV file here</p>
+                            <input type="file" id="curr-file" accept=".csv" style="display: none;">
+                        </div>
+                        <div id="curr-file-info" class="hidden mt-2 text-sm text-gray-600">
+                            <span id="curr-file-name"></span> (<span id="curr-file-size"></span>)
                         </div>
                     </div>
                 </div>
-
-                <!-- Session Info -->
-                <div class="grid md:grid-cols-3 gap-4 mt-6">
-                    <input type="text" id="driver-name" placeholder="Driver Name" 
-                           class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
-                    <input type="text" id="track-name" placeholder="Track Name" 
-                           class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
-                    <button id="analyze-btn" disabled
-                            class="bg-purple-600 text-white px-6 py-2 rounded-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed hover:bg-purple-700 transition duration-200">
+                
+                <!-- Analyze Button -->
+                <div class="mt-6 text-center">
+                    <button id="analyze-btn" disabled 
+                            class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:from-purple-700 hover:to-indigo-700 transition">
                         <i class="fas fa-chart-line mr-2"></i>Analyze Telemetry
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- Analysis Results Section (Hidden Initially) -->
+        <!-- Results Section (Hidden Initially) -->
         <div id="results-section" class="hidden">
             <!-- Key Metrics -->
             <div class="grid md:grid-cols-4 gap-4 mb-6">
-                <div class="metric-card bg-white rounded-lg shadow p-4">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-gray-500 text-sm">Lap Time Delta</p>
-                            <p class="text-2xl font-bold" id="lap-delta">--</p>
-                        </div>
-                        <i class="fas fa-clock text-3xl text-purple-500"></i>
-                    </div>
+                <div class="bg-white rounded-lg p-4 shadow">
+                    <p class="text-gray-600 text-sm">Lap Time Delta</p>
+                    <p id="lap-delta" class="text-2xl font-bold">0.000s</p>
+                    <i class="fas fa-clock text-purple-500"></i>
                 </div>
-                
-                <div class="metric-card bg-white rounded-lg shadow p-4">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-gray-500 text-sm">G-Force Usage</p>
-                            <p class="text-2xl font-bold" id="g-force-usage">--</p>
-                        </div>
-                        <i class="fas fa-tachometer-alt text-3xl text-blue-500"></i>
-                    </div>
+                <div class="bg-white rounded-lg p-4 shadow">
+                    <p class="text-gray-600 text-sm">G-Force Usage</p>
+                    <p id="g-force-usage" class="text-2xl font-bold">75%</p>
+                    <i class="fas fa-tachometer-alt text-blue-500"></i>
                 </div>
-                
-                <div class="metric-card bg-white rounded-lg shadow p-4">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-gray-500 text-sm">Tire Status</p>
-                            <p class="text-2xl font-bold" id="tire-status">--</p>
-                        </div>
-                        <i class="fas fa-circle-notch text-3xl text-green-500"></i>
-                    </div>
+                <div class="bg-white rounded-lg p-4 shadow">
+                    <p class="text-gray-600 text-sm">Tire Status</p>
+                    <p id="tire-status" class="text-2xl font-bold">Analyzing</p>
+                    <i class="fas fa-circle-notch text-green-500"></i>
                 </div>
-                
-                <div class="metric-card bg-white rounded-lg shadow p-4">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-gray-500 text-sm">Setup Issue</p>
-                            <p class="text-2xl font-bold" id="setup-issue">--</p>
-                        </div>
-                        <i class="fas fa-tools text-3xl text-orange-500"></i>
-                    </div>
+                <div class="bg-white rounded-lg p-4 shadow">
+                    <p class="text-gray-600 text-sm">Setup Issue</p>
+                    <p id="setup-issue" class="text-2xl font-bold">0 Issues</p>
+                    <i class="fas fa-wrench text-orange-500"></i>
                 </div>
             </div>
 
-            <!-- Tabs for Different Views -->
-            <div class="bg-white rounded-lg shadow-md mb-6">
+            <!-- Tabs -->
+            <div class="bg-white rounded-lg shadow-lg">
                 <div class="border-b border-gray-200">
-                    <nav class="flex -mb-px">
-                        <button class="tab-btn py-2 px-6 border-b-2 border-purple-500 font-medium text-purple-600" 
-                                data-tab="chat">
+                    <nav class="flex">
+                        <button data-tab="chat" class="tab-btn px-6 py-3 border-b-2 border-purple-500 text-purple-600 font-medium">
                             <i class="fas fa-comments mr-2"></i>AI Coach Chat
                         </button>
-                        <button class="tab-btn py-2 px-6 border-b-2 border-transparent font-medium text-gray-600 hover:text-gray-800" 
-                                data-tab="graphs">
-                            <i class="fas fa-chart-area mr-2"></i>Telemetry Graphs
+                        <button data-tab="graphs" class="tab-btn px-6 py-3 border-b-2 border-transparent text-gray-600 hover:text-gray-800">
+                            <i class="fas fa-chart-line mr-2"></i>Telemetry Graphs
                         </button>
-                        <button class="tab-btn py-2 px-6 border-b-2 border-transparent font-medium text-gray-600 hover:text-gray-800" 
-                                data-tab="setup">
-                            <i class="fas fa-cog mr-2"></i>Setup Recommendations
+                        <button data-tab="setup" class="tab-btn px-6 py-3 border-b-2 border-transparent text-gray-600 hover:text-gray-800">
+                            <i class="fas fa-cogs mr-2"></i>Setup Recommendations
                         </button>
-                        <button class="tab-btn py-2 px-6 border-b-2 border-transparent font-medium text-gray-600 hover:text-gray-800" 
-                                data-tab="report">
+                        <button data-tab="report" class="tab-btn px-6 py-3 border-b-2 border-transparent text-gray-600 hover:text-gray-800">
                             <i class="fas fa-file-alt mr-2"></i>Full Report
                         </button>
                     </nav>
                 </div>
 
-                <!-- Tab Contents -->
+                <!-- Tab Content -->
                 <div class="p-6">
                     <!-- Chat Tab -->
-                    <div id="chat-tab" class="tab-content">
-                        <div class="chat-container bg-gray-50 rounded-lg p-4 mb-4">
-                            <div id="chat-messages" class="space-y-4">
-                                <!-- Ayrton's welcome message -->
-                                <div class="message flex items-start">
-                                    <div class="bg-gradient-to-r from-purple-700 to-purple-900 text-white rounded-lg p-4 max-w-2xl shadow-lg">
-                                        <div class="flex items-center mb-2">
-                                            <div class="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center mr-3">
-                                                <span class="text-purple-900 font-bold text-lg">A</span>
-                                            </div>
-                                            <div>
-                                                <p class="font-bold text-yellow-300">Ayrton</p>
-                                                <p class="text-xs text-purple-200">Legendary Racing Coach</p>
-                                            </div>
-                                        </div>
-                                        <p>Listen. I've analyzed your telemetry - every brake point, every throttle application, every moment of hesitation.</p>
-                                        <p class="mt-2">The data never lies, but it doesn't show heart. I see both.</p>
-                                        <p class="mt-2 text-yellow-200 italic">"Being second is to be the first of the ones who lose."</p>
-                                        <p class="mt-2">Now, what do you want to know about your performance?</p>
-                                    </div>
-                                </div>
-                            </div>
+                    <div id="chat-tab" class="tab-content active">
+                        <div id="chat-messages" class="h-96 overflow-y-auto mb-4 space-y-4 border rounded-lg p-4 bg-gray-50">
+                            <!-- Messages will appear here -->
                         </div>
                         
+                        <!-- Quick Questions -->
+                        <div class="mb-4 flex flex-wrap gap-2">
+                            <button class="quick-question px-3 py-1 bg-gray-200 rounded-full text-sm hover:bg-gray-300">
+                                Why am I losing time in sector 2?
+                            </button>
+                            <button class="quick-question px-3 py-1 bg-gray-200 rounded-full text-sm hover:bg-gray-300">
+                                Am I braking too early?
+                            </button>
+                            <button class="quick-question px-3 py-1 bg-gray-200 rounded-full text-sm hover:bg-gray-300">
+                                How do I find the limit?
+                            </button>
+                            <button class="quick-question px-3 py-1 bg-gray-200 rounded-full text-sm hover:bg-gray-300">
+                                Where's my biggest mistake?
+                            </button>
+                            <button class="quick-question px-3 py-1 bg-gray-200 rounded-full text-sm hover:bg-gray-300">
+                                Should I change my racing line?
+                            </button>
+                        </div>
+                        
+                        <!-- Chat Input -->
                         <div class="flex gap-2">
                             <input type="text" id="chat-input" 
-                                   placeholder="Ask Ayrton about your driving, setup, or specific corners..." 
-                                   class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                   placeholder="Ask Ayrton about your driving, setup, or specific corners..."
+                                   class="flex-1 border rounded-lg px-4 py-2">
                             <button id="send-btn" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700">
                                 <i class="fas fa-paper-plane"></i>
                             </button>
                         </div>
                         
-                        <!-- Ayrton's Quick Questions -->
-                        <div class="mt-4">
-                            <p class="text-sm text-gray-600 mb-2">Questions Ayrton expects:</p>
-                            <div class="flex flex-wrap gap-2">
-                                <button class="quick-question bg-gray-200 px-3 py-1 rounded-full text-sm hover:bg-gray-300">
-                                    Why am I losing time in sector 2?
-                                </button>
-                                <button class="quick-question bg-gray-200 px-3 py-1 rounded-full text-sm hover:bg-gray-300">
-                                    Am I braking too early?
-                                </button>
-                                <button class="quick-question bg-gray-200 px-3 py-1 rounded-full text-sm hover:bg-gray-300">
-                                    How do I find the limit?
-                                </button>
-                                <button class="quick-question bg-gray-200 px-3 py-1 rounded-full text-sm hover:bg-gray-300">
-                                    Where's my biggest mistake?
-                                </button>
-                                <button class="quick-question bg-gray-200 px-3 py-1 rounded-full text-sm hover:bg-gray-300">
-                                    Should I change my racing line?
-                                </button>
-                            </div>
-                        </div>
+                        <p class="text-xs text-gray-500 mt-2">
+                            Questions Ayrton expects:
+                        </p>
                     </div>
 
                     <!-- Graphs Tab -->
-                    <div id="graphs-tab" class="tab-content hidden">
+                    <div id="graphs-tab" class="tab-content">
                         <div class="grid md:grid-cols-2 gap-6">
-                            <div id="speed-trace" class="h-80"></div>
-                            <div id="g-force-trace" class="h-80"></div>
-                            <div id="suspension-travel" class="h-80"></div>
-                            <div id="tire-temps" class="h-80"></div>
+                            <div id="speed-trace" class="h-64"></div>
+                            <div id="throttle-brake" class="h-64"></div>
+                            <div id="g-forces" class="h-64"></div>
+                            <div id="sector-times" class="h-64"></div>
                         </div>
                     </div>
 
                     <!-- Setup Tab -->
-                    <div id="setup-tab" class="tab-content hidden">
+                    <div id="setup-tab" class="tab-content">
                         <div id="setup-recommendations" class="space-y-4">
-                            <!-- Setup recommendations will be populated here -->
+                            <!-- Recommendations will appear here -->
                         </div>
                     </div>
 
                     <!-- Report Tab -->
-                    <div id="report-tab" class="tab-content hidden">
+                    <div id="report-tab" class="tab-content">
                         <div id="full-report" class="prose max-w-none">
-                            <!-- Full report will be populated here -->
+                            <!-- Full report will appear here -->
                         </div>
-                        <button id="download-report" class="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-                            <i class="fas fa-download mr-2"></i>Download PDF Report
-                        </button>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Loading Overlay -->
-        <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-            <div class="bg-white rounded-lg p-8 text-center">
-                <div class="loader mx-auto mb-4"></div>
-                <p class="text-lg font-medium">Analyzing Telemetry...</p>
-                <p class="text-sm text-gray-600 mt-2">Processing sensor data from all channels</p>
-            </div>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-8 text-center">
+            <i class="fas fa-spinner fa-spin text-4xl text-purple-600 mb-4"></i>
+            <p class="text-lg font-semibold">Analyzing Telemetry...</p>
+            <p class="text-gray-600">Ayrton is studying your data</p>
         </div>
     </div>
 
     <!-- Configuration Modal -->
     <div id="config-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
         <div class="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 class="text-xl font-bold mb-4">Configure N8N Webhook</h3>
-            <p class="text-sm text-gray-600 mb-4">Enter your N8N webhook URL to connect the analysis backend</p>
+            <h3 class="text-lg font-bold mb-4">Configure N8N Webhook</h3>
             <input type="text" id="webhook-url" 
-                   placeholder="https://your-n8n.app.n8n.cloud/webhook/..." 
-                   class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 mb-4">
-            <div class="flex justify-end gap-2">
-                <button id="save-config" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
-                    Save Configuration
-                </button>
-            </div>
-            <p class="text-xs text-gray-500 mt-4">
-                This URL is stored locally in your browser and never shared.
-            </p>
+                   placeholder="https://your-n8n-instance.com" 
+                   value="https://ruturajw.app.n8n.cloud"
+                   class="w-full border rounded px-3 py-2 mb-4">
+            <button id="save-config" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 w-full">
+                Save Configuration
+            </button>
         </div>
     </div>
 
+    <!-- Required JavaScript Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    
+    <!-- CRITICAL: Your app.js file MUST be loaded here -->
     <script src="app.js"></script>
+    
+    <!-- Verify app loaded -->
+    <script>
+        // Check if app initialized properly
+        setTimeout(function() {
+            if (!window.telemetryApp) {
+                console.error('❌ CRITICAL ERROR: TelemetryAnalysisApp failed to initialize!');
+                console.error('Check that app.js is in the same folder as index.html');
+                alert('App failed to load! Check console for details.');
+            } else {
+                console.log('✅ Telemetry Analysis App loaded successfully');
+            }
+        }, 1000);
+    </script>
 </body>
 </html>
