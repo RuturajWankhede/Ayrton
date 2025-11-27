@@ -1,5 +1,6 @@
 // Complete Racing Telemetry Analysis Frontend Application
 // Updated to properly store and pass session data for chat functionality
+// Fixed to handle both JSON and text responses from webhook
 
 class TelemetryAnalysisApp {
     constructor() {
@@ -553,15 +554,34 @@ class TelemetryAnalysisApp {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const result = await response.json();
-            console.log('Chat response:', result);
+            // Handle both text and JSON responses
+            const responseText = await response.text();
+            console.log('Raw chat response:', responseText);
+            
+            let result;
+            try {
+                // Try to parse as JSON first
+                result = JSON.parse(responseText);
+            } catch (e) {
+                // If parsing fails, it's plain text - wrap it
+                console.log('Response is plain text, wrapping it');
+                result = { ayrton_says: responseText };
+            }
+            
+            console.log('Chat response processed:', result);
             
             // Remove typing indicator
             this.hideTypingIndicator();
             
-            // Add AI response
-            const responseMessage = result.ayrton_says || result.response || result.message || 
+            // Add AI response - try multiple possible field names
+            const responseMessage = result.ayrton_says || 
+                                  result.response || 
+                                  result.message || 
+                                  result.text ||
+                                  (typeof result === 'string' ? result : null) ||
+                                  responseText ||
                                   'I need to analyze your data first. Upload your telemetry.';
+                                  
             this.addAyrtonMessage(responseMessage);
             
         } catch (error) {
