@@ -900,9 +900,66 @@ class TelemetryAnalysisApp {
         try {
             const sessionId = this.generateSessionId();
             
+            // Check if data needs to be reduced for large MoTeC files
+            // Only reduce if data is large (>1000 rows or >50 columns)
+            let refData = this.referenceData;
+            let currData = this.currentData;
+            
+            const columnCount = Object.keys(refData[0] || {}).length;
+            const isLargeDataset = refData.length > 1000 || columnCount > 50;
+            
+            if (isLargeDataset) {
+                console.log(`Large dataset detected: ${refData.length} rows, ${columnCount} columns. Optimizing...`);
+                
+                // Sample rows to ~500 data points
+                const maxRows = 500;
+                const sampleData = (data) => {
+                    if (data.length <= maxRows) return data;
+                    const step = Math.ceil(data.length / maxRows);
+                    return data.filter((_, index) => index % step === 0);
+                };
+                
+                // Keep only essential channels for analysis
+                const essentialChannels = [
+                    'Time', 'Lap Distance', 'Ground Speed', 'Drive Speed',
+                    'Throttle Pos', 'Brake Pres Front', 'Brake Pres Rear',
+                    'Gear', 'Engine RPM', 'Steered Angle',
+                    'G Force Lat', 'G Force Long', 'G Force Vert',
+                    'Wheel Speed FL', 'Wheel Speed FR', 'Wheel Speed RL', 'Wheel Speed RR',
+                    'Lap Time', 'Running Lap Time'
+                ];
+                
+                const filterChannels = (data) => {
+                    const availableChannels = Object.keys(data[0] || {});
+                    const channelsToKeep = availableChannels.filter(ch => 
+                        essentialChannels.some(essential => 
+                            ch.toLowerCase().includes(essential.toLowerCase().replace(' ', '')) || 
+                            essential.toLowerCase().includes(ch.toLowerCase())
+                        )
+                    );
+                    
+                    // Fallback: if no matches, keep first 15 columns
+                    const finalChannels = channelsToKeep.length >= 3 ? channelsToKeep : availableChannels.slice(0, 15);
+                    
+                    return data.map(row => {
+                        const filtered = {};
+                        finalChannels.forEach(ch => {
+                            if (row[ch] !== undefined) filtered[ch] = row[ch];
+                        });
+                        return filtered;
+                    });
+                };
+                
+                refData = filterChannels(sampleData(this.referenceData));
+                currData = filterChannels(sampleData(this.currentData));
+                
+                console.log(`Optimized to: ${refData.length} rows, ${Object.keys(refData[0] || {}).length} columns`);
+                this.showNotification(`Large file optimized: ${refData.length} samples sent`, 'info');
+            }
+            
             const payload = {
-                reference_lap: this.referenceData,
-                current_lap: this.currentData,
+                reference_lap: refData,
+                current_lap: currData,
                 driver_name: document.getElementById('driver-name').value || 'Driver',
                 track_name: document.getElementById('track-name').value || 'Track',
                 session_id: sessionId,
@@ -911,8 +968,8 @@ class TelemetryAnalysisApp {
             };
 
             console.log('Sending payload to:', `${this.webhookUrl}/webhook/telemetry-analysis`);
-            console.log('Reference rows:', this.referenceData.length);
-            console.log('Current rows:', this.currentData.length);
+            console.log('Reference rows:', refData.length);
+            console.log('Current rows:', currData.length);
 
             const response = await fetch(`${this.webhookUrl}/webhook/telemetry-analysis`, {
                 method: 'POST',
