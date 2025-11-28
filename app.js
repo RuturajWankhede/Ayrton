@@ -1042,26 +1042,48 @@ class TelemetryAnalysisApp {
         document.getElementById('lap-delta').textContent = 
             lapDelta > 0 ? `+${lapDelta.toFixed(3)}s` : `${lapDelta.toFixed(3)}s`;
         
-        // G-force usage or efficiency
-        const gForceUsage = analysis.vehicleDynamics?.averageUtilization || 
-                          (analysis.efficiency * 100) || 75;
-        document.getElementById('g-force-usage').textContent = `${gForceUsage.toFixed(0)}%`;
+        // G-force usage - calculate from actual G data if available
+        let gForceUsage = 75; // default
+        if (analysis.gForces && analysis.gForces.maxLatRef && analysis.gForces.maxLatCurr) {
+            gForceUsage = (analysis.gForces.maxLatCurr / analysis.gForces.maxLatRef * 100);
+        } else if (analysis.avgSpeedCurr && analysis.avgSpeedRef) {
+            gForceUsage = (analysis.avgSpeedCurr / analysis.avgSpeedRef * 100);
+        }
+        document.getElementById('g-force-usage').textContent = `${Math.min(gForceUsage, 100).toFixed(0)}%`;
         
-        // Tire status or style
-        const tireStatus = analysis.drivingStyle?.primaryStyle || 'Analyzing';
-        document.getElementById('tire-status').textContent = tireStatus;
+        // Driving style based on throttle data
+        let drivingStyle = 'Analyzing';
+        if (analysis.throttle) {
+            const throttleDiff = (analysis.throttle.fullThrottleCurr || 0) - (analysis.throttle.fullThrottleRef || 0);
+            if (throttleDiff < -10) {
+                drivingStyle = 'Conservative';
+            } else if (throttleDiff < -3) {
+                drivingStyle = 'Cautious';
+            } else if (throttleDiff > 3) {
+                drivingStyle = 'Aggressive';
+            } else {
+                drivingStyle = 'Balanced';
+            }
+        } else if (analysis.timeDelta) {
+            if (analysis.timeDelta > 2) drivingStyle = 'Very Conservative';
+            else if (analysis.timeDelta > 1) drivingStyle = 'Conservative';
+            else if (analysis.timeDelta > 0.5) drivingStyle = 'Cautious';
+            else if (analysis.timeDelta > 0) drivingStyle = 'Close';
+            else drivingStyle = 'Competitive';
+        }
+        document.getElementById('tire-status').textContent = drivingStyle;
         
-        // Setup issues
-        const setupIssues = analysis.anomalies?.criticalCount || 0;
-        document.getElementById('setup-issue').textContent = `${setupIssues} Issues`;
+        // Problem count from analysis
+        const problemCount = analysis.problems?.length || 0;
+        document.getElementById('setup-issue').textContent = `${problemCount} Issues`;
 
         // Generate graphs if data available
-        if (analysis.speedTrace || analysis.sectors) {
+        if (analysis.sectors && analysis.sectors.length > 0) {
             this.generateGraphs(analysis);
         }
         
         // Display setup recommendations
-        if (analysis.racingLine || analysis.setupRecommendations) {
+        if (analysis.sectors || analysis.problems) {
             this.displaySetupRecommendations(analysis);
         }
         
@@ -1107,25 +1129,109 @@ class TelemetryAnalysisApp {
     }
 
     generateGraphs(analysis) {
-        // Speed trace
-        if (analysis.sectors) {
-            const speedTrace = {
-                x: analysis.sectors.map((s, i) => `Sector ${i + 1}`),
+        // Sector Speed Delta chart
+        if (analysis.sectors && analysis.sectors.length > 0) {
+            const speedDeltaTrace = {
+                x: analysis.sectors.map(s => `Sector ${s.sector}`),
                 y: analysis.sectors.map(s => s.avgSpeedDelta || 0),
                 type: 'bar',
-                name: 'Speed Delta',
+                name: 'Average Speed Delta',
                 marker: {
-                    color: analysis.sectors.map(s => s.avgSpeedDelta < 0 ? 'red' : 'green')
+                    color: analysis.sectors.map(s => (s.avgSpeedDelta || 0) < 0 ? '#ef4444' : '#22c55e')
                 }
             };
 
-            const layout = {
-                title: 'Sector Speed Comparison',
-                xaxis: { title: 'Sector' },
-                yaxis: { title: 'Speed Delta (km/h)' }
+            const speedLayout = {
+                title: 'Sector Speed Delta (km/h)',
+                xaxis: { title: '' },
+                yaxis: { title: 'Speed Delta (km/h)', zeroline: true },
+                margin: { t: 40, b: 40, l: 50, r: 20 }
             };
 
-            Plotly.newPlot('speed-trace', [speedTrace], layout);
+            Plotly.newPlot('speed-trace', [speedDeltaTrace], speedLayout, { responsive: true });
+
+            // Corner Speed Delta chart
+            const cornerSpeedTrace = {
+                x: analysis.sectors.map(s => `Sector ${s.sector}`),
+                y: analysis.sectors.map(s => s.minSpeedDelta || 0),
+                type: 'bar',
+                name: 'Corner Speed Delta',
+                marker: {
+                    color: analysis.sectors.map(s => (s.minSpeedDelta || 0) < 0 ? '#f97316' : '#3b82f6')
+                }
+            };
+
+            const cornerLayout = {
+                title: 'Corner Speed Delta (km/h)',
+                xaxis: { title: '' },
+                yaxis: { title: 'Min Speed Delta (km/h)', zeroline: true },
+                margin: { t: 40, b: 40, l: 50, r: 20 }
+            };
+
+            Plotly.newPlot('throttle-brake', [cornerSpeedTrace], cornerLayout, { responsive: true });
+        }
+
+        // G-Force comparison (if available)
+        if (analysis.gForces && analysis.gForces.maxLatRef) {
+            const gForceTrace = {
+                x: ['Lateral G', 'Longitudinal G'],
+                y: [analysis.gForces.maxLatCurr || 0, analysis.gForces.maxLongCurr || 0],
+                type: 'bar',
+                name: 'Your Max G',
+                marker: { color: '#8b5cf6' }
+            };
+
+            const gForceRefTrace = {
+                x: ['Lateral G', 'Longitudinal G'],
+                y: [analysis.gForces.maxLatRef || 0, analysis.gForces.maxLongRef || 0],
+                type: 'bar',
+                name: 'Reference Max G',
+                marker: { color: '#6b7280' }
+            };
+
+            const gLayout = {
+                title: 'G-Force Comparison',
+                barmode: 'group',
+                yaxis: { title: 'G Force' },
+                margin: { t: 40, b: 40, l: 50, r: 20 }
+            };
+
+            Plotly.newPlot('g-forces', [gForceTrace, gForceRefTrace], gLayout, { responsive: true });
+        } else {
+            // Placeholder for G-forces
+            document.getElementById('g-forces').innerHTML = `
+                <div class="h-full flex items-center justify-center text-gray-500">
+                    <p>G-Force data not available in this dataset</p>
+                </div>
+            `;
+        }
+
+        // Speed comparison chart
+        if (analysis.avgSpeedCurr && analysis.avgSpeedRef) {
+            const speedCompareTrace = {
+                x: ['Average', 'Top Speed', 'Min Corner'],
+                y: [analysis.avgSpeedCurr, analysis.maxSpeedCurr || 0, analysis.minSpeedCurr || 0],
+                type: 'bar',
+                name: 'Your Lap',
+                marker: { color: '#8b5cf6' }
+            };
+
+            const speedCompareRefTrace = {
+                x: ['Average', 'Top Speed', 'Min Corner'],
+                y: [analysis.avgSpeedRef, analysis.maxSpeedRef || 0, analysis.minSpeedRef || 0],
+                type: 'bar',
+                name: 'Reference',
+                marker: { color: '#6b7280' }
+            };
+
+            const compareLayout = {
+                title: 'Speed Comparison (km/h)',
+                barmode: 'group',
+                yaxis: { title: 'Speed (km/h)' },
+                margin: { t: 40, b: 40, l: 50, r: 20 }
+            };
+
+            Plotly.newPlot('sector-times', [speedCompareTrace, speedCompareRefTrace], compareLayout, { responsive: true });
         }
     }
 
@@ -1133,40 +1239,234 @@ class TelemetryAnalysisApp {
         const container = document.getElementById('setup-recommendations');
         container.innerHTML = '';
 
-        if (analysis.sectors) {
-            const section = document.createElement('div');
-            section.className = 'bg-white rounded-lg p-4 shadow mb-4';
+        // Show problems identified
+        if (analysis.problems && analysis.problems.length > 0) {
+            const problemsSection = document.createElement('div');
+            problemsSection.className = 'bg-white rounded-lg p-4 shadow mb-4';
             
-            section.innerHTML = `
-                <h3 class="font-bold text-lg mb-3">Sector Analysis</h3>
+            problemsSection.innerHTML = `
+                <h3 class="font-bold text-lg mb-3 text-red-600">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>Issues Identified
+                </h3>
                 <div class="space-y-2">
-                    ${analysis.sectors.map(s => `
-                        <div class="border-l-4 ${s.avgSpeedDelta < 0 ? 'border-red-500' : 'border-green-500'} pl-3">
-                            <p class="font-medium">Sector ${s.sector}</p>
-                            <p class="text-sm text-gray-600">Speed Delta: ${s.avgSpeedDelta.toFixed(1)} km/h</p>
-                            <p class="text-xs text-gray-500">Time Delta: ${s.timeDelta.toFixed(3)}s</p>
+                    ${analysis.problems.map(problem => `
+                        <div class="border-l-4 border-red-500 pl-3 py-2 bg-red-50 rounded-r">
+                            <p class="text-red-800">${problem}</p>
                         </div>
                     `).join('')}
                 </div>
             `;
             
-            container.appendChild(section);
+            container.appendChild(problemsSection);
+        }
+
+        // Show sector analysis
+        if (analysis.sectors && analysis.sectors.length > 0) {
+            const sectorSection = document.createElement('div');
+            sectorSection.className = 'bg-white rounded-lg p-4 shadow mb-4';
+            
+            sectorSection.innerHTML = `
+                <h3 class="font-bold text-lg mb-3">
+                    <i class="fas fa-road mr-2"></i>Sector Analysis
+                </h3>
+                <div class="space-y-3">
+                    ${analysis.sectors.map(s => {
+                        const isGood = s.avgSpeedDelta >= 0;
+                        const borderColor = isGood ? 'border-green-500' : 'border-red-500';
+                        const bgColor = isGood ? 'bg-green-50' : 'bg-red-50';
+                        return `
+                        <div class="border-l-4 ${borderColor} pl-3 py-2 ${bgColor} rounded-r">
+                            <p class="font-medium">Sector ${s.sector}</p>
+                            <div class="grid grid-cols-2 gap-2 text-sm mt-1">
+                                <div>
+                                    <span class="text-gray-600">Avg Speed Delta:</span>
+                                    <span class="${isGood ? 'text-green-600' : 'text-red-600'} font-medium">
+                                        ${s.avgSpeedDelta > 0 ? '+' : ''}${s.avgSpeedDelta.toFixed(1)} km/h
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-600">Corner Speed Delta:</span>
+                                    <span class="${(s.minSpeedDelta || 0) >= 0 ? 'text-green-600' : 'text-red-600'} font-medium">
+                                        ${(s.minSpeedDelta || 0) > 0 ? '+' : ''}${(s.minSpeedDelta || 0).toFixed(1)} km/h
+                                    </span>
+                                </div>
+                                ${s.avgSpeedCurr ? `
+                                <div>
+                                    <span class="text-gray-600">Your Avg:</span>
+                                    <span class="font-medium">${s.avgSpeedCurr.toFixed(1)} km/h</span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-600">Reference Avg:</span>
+                                    <span class="font-medium">${s.avgSpeedRef.toFixed(1)} km/h</span>
+                                </div>
+                                ` : ''}
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">Time impact: ~${Math.abs(s.timeDelta || 0).toFixed(3)}s</p>
+                        </div>
+                    `}).join('')}
+                </div>
+            `;
+            
+            container.appendChild(sectorSection);
+        }
+
+        // Show throttle analysis if available
+        if (analysis.throttle && analysis.throttle.fullThrottleCurr !== null) {
+            const throttleSection = document.createElement('div');
+            throttleSection.className = 'bg-white rounded-lg p-4 shadow mb-4';
+            
+            const throttleDiff = analysis.throttle.fullThrottleCurr - analysis.throttle.fullThrottleRef;
+            
+            throttleSection.innerHTML = `
+                <h3 class="font-bold text-lg mb-3">
+                    <i class="fas fa-gas-pump mr-2"></i>Throttle Analysis
+                </h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="text-center p-3 bg-gray-50 rounded">
+                        <p class="text-gray-600 text-sm">Your Full Throttle</p>
+                        <p class="text-2xl font-bold ${throttleDiff < -5 ? 'text-red-600' : 'text-green-600'}">
+                            ${analysis.throttle.fullThrottleCurr.toFixed(0)}%
+                        </p>
+                    </div>
+                    <div class="text-center p-3 bg-gray-50 rounded">
+                        <p class="text-gray-600 text-sm">Reference Full Throttle</p>
+                        <p class="text-2xl font-bold">${analysis.throttle.fullThrottleRef.toFixed(0)}%</p>
+                    </div>
+                </div>
+                ${throttleDiff < -5 ? `
+                    <p class="text-red-600 text-sm mt-3">
+                        <i class="fas fa-exclamation-circle mr-1"></i>
+                        You're lifting ${Math.abs(throttleDiff).toFixed(0)}% more than the reference. Commit to the throttle!
+                    </p>
+                ` : ''}
+            `;
+            
+            container.appendChild(throttleSection);
+        }
+
+        // Show worst sector recommendation
+        if (analysis.worstSector) {
+            const worstSection = document.createElement('div');
+            worstSection.className = 'bg-white rounded-lg p-4 shadow mb-4 border-2 border-yellow-400';
+            
+            worstSection.innerHTML = `
+                <h3 class="font-bold text-lg mb-3 text-yellow-600">
+                    <i class="fas fa-bullseye mr-2"></i>Priority Focus Area
+                </h3>
+                <p class="text-gray-700">
+                    <strong>Sector ${analysis.worstSector.sector}</strong> is where you're losing the most time.
+                    You're ${Math.abs(analysis.worstSector.avgSpeedDelta).toFixed(1)} km/h slower on average here.
+                </p>
+                <p class="text-sm text-gray-600 mt-2">
+                    Focus your practice on this sector first. Study the reference data to understand 
+                    where the speed difference comes from - likely corner entry speed or throttle application.
+                </p>
+            `;
+            
+            container.appendChild(worstSection);
+        }
+
+        // If no data, show message
+        if (container.children.length === 0) {
+            container.innerHTML = '<p class="text-gray-500">Analysis data will appear here after processing.</p>';
         }
     }
 
     generateFullReport(analysis) {
         const reportContainer = document.getElementById('full-report');
         
+        const timeDelta = analysis.timeDelta || 0;
+        const speedDelta = analysis.speedDelta || (analysis.avgSpeedCurr - analysis.avgSpeedRef) || 0;
+        
         const reportHTML = `
             <h2 class="text-2xl font-bold mb-4">Telemetry Analysis Report</h2>
             
             <h3 class="text-xl font-bold mt-6 mb-3">Executive Summary</h3>
-            <p>Total lap time delta: ${(analysis.timeDelta || 0).toFixed(3)}s</p>
-            <p>Average speed current: ${(analysis.avgSpeedCurr || 0).toFixed(1)} km/h</p>
-            <p>Average speed reference: ${(analysis.avgSpeedRef || 0).toFixed(1)} km/h</p>
+            <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                <p class="text-lg ${timeDelta > 0 ? 'text-red-600' : 'text-green-600'} font-bold">
+                    Lap Time Delta: ${timeDelta > 0 ? '+' : ''}${timeDelta.toFixed(3)} seconds
+                </p>
+                <p class="text-gray-700 mt-2">
+                    Your average speed: <strong>${(analysis.avgSpeedCurr || 0).toFixed(1)} km/h</strong> 
+                    (Reference: ${(analysis.avgSpeedRef || 0).toFixed(1)} km/h)
+                </p>
+                <p class="text-gray-700">
+                    Speed deficit: <strong>${Math.abs(speedDelta).toFixed(1)} km/h</strong> overall
+                </p>
+            </div>
+            
+            <h3 class="text-xl font-bold mt-6 mb-3">Speed Analysis</h3>
+            <table class="w-full border-collapse mb-4">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="border p-2 text-left">Metric</th>
+                        <th class="border p-2 text-right">Your Lap</th>
+                        <th class="border p-2 text-right">Reference</th>
+                        <th class="border p-2 text-right">Delta</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="border p-2">Average Speed</td>
+                        <td class="border p-2 text-right">${(analysis.avgSpeedCurr || 0).toFixed(1)} km/h</td>
+                        <td class="border p-2 text-right">${(analysis.avgSpeedRef || 0).toFixed(1)} km/h</td>
+                        <td class="border p-2 text-right ${speedDelta >= 0 ? 'text-green-600' : 'text-red-600'}">
+                            ${speedDelta >= 0 ? '+' : ''}${speedDelta.toFixed(1)} km/h
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="border p-2">Top Speed</td>
+                        <td class="border p-2 text-right">${(analysis.maxSpeedCurr || 0).toFixed(0)} km/h</td>
+                        <td class="border p-2 text-right">${(analysis.maxSpeedRef || 0).toFixed(0)} km/h</td>
+                        <td class="border p-2 text-right ${(analysis.maxSpeedCurr - analysis.maxSpeedRef) >= 0 ? 'text-green-600' : 'text-red-600'}">
+                            ${((analysis.maxSpeedCurr || 0) - (analysis.maxSpeedRef || 0)).toFixed(0)} km/h
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="border p-2">Min Corner Speed</td>
+                        <td class="border p-2 text-right">${(analysis.minSpeedCurr || 0).toFixed(0)} km/h</td>
+                        <td class="border p-2 text-right">${(analysis.minSpeedRef || 0).toFixed(0)} km/h</td>
+                        <td class="border p-2 text-right ${((analysis.minSpeedCurr || 0) - (analysis.minSpeedRef || 0)) >= 0 ? 'text-green-600' : 'text-red-600'}">
+                            ${((analysis.minSpeedCurr || 0) - (analysis.minSpeedRef || 0)).toFixed(0)} km/h
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
             
             <h3 class="text-xl font-bold mt-6 mb-3">Sector Analysis</h3>
             ${this.generateSectorTable(analysis.sectors)}
+            
+            ${analysis.throttle && analysis.throttle.fullThrottleCurr !== null ? `
+            <h3 class="text-xl font-bold mt-6 mb-3">Throttle Analysis</h3>
+            <table class="w-full border-collapse mb-4">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="border p-2 text-left">Metric</th>
+                        <th class="border p-2 text-right">Your Lap</th>
+                        <th class="border p-2 text-right">Reference</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="border p-2">Full Throttle Time</td>
+                        <td class="border p-2 text-right">${analysis.throttle.fullThrottleCurr.toFixed(0)}%</td>
+                        <td class="border p-2 text-right">${analysis.throttle.fullThrottleRef.toFixed(0)}%</td>
+                    </tr>
+                    <tr>
+                        <td class="border p-2">Coasting Time</td>
+                        <td class="border p-2 text-right">${(analysis.throttle.coastingCurr || 0).toFixed(1)}%</td>
+                        <td class="border p-2 text-right">${(analysis.throttle.coastingRef || 0).toFixed(1)}%</td>
+                    </tr>
+                </tbody>
+            </table>
+            ` : ''}
+            
+            ${analysis.problems && analysis.problems.length > 0 ? `
+            <h3 class="text-xl font-bold mt-6 mb-3">Identified Issues</h3>
+            <ul class="list-disc pl-5 space-y-2 mb-4">
+                ${analysis.problems.map(p => `<li class="text-red-700">${p}</li>`).join('')}
+            </ul>
+            ` : ''}
             
             <h3 class="text-xl font-bold mt-6 mb-3">Recommendations</h3>
             ${this.generateRecommendationsList(analysis)}
@@ -1176,25 +1476,38 @@ class TelemetryAnalysisApp {
     }
 
     generateSectorTable(sectors) {
-        if (!sectors || sectors.length === 0) return '<p>No sector data available</p>';
+        if (!sectors || sectors.length === 0) return '<p class="text-gray-500">No sector data available</p>';
         
         return `
-            <table class="w-full border-collapse">
+            <table class="w-full border-collapse mb-4">
                 <thead>
                     <tr class="bg-gray-100">
                         <th class="border p-2">Sector</th>
-                        <th class="border p-2">Speed Delta</th>
-                        <th class="border p-2">Time Delta</th>
+                        <th class="border p-2">Avg Speed Delta</th>
+                        <th class="border p-2">Corner Speed Delta</th>
+                        <th class="border p-2">Est. Time Delta</th>
+                        <th class="border p-2">Status</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${sectors.map(sector => `
+                    ${sectors.map(sector => {
+                        const avgDelta = sector.avgSpeedDelta || 0;
+                        const minDelta = sector.minSpeedDelta || 0;
+                        const status = avgDelta >= 0 ? '✓ Good' : avgDelta > -5 ? '⚠️ Needs Work' : '❌ Critical';
+                        const statusColor = avgDelta >= 0 ? 'text-green-600' : avgDelta > -5 ? 'text-yellow-600' : 'text-red-600';
+                        return `
                         <tr>
-                            <td class="border p-2">${sector.sector}</td>
-                            <td class="border p-2">${(sector.avgSpeedDelta || 0).toFixed(1)} km/h</td>
-                            <td class="border p-2">${(sector.timeDelta || 0).toFixed(3)}s</td>
+                            <td class="border p-2 font-medium">Sector ${sector.sector}</td>
+                            <td class="border p-2 text-right ${avgDelta >= 0 ? 'text-green-600' : 'text-red-600'}">
+                                ${avgDelta >= 0 ? '+' : ''}${avgDelta.toFixed(1)} km/h
+                            </td>
+                            <td class="border p-2 text-right ${minDelta >= 0 ? 'text-green-600' : 'text-red-600'}">
+                                ${minDelta >= 0 ? '+' : ''}${minDelta.toFixed(1)} km/h
+                            </td>
+                            <td class="border p-2 text-right">${Math.abs(sector.timeDelta || 0).toFixed(3)}s</td>
+                            <td class="border p-2 ${statusColor}">${status}</td>
                         </tr>
-                    `).join('')}
+                    `}).join('')}
                 </tbody>
             </table>
         `;
@@ -1203,29 +1516,87 @@ class TelemetryAnalysisApp {
     generateRecommendationsList(analysis) {
         const recommendations = [];
         
-        if (analysis.sectors) {
-            const worstSector = analysis.sectors.reduce((prev, curr) => 
-                curr.avgSpeedDelta < prev.avgSpeedDelta ? curr : prev
-            );
-            
+        // Worst sector recommendation
+        if (analysis.worstSector && analysis.worstSector.avgSpeedDelta < 0) {
             recommendations.push({
-                area: `Focus on Sector ${worstSector.sector}`,
-                recommendation: `You're losing ${Math.abs(worstSector.avgSpeedDelta).toFixed(1)} km/h here`
+                priority: 'High',
+                area: `Sector ${analysis.worstSector.sector}`,
+                recommendation: `Focus here first - you're losing ${Math.abs(analysis.worstSector.avgSpeedDelta).toFixed(1)} km/h average speed. Study the reference data for this section.`
             });
         }
         
+        // Throttle recommendations
+        if (analysis.throttle) {
+            if (analysis.throttle.fullThrottleCurr < analysis.throttle.fullThrottleRef - 5) {
+                recommendations.push({
+                    priority: 'High',
+                    area: 'Throttle Application',
+                    recommendation: `You're at full throttle ${analysis.throttle.fullThrottleCurr.toFixed(0)}% of the lap vs ${analysis.throttle.fullThrottleRef.toFixed(0)}% reference. Trust the car and commit earlier.`
+                });
+            }
+            if (analysis.throttle.coastingCurr > analysis.throttle.coastingRef + 3) {
+                recommendations.push({
+                    priority: 'Medium',
+                    area: 'Trail Braking',
+                    recommendation: `Too much coasting between throttle and brake. Work on smoother transitions and trail braking into corners.`
+                });
+            }
+        }
+        
+        // Corner speed recommendations
+        if (analysis.minSpeedCurr && analysis.minSpeedRef && analysis.minSpeedCurr < analysis.minSpeedRef - 3) {
+            recommendations.push({
+                priority: 'Medium',
+                area: 'Corner Entry',
+                recommendation: `Your minimum corner speed is ${(analysis.minSpeedRef - analysis.minSpeedCurr).toFixed(0)} km/h slower. Carry more speed into the corners - the car can handle it.`
+            });
+        }
+        
+        // G-Force recommendations
+        if (analysis.gForces && analysis.gForces.maxLatRef && analysis.gForces.maxLatCurr < analysis.gForces.maxLatRef - 0.2) {
+            recommendations.push({
+                priority: 'Medium',
+                area: 'Cornering Commitment',
+                recommendation: `You're not using all available grip. Reference shows ${analysis.gForces.maxLatRef.toFixed(2)}G lateral, you're only reaching ${analysis.gForces.maxLatCurr.toFixed(2)}G.`
+            });
+        }
+        
+        // Default if no specific recommendations
         if (recommendations.length === 0) {
-            return '<p>Analyzing data for personalized recommendations...</p>';
+            if (analysis.timeDelta > 0) {
+                recommendations.push({
+                    priority: 'General',
+                    area: 'Overall Pace',
+                    recommendation: 'Review each sector carefully. The time loss is spread throughout the lap. Focus on consistent execution.'
+                });
+            } else {
+                recommendations.push({
+                    priority: 'General',
+                    area: 'Consistency',
+                    recommendation: 'Good pace! Now focus on reproducing this lap consistently while looking for small gains.'
+                });
+            }
         }
         
         return `
-            <ul class="list-disc pl-5 space-y-2">
+            <div class="space-y-3">
                 ${recommendations.map(item => `
-                    <li>
-                        <strong>${item.area}</strong>: ${item.recommendation}
-                    </li>
+                    <div class="border-l-4 ${
+                        item.priority === 'High' ? 'border-red-500 bg-red-50' : 
+                        item.priority === 'Medium' ? 'border-yellow-500 bg-yellow-50' : 
+                        'border-blue-500 bg-blue-50'
+                    } pl-3 py-2 rounded-r">
+                        <p class="font-medium">${item.area} 
+                            <span class="text-xs ${
+                                item.priority === 'High' ? 'text-red-600' : 
+                                item.priority === 'Medium' ? 'text-yellow-600' : 
+                                'text-blue-600'
+                            }">(${item.priority} Priority)</span>
+                        </p>
+                        <p class="text-sm text-gray-700">${item.recommendation}</p>
+                    </div>
                 `).join('')}
-            </ul>
+            </div>
         `;
     }
 
@@ -1389,12 +1760,18 @@ class TelemetryAnalysisApp {
     }
 
     switchTab(tabName) {
+        // Remove active class from all tabs
         document.querySelectorAll('.tab-content').forEach(tab => {
-            tab.classList.add('hidden');
+            tab.classList.remove('active');
         });
         
-        document.getElementById(`${tabName}-tab`).classList.remove('hidden');
+        // Add active class to selected tab
+        const selectedTab = document.getElementById(`${tabName}-tab`);
+        if (selectedTab) {
+            selectedTab.classList.add('active');
+        }
         
+        // Update tab button styles
         document.querySelectorAll('.tab-btn').forEach(btn => {
             if (btn.dataset.tab === tabName) {
                 btn.classList.add('border-purple-500', 'text-purple-600');
