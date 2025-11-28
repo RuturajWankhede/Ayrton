@@ -1345,7 +1345,18 @@ class TelemetryAnalysisApp {
     }
 
     formatAyrtonMessage(message) {
-        return message
+        // First, strip any HTML tags that might have been included by the AI
+        let cleaned = message
+            .replace(/<[^>]*>/g, '') // Remove all HTML tags
+            .replace(/&lt;/g, '<')   // Decode HTML entities
+            .replace(/&gt;/g, '>')
+            .replace(/&amp;/g, '&')
+            .replace(/&quot;/g, '"')
+            .replace(/"text-[^"]*">/g, '') // Remove any CSS class remnants
+            .replace(/class="[^"]*"/g, ''); // Remove class attributes
+        
+        // Now apply our formatting
+        return cleaned
             .replace(/\*\*(.*?)\*\*/g, '<strong class="text-yellow-300">$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/\n\n/g, '</p><p class="mt-3">')
