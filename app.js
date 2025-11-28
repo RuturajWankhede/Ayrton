@@ -907,14 +907,14 @@ class TelemetryAnalysisApp {
                 track_name: document.getElementById('track-name').value || 'Track',
                 session_id: sessionId,
                 timestamp: new Date().toISOString(),
-                detected_channels: this.detectedChannels // Include channel mapping in payload
+                detected_channels: this.detectedChannels
             };
 
             console.log('Sending payload to:', `${this.webhookUrl}/webhook/telemetry-analysis`);
+            console.log('Reference rows:', this.referenceData.length);
+            console.log('Current rows:', this.currentData.length);
 
-            const url = `${this.webhookUrl}/webhook/telemetry-analysis`;
-
-            const response = await fetch(url, {
+            const response = await fetch(`${this.webhookUrl}/webhook/telemetry-analysis`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
