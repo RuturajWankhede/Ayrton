@@ -101,29 +101,82 @@ class TelemetryAnalysisApp {
             return;
         }
 
-        // Parse CSV
-        Papa.parse(file, {
-            header: true,
-            dynamicTyping: true,
-            complete: (results) => {
-                if (type === 'ref') {
-                    this.referenceData = results.data.filter(row => row && Object.keys(row).length > 0);
-                    this.displayFileInfo('ref', file);
-                } else {
-                    this.currentData = results.data.filter(row => row && Object.keys(row).length > 0);
-                    this.displayFileInfo('curr', file);
+        // First read the file as text to detect format
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const text = e.target.result;
+            const lines = text.split(/\r?\n/);
+            
+            // Detect MoTeC format by checking first line
+            let headerRowIndex = 0;
+            let isMoTeCFormat = false;
+            
+            if (lines[0] && lines[0].includes('MoTeC CSV File')) {
+                isMoTeCFormat = true;
+                // Find the actual header row (contains "Time" as first data column)
+                for (let i = 0; i < Math.min(lines.length, 30); i++) {
+                    const cells = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
+                    if (cells[0] === 'Time' || cells.includes('Time')) {
+                        headerRowIndex = i;
+                        console.log(`MoTeC format detected. Header row at line ${i + 1}`);
+                        break;
+                    }
                 }
-                
-                // Enable analyze button if both files are loaded
-                if (this.referenceData && this.currentData) {
-                    document.getElementById('analyze-btn').disabled = false;
-                    this.validateAndDetectChannels();
-                }
-            },
-            error: (error) => {
-                this.showNotification(`Error parsing CSV: ${error.message}`, 'error');
             }
-        });
+            
+            // If MoTeC format, skip metadata rows and units row
+            let csvText = text;
+            if (isMoTeCFormat && headerRowIndex > 0) {
+                // Get header row and data rows (skip the units row right after header)
+                const headerLine = lines[headerRowIndex];
+                const dataLines = lines.slice(headerRowIndex + 2); // +2 to skip units row
+                csvText = [headerLine, ...dataLines].join('\n');
+                console.log(`Skipped ${headerRowIndex} metadata rows and 1 units row`);
+            }
+            
+            // Now parse the cleaned CSV
+            Papa.parse(csvText, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true,
+                complete: (results) => {
+                    // Filter out empty rows and rows with no valid data
+                    const cleanedData = results.data.filter(row => {
+                        if (!row || Object.keys(row).length === 0) return false;
+                        // Check if row has at least one non-empty value
+                        return Object.values(row).some(val => val !== null && val !== '' && val !== undefined);
+                    });
+                    
+                    if (type === 'ref') {
+                        this.referenceData = cleanedData;
+                        this.displayFileInfo('ref', file);
+                        if (isMoTeCFormat) {
+                            this.showNotification('MoTeC format detected - metadata skipped', 'info');
+                        }
+                    } else {
+                        this.currentData = cleanedData;
+                        this.displayFileInfo('curr', file);
+                    }
+                    
+                    console.log(`Parsed ${cleanedData.length} data rows with ${Object.keys(cleanedData[0] || {}).length} columns`);
+                    
+                    // Enable analyze button if both files are loaded
+                    if (this.referenceData && this.currentData) {
+                        document.getElementById('analyze-btn').disabled = false;
+                        this.validateAndDetectChannels();
+                    }
+                },
+                error: (error) => {
+                    this.showNotification(`Error parsing CSV: ${error.message}`, 'error');
+                }
+            });
+        };
+        
+        reader.onerror = () => {
+            this.showNotification('Error reading file', 'error');
+        };
+        
+        reader.readAsText(file);
     }
 
     displayFileInfo(type, file) {
