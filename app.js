@@ -204,6 +204,7 @@ class TelemetryAnalysisApp {
                 }
             },
             optional: {
+                // Driver Inputs
                 throttle: {
                     variants: ['Throttle Pos', 'Throttle', 'TPS', 'throttle', 'Throttle Position'],
                     description: 'Throttle position',
@@ -228,30 +229,114 @@ class TelemetryAnalysisApp {
                     icon: 'fa-dharmachakra',
                     category: 'Driver Inputs'
                 },
+                
+                // Engine
                 rpm: {
                     variants: ['Engine RPM', 'RPM', 'rpm', 'Engine Speed'],
                     description: 'Engine RPM',
                     icon: 'fa-tachometer-alt',
                     category: 'Engine'
                 },
+                engineTemp: {
+                    variants: ['Engine Temp', 'Water Temp', 'Coolant Temp'],
+                    description: 'Engine temperature',
+                    icon: 'fa-thermometer-full',
+                    category: 'Engine'
+                },
+                oilTemp: {
+                    variants: ['Eng Oil Temp', 'Oil Temp', 'Engine Oil Temp'],
+                    description: 'Oil temperature',
+                    icon: 'fa-oil-can',
+                    category: 'Engine'
+                },
+                fuelLevel: {
+                    variants: ['Fuel Level', 'Fuel', 'Fuel Qty'],
+                    description: 'Fuel level',
+                    icon: 'fa-gas-pump',
+                    category: 'Engine'
+                },
+                
+                // G-Forces - Combined/Average
                 gLat: {
-                    variants: ['G Force Lat', 'Lateral G', 'G_Lat', 'gLat'],
-                    description: 'Lateral G-force',
+                    variants: ['G Force Lat', 'Lateral G', 'G_Lat', 'gLat', 'Lat G'],
+                    description: 'Lateral G-force (combined)',
                     icon: 'fa-arrows-alt-h',
-                    category: 'Vehicle Dynamics'
+                    category: 'G-Forces'
                 },
                 gLong: {
-                    variants: ['G Force Long', 'Longitudinal G', 'G_Long', 'gLong'],
-                    description: 'Longitudinal G-force',
+                    variants: ['G Force Long', 'Longitudinal G', 'G_Long', 'gLong', 'Long G'],
+                    description: 'Longitudinal G-force (combined)',
                     icon: 'fa-arrows-alt-v',
-                    category: 'Vehicle Dynamics'
+                    category: 'G-Forces'
                 },
+                // G-Forces - Front Position
+                gLatFront: {
+                    variants: ['G Force Lat Front', 'G Force Lat - Front', 'Lat G Front', 'G_Lat_Front'],
+                    description: 'Lateral G-force at front axle',
+                    icon: 'fa-arrows-alt-h',
+                    category: 'G-Forces'
+                },
+                gLongFront: {
+                    variants: ['G Force Long Front', 'G Force Long - Front', 'Long G Front', 'G_Long_Front'],
+                    description: 'Longitudinal G-force at front axle',
+                    icon: 'fa-arrows-alt-v',
+                    category: 'G-Forces'
+                },
+                // G-Forces - Mid Position
+                gLatMid: {
+                    variants: ['G Force Lat Mid', 'G Force Lat - Mid', 'Lat G Mid', 'G_Lat_Mid', 'G Force Lat Center'],
+                    description: 'Lateral G-force at center/mid',
+                    icon: 'fa-arrows-alt-h',
+                    category: 'G-Forces'
+                },
+                gLongMid: {
+                    variants: ['G Force Long Mid', 'G Force Long - Mid', 'Long G Mid', 'G_Long_Mid', 'G Force Long Center'],
+                    description: 'Longitudinal G-force at center/mid',
+                    icon: 'fa-arrows-alt-v',
+                    category: 'G-Forces'
+                },
+                // G-Forces - Rear Position
+                gLatRear: {
+                    variants: ['G Force Lat Rear', 'G Force Lat - Rear', 'Lat G Rear', 'G_Lat_Rear'],
+                    description: 'Lateral G-force at rear axle',
+                    icon: 'fa-arrows-alt-h',
+                    category: 'G-Forces'
+                },
+                gLongRear: {
+                    variants: ['G Force Long Rear', 'G Force Long - Rear', 'Long G Rear', 'G_Long_Rear'],
+                    description: 'Longitudinal G-force at rear axle',
+                    icon: 'fa-arrows-alt-v',
+                    category: 'G-Forces'
+                },
+                // G-Forces - Vertical
+                gVert: {
+                    variants: ['G Force Vert', 'Vertical G', 'G_Vert', 'gVert', 'G Force Vertical'],
+                    description: 'Vertical G-force',
+                    icon: 'fa-arrows-alt-v',
+                    category: 'G-Forces'
+                },
+                
+                // Vehicle Dynamics
                 yaw: {
                     variants: ['Gyro Yaw Velocity', 'Yaw Rate', 'Yaw', 'yaw'],
                     description: 'Yaw rate',
                     icon: 'fa-sync',
                     category: 'Vehicle Dynamics'
                 },
+                pitch: {
+                    variants: ['Gyro Pitch Velocity', 'Pitch Rate', 'Pitch'],
+                    description: 'Pitch rate',
+                    icon: 'fa-sync',
+                    category: 'Vehicle Dynamics'
+                },
+                roll: {
+                    variants: ['Gyro Roll Velocity', 'Roll Rate', 'Roll'],
+                    description: 'Roll rate',
+                    icon: 'fa-sync',
+                    category: 'Vehicle Dynamics'
+                },
+                
+                // Wheel Speeds
                 wheelSpeedFL: {
                     variants: ['Wheel Speed FL', 'WheelSpeed FL', 'Wheel Speed LF'],
                     description: 'Front left wheel speed',
@@ -276,54 +361,202 @@ class TelemetryAnalysisApp {
                     icon: 'fa-circle',
                     category: 'Wheel Speeds'
                 },
+                
+                // Wheel Slip
+                wheelSlipFL: {
+                    variants: ['Wheel Slip FL', 'Slip FL', 'Slip Ratio FL', 'Tyre Slip FL'],
+                    description: 'Front left wheel slip',
+                    icon: 'fa-wave-square',
+                    category: 'Wheel Slip'
+                },
+                wheelSlipFR: {
+                    variants: ['Wheel Slip FR', 'Slip FR', 'Slip Ratio FR', 'Tyre Slip FR'],
+                    description: 'Front right wheel slip',
+                    icon: 'fa-wave-square',
+                    category: 'Wheel Slip'
+                },
+                wheelSlipRL: {
+                    variants: ['Wheel Slip RL', 'Slip RL', 'Slip Ratio RL', 'Tyre Slip RL'],
+                    description: 'Rear left wheel slip',
+                    icon: 'fa-wave-square',
+                    category: 'Wheel Slip'
+                },
+                wheelSlipRR: {
+                    variants: ['Wheel Slip RR', 'Slip RR', 'Slip Ratio RR', 'Tyre Slip RR'],
+                    description: 'Rear right wheel slip',
+                    icon: 'fa-wave-square',
+                    category: 'Wheel Slip'
+                },
+                slipAngleFL: {
+                    variants: ['Slip Angle FL', 'Tyre Slip Angle FL', 'Slip Ang FL'],
+                    description: 'Front left slip angle',
+                    icon: 'fa-angle-double-right',
+                    category: 'Wheel Slip'
+                },
+                slipAngleFR: {
+                    variants: ['Slip Angle FR', 'Tyre Slip Angle FR', 'Slip Ang FR'],
+                    description: 'Front right slip angle',
+                    icon: 'fa-angle-double-right',
+                    category: 'Wheel Slip'
+                },
+                slipAngleRL: {
+                    variants: ['Slip Angle RL', 'Tyre Slip Angle RL', 'Slip Ang RL'],
+                    description: 'Rear left slip angle',
+                    icon: 'fa-angle-double-right',
+                    category: 'Wheel Slip'
+                },
+                slipAngleRR: {
+                    variants: ['Slip Angle RR', 'Tyre Slip Angle RR', 'Slip Ang RR'],
+                    description: 'Rear right slip angle',
+                    icon: 'fa-angle-double-right',
+                    category: 'Wheel Slip'
+                },
+                
+                // Suspension
                 suspFL: {
-                    variants: ['Susp Pos FL', 'Suspension FL', 'Damper FL'],
+                    variants: ['Susp Pos FL', 'Suspension FL', 'Damper FL', 'Susp Travel FL'],
                     description: 'Front left suspension',
                     icon: 'fa-arrows-alt-v',
                     category: 'Suspension'
                 },
                 suspFR: {
-                    variants: ['Susp Pos FR', 'Suspension FR', 'Damper FR'],
+                    variants: ['Susp Pos FR', 'Suspension FR', 'Damper FR', 'Susp Travel FR'],
                     description: 'Front right suspension',
                     icon: 'fa-arrows-alt-v',
                     category: 'Suspension'
                 },
-                tyreTempFL: {
-                    variants: ['Tyre Temp FL Centre', 'Tire Temp FL', 'TyreTemp FL'],
-                    description: 'Front left tire temp',
-                    icon: 'fa-thermometer-half',
-                    category: 'Temperatures'
+                suspRL: {
+                    variants: ['Susp Pos RL', 'Suspension RL', 'Damper RL', 'Susp Travel RL'],
+                    description: 'Rear left suspension',
+                    icon: 'fa-arrows-alt-v',
+                    category: 'Suspension'
                 },
-                tyreTempFR: {
-                    variants: ['Tyre Temp FR Center', 'Tire Temp FR', 'TyreTemp FR'],
-                    description: 'Front right tire temp',
-                    icon: 'fa-thermometer-half',
-                    category: 'Temperatures'
+                suspRR: {
+                    variants: ['Susp Pos RR', 'Suspension RR', 'Damper RR', 'Susp Travel RR'],
+                    description: 'Rear right suspension',
+                    icon: 'fa-arrows-alt-v',
+                    category: 'Suspension'
                 },
+                rideHeightFront: {
+                    variants: ['Ride Height Front', 'Ride Ht Front', 'Front Ride Height'],
+                    description: 'Front ride height',
+                    icon: 'fa-ruler-vertical',
+                    category: 'Suspension'
+                },
+                rideHeightRear: {
+                    variants: ['Ride Height Rear', 'Ride Ht Rear', 'Rear Ride Height'],
+                    description: 'Rear ride height',
+                    icon: 'fa-ruler-vertical',
+                    category: 'Suspension'
+                },
+                
+                // Tire Temperatures - FL (Front Left)
+                tyreTempFLCenter: {
+                    variants: ['Tyre Temp FL Centre', 'Tire Temp FL Center', 'Tyre Temp FL Mid', 'TyreTemp FL C'],
+                    description: 'FL tire center temp',
+                    icon: 'fa-thermometer-half',
+                    category: 'Tire Temps FL'
+                },
+                tyreTempFLInner: {
+                    variants: ['Tyre Temp FL Inner', 'Tire Temp FL Inner', 'Tyre Temp FL In', 'TyreTemp FL I'],
+                    description: 'FL tire inner temp',
+                    icon: 'fa-thermometer-half',
+                    category: 'Tire Temps FL'
+                },
+                tyreTempFLOuter: {
+                    variants: ['Tyre Temp FL Outer', 'Tire Temp FL Outer', 'Tyre Temp FL Out', 'TyreTemp FL O'],
+                    description: 'FL tire outer temp',
+                    icon: 'fa-thermometer-half',
+                    category: 'Tire Temps FL'
+                },
+                
+                // Tire Temperatures - FR (Front Right)
+                tyreTempFRCenter: {
+                    variants: ['Tyre Temp FR Centre', 'Tire Temp FR Center', 'Tyre Temp FR Mid', 'TyreTemp FR C'],
+                    description: 'FR tire center temp',
+                    icon: 'fa-thermometer-half',
+                    category: 'Tire Temps FR'
+                },
+                tyreTempFRInner: {
+                    variants: ['Tyre Temp FR Inner', 'Tire Temp FR Inner', 'Tyre Temp FR In', 'TyreTemp FR I'],
+                    description: 'FR tire inner temp',
+                    icon: 'fa-thermometer-half',
+                    category: 'Tire Temps FR'
+                },
+                tyreTempFROuter: {
+                    variants: ['Tyre Temp FR Outer', 'Tire Temp FR Outer', 'Tyre Temp FR Out', 'TyreTemp FR O'],
+                    description: 'FR tire outer temp',
+                    icon: 'fa-thermometer-half',
+                    category: 'Tire Temps FR'
+                },
+                
+                // Tire Temperatures - RL (Rear Left)
+                tyreTempRLCenter: {
+                    variants: ['Tyre Temp RL Centre', 'Tire Temp RL Center', 'Tyre Temp RL Mid', 'TyreTemp RL C'],
+                    description: 'RL tire center temp',
+                    icon: 'fa-thermometer-half',
+                    category: 'Tire Temps RL'
+                },
+                tyreTempRLInner: {
+                    variants: ['Tyre Temp RL Inner', 'Tire Temp RL Inner', 'Tyre Temp RL In', 'TyreTemp RL I'],
+                    description: 'RL tire inner temp',
+                    icon: 'fa-thermometer-half',
+                    category: 'Tire Temps RL'
+                },
+                tyreTempRLOuter: {
+                    variants: ['Tyre Temp RL Outer', 'Tire Temp RL Outer', 'Tyre Temp RL Out', 'TyreTemp RL O'],
+                    description: 'RL tire outer temp',
+                    icon: 'fa-thermometer-half',
+                    category: 'Tire Temps RL'
+                },
+                
+                // Tire Temperatures - RR (Rear Right)
+                tyreTempRRCenter: {
+                    variants: ['Tyre Temp RR Centre', 'Tire Temp RR Center', 'Tyre Temp RR Mid', 'TyreTemp RR C'],
+                    description: 'RR tire center temp',
+                    icon: 'fa-thermometer-half',
+                    category: 'Tire Temps RR'
+                },
+                tyreTempRRInner: {
+                    variants: ['Tyre Temp RR Inner', 'Tire Temp RR Inner', 'Tyre Temp RR In', 'TyreTemp RR I'],
+                    description: 'RR tire inner temp',
+                    icon: 'fa-thermometer-half',
+                    category: 'Tire Temps RR'
+                },
+                tyreTempRROuter: {
+                    variants: ['Tyre Temp RR Outer', 'Tire Temp RR Outer', 'Tyre Temp RR Out', 'TyreTemp RR O'],
+                    description: 'RR tire outer temp',
+                    icon: 'fa-thermometer-half',
+                    category: 'Tire Temps RR'
+                },
+                
+                // Brake Temperatures (All 4 corners)
                 brakeTempFL: {
-                    variants: ['Brake Temp FL', 'BrakeTemp FL'],
+                    variants: ['Brake Temp FL', 'BrakeTemp FL', 'Brake Disc Temp FL'],
                     description: 'Front left brake temp',
                     icon: 'fa-fire',
-                    category: 'Temperatures'
+                    category: 'Brake Temps'
                 },
-                engineTemp: {
-                    variants: ['Engine Temp', 'Water Temp', 'Coolant Temp'],
-                    description: 'Engine temperature',
-                    icon: 'fa-thermometer-full',
-                    category: 'Engine'
+                brakeTempFR: {
+                    variants: ['Brake Temp FR', 'BrakeTemp FR', 'Brake Disc Temp FR'],
+                    description: 'Front right brake temp',
+                    icon: 'fa-fire',
+                    category: 'Brake Temps'
                 },
-                oilTemp: {
-                    variants: ['Eng Oil Temp', 'Oil Temp', 'Engine Oil Temp'],
-                    description: 'Oil temperature',
-                    icon: 'fa-oil-can',
-                    category: 'Engine'
+                brakeTempRL: {
+                    variants: ['Brake Temp RL', 'BrakeTemp RL', 'Brake Disc Temp RL'],
+                    description: 'Rear left brake temp',
+                    icon: 'fa-fire',
+                    category: 'Brake Temps'
                 },
-                fuelLevel: {
-                    variants: ['Fuel Level', 'Fuel', 'Fuel Qty'],
-                    description: 'Fuel level',
-                    icon: 'fa-gas-pump',
-                    category: 'Engine'
+                brakeTempRR: {
+                    variants: ['Brake Temp RR', 'BrakeTemp RR', 'Brake Disc Temp RR'],
+                    description: 'Rear right brake temp',
+                    icon: 'fa-fire',
+                    category: 'Brake Temps'
                 },
+                
+                // Position/GPS
                 gpsLat: {
                     variants: ['GPS Latitude', 'Latitude', 'Lat', 'GPS_Lat'],
                     description: 'GPS Latitude',
@@ -336,10 +569,36 @@ class TelemetryAnalysisApp {
                     icon: 'fa-map-marker-alt',
                     category: 'Position'
                 },
+                gpsAltitude: {
+                    variants: ['GPS Altitude', 'Altitude', 'GPS_Alt', 'GPS Height'],
+                    description: 'GPS Altitude',
+                    icon: 'fa-mountain',
+                    category: 'Position'
+                },
+                gpsSpeed: {
+                    variants: ['GPS Speed', 'GPS_Speed'],
+                    description: 'GPS Speed',
+                    icon: 'fa-satellite',
+                    category: 'Position'
+                },
+                
+                // Lap Info
                 lapTime: {
                     variants: ['Lap Time', 'LapTime', 'Running Lap Time'],
                     description: 'Lap timing',
                     icon: 'fa-stopwatch',
+                    category: 'Lap Info'
+                },
+                lapNumber: {
+                    variants: ['Lap Number', 'Lap', 'Lap Count', 'Lap Num'],
+                    description: 'Current lap number',
+                    icon: 'fa-hashtag',
+                    category: 'Lap Info'
+                },
+                sector: {
+                    variants: ['Sector', 'Current Sector', 'Track Sector'],
+                    description: 'Current sector',
+                    icon: 'fa-map-signs',
                     category: 'Lap Info'
                 }
             }
@@ -425,10 +684,18 @@ class TelemetryAnalysisApp {
             });
         }
         
-        if (detected.optional.gLat && detected.optional.gLong) {
+        // G-Force Analysis - check for any G-force channels
+        var hasBasicGForce = detected.optional.gLat && detected.optional.gLong;
+        var hasDetailedGForce = (detected.optional.gLatFront || detected.optional.gLatMid || detected.optional.gLatRear) &&
+                                (detected.optional.gLongFront || detected.optional.gLongMid || detected.optional.gLongRear);
+        
+        if (hasBasicGForce || hasDetailedGForce) {
+            var gForceDesc = hasDetailedGForce ? 
+                'Multi-position G analysis (front/mid/rear), traction circle' : 
+                'Traction circle, grip utilization';
             detected.capabilities.push({
-                name: 'G-Force Analysis',
-                description: 'Traction circle, grip utilization',
+                name: hasDetailedGForce ? 'Advanced G-Force Analysis' : 'G-Force Analysis',
+                description: gForceDesc,
                 icon: 'fa-circle-notch',
                 color: 'purple'
             });
@@ -437,27 +704,70 @@ class TelemetryAnalysisApp {
         if (detected.optional.wheelSpeedFL && detected.optional.wheelSpeedFR) {
             detected.capabilities.push({
                 name: 'Wheel Speed Analysis',
-                description: 'Slip detection, differential behavior',
+                description: 'Speed differential, cornering behavior',
                 icon: 'fa-circle',
                 color: 'orange'
             });
         }
         
-        if (detected.optional.suspFL || detected.optional.suspFR) {
+        // Wheel Slip Analysis
+        var hasWheelSlip = detected.optional.wheelSlipFL || detected.optional.wheelSlipFR || 
+                          detected.optional.wheelSlipRL || detected.optional.wheelSlipRR;
+        var hasSlipAngle = detected.optional.slipAngleFL || detected.optional.slipAngleFR ||
+                          detected.optional.slipAngleRL || detected.optional.slipAngleRR;
+        
+        if (hasWheelSlip || hasSlipAngle) {
+            var slipDesc = hasSlipAngle ? 
+                'Slip ratio and slip angle analysis, tire grip limit detection' :
+                'Slip ratio analysis, traction loss detection';
             detected.capabilities.push({
-                name: 'Suspension Analysis',
-                description: 'Damper travel, weight transfer',
+                name: 'Wheel Slip Analysis',
+                description: slipDesc,
+                icon: 'fa-wave-square',
+                color: 'pink'
+            });
+        }
+        
+        if (detected.optional.suspFL || detected.optional.suspFR) {
+            var hasFourCorner = detected.optional.suspFL && detected.optional.suspFR && 
+                               detected.optional.suspRL && detected.optional.suspRR;
+            detected.capabilities.push({
+                name: hasFourCorner ? 'Full Suspension Analysis' : 'Suspension Analysis',
+                description: hasFourCorner ? 'Four-corner damper analysis, weight transfer' : 'Damper travel, weight transfer',
                 icon: 'fa-car',
                 color: 'cyan'
             });
         }
         
-        if (detected.optional.tyreTempFL || detected.optional.brakeTempFL) {
+        // Tire Temperature Analysis - check for detailed temps
+        var hasFLTireTemps = detected.optional.tyreTempFLCenter || detected.optional.tyreTempFLInner || detected.optional.tyreTempFLOuter;
+        var hasFRTireTemps = detected.optional.tyreTempFRCenter || detected.optional.tyreTempFRInner || detected.optional.tyreTempFROuter;
+        var hasRLTireTemps = detected.optional.tyreTempRLCenter || detected.optional.tyreTempRLInner || detected.optional.tyreTempRLOuter;
+        var hasRRTireTemps = detected.optional.tyreTempRRCenter || detected.optional.tyreTempRRInner || detected.optional.tyreTempRROuter;
+        var hasAnyTireTemps = hasFLTireTemps || hasFRTireTemps || hasRLTireTemps || hasRRTireTemps;
+        
+        var hasDetailedTireTemps = (detected.optional.tyreTempFLInner && detected.optional.tyreTempFLOuter) ||
+                                   (detected.optional.tyreTempFRInner && detected.optional.tyreTempFROuter);
+        
+        if (hasAnyTireTemps) {
+            var tireDesc = hasDetailedTireTemps ?
+                'Inner/center/outer tire temp analysis, camber optimization' :
+                'Tire temperature monitoring, thermal degradation';
             detected.capabilities.push({
-                name: 'Thermal Analysis',
-                description: 'Tire/brake temperature monitoring',
-                icon: 'fa-temperature-high',
+                name: hasDetailedTireTemps ? 'Advanced Tire Thermal Analysis' : 'Tire Thermal Analysis',
+                description: tireDesc,
+                icon: 'fa-thermometer-half',
                 color: 'red'
+            });
+        }
+        
+        // Brake Temperature Analysis (front only)
+        if (detected.optional.brakeTempFL || detected.optional.brakeTempFR) {
+            detected.capabilities.push({
+                name: 'Brake Thermal Analysis',
+                description: 'Front brake temperature monitoring',
+                icon: 'fa-fire',
+                color: 'amber'
             });
         }
         
@@ -485,6 +795,16 @@ class TelemetryAnalysisApp {
                 description: 'Accurate track position from GPS',
                 icon: 'fa-map-marked-alt',
                 color: 'teal'
+            });
+        }
+        
+        // Vehicle Dynamics (yaw, pitch, roll)
+        if (detected.optional.yaw && (detected.optional.pitch || detected.optional.roll)) {
+            detected.capabilities.push({
+                name: 'Vehicle Dynamics Analysis',
+                description: 'Yaw/pitch/roll rates, vehicle attitude',
+                icon: 'fa-sync',
+                color: 'gray'
             });
         }
         
@@ -656,10 +976,27 @@ class TelemetryAnalysisApp {
                 { key: 'oilTemp', name: 'Oil Temperature', icon: 'fa-oil-can' },
                 { key: 'fuelLevel', name: 'Fuel Level', icon: 'fa-gas-pump' }
             ]},
+            { category: 'G-Forces (Combined)', channels: [
+                { key: 'gLat', name: 'Lateral G (Combined)', icon: 'fa-arrows-alt-h' },
+                { key: 'gLong', name: 'Longitudinal G (Combined)', icon: 'fa-arrows-alt-v' },
+                { key: 'gVert', name: 'Vertical G', icon: 'fa-arrows-alt-v' }
+            ]},
+            { category: 'G-Forces (Front)', channels: [
+                { key: 'gLatFront', name: 'Lateral G - Front', icon: 'fa-arrows-alt-h' },
+                { key: 'gLongFront', name: 'Longitudinal G - Front', icon: 'fa-arrows-alt-v' }
+            ]},
+            { category: 'G-Forces (Mid/Center)', channels: [
+                { key: 'gLatMid', name: 'Lateral G - Mid', icon: 'fa-arrows-alt-h' },
+                { key: 'gLongMid', name: 'Longitudinal G - Mid', icon: 'fa-arrows-alt-v' }
+            ]},
+            { category: 'G-Forces (Rear)', channels: [
+                { key: 'gLatRear', name: 'Lateral G - Rear', icon: 'fa-arrows-alt-h' },
+                { key: 'gLongRear', name: 'Longitudinal G - Rear', icon: 'fa-arrows-alt-v' }
+            ]},
             { category: 'Vehicle Dynamics', channels: [
-                { key: 'gLat', name: 'Lateral G-Force', icon: 'fa-arrows-alt-h' },
-                { key: 'gLong', name: 'Longitudinal G-Force', icon: 'fa-arrows-alt-v' },
-                { key: 'yaw', name: 'Yaw Rate', icon: 'fa-sync' }
+                { key: 'yaw', name: 'Yaw Rate', icon: 'fa-sync' },
+                { key: 'pitch', name: 'Pitch Rate', icon: 'fa-sync' },
+                { key: 'roll', name: 'Roll Rate', icon: 'fa-sync' }
             ]},
             { category: 'Wheel Speeds', channels: [
                 { key: 'wheelSpeedFL', name: 'Wheel Speed FL', icon: 'fa-circle' },
@@ -667,27 +1004,62 @@ class TelemetryAnalysisApp {
                 { key: 'wheelSpeedRL', name: 'Wheel Speed RL', icon: 'fa-circle' },
                 { key: 'wheelSpeedRR', name: 'Wheel Speed RR', icon: 'fa-circle' }
             ]},
+            { category: 'Wheel Slip Ratio', channels: [
+                { key: 'wheelSlipFL', name: 'Slip Ratio FL', icon: 'fa-wave-square' },
+                { key: 'wheelSlipFR', name: 'Slip Ratio FR', icon: 'fa-wave-square' },
+                { key: 'wheelSlipRL', name: 'Slip Ratio RL', icon: 'fa-wave-square' },
+                { key: 'wheelSlipRR', name: 'Slip Ratio RR', icon: 'fa-wave-square' }
+            ]},
+            { category: 'Slip Angles', channels: [
+                { key: 'slipAngleFL', name: 'Slip Angle FL', icon: 'fa-angle-double-right' },
+                { key: 'slipAngleFR', name: 'Slip Angle FR', icon: 'fa-angle-double-right' },
+                { key: 'slipAngleRL', name: 'Slip Angle RL', icon: 'fa-angle-double-right' },
+                { key: 'slipAngleRR', name: 'Slip Angle RR', icon: 'fa-angle-double-right' }
+            ]},
             { category: 'Suspension', channels: [
                 { key: 'suspFL', name: 'Suspension FL', icon: 'fa-arrows-alt-v' },
                 { key: 'suspFR', name: 'Suspension FR', icon: 'fa-arrows-alt-v' },
                 { key: 'suspRL', name: 'Suspension RL', icon: 'fa-arrows-alt-v' },
-                { key: 'suspRR', name: 'Suspension RR', icon: 'fa-arrows-alt-v' }
+                { key: 'suspRR', name: 'Suspension RR', icon: 'fa-arrows-alt-v' },
+                { key: 'rideHeightFront', name: 'Ride Height Front', icon: 'fa-ruler-vertical' },
+                { key: 'rideHeightRear', name: 'Ride Height Rear', icon: 'fa-ruler-vertical' }
             ]},
-            { category: 'Temperatures', channels: [
-                { key: 'tyreTempFL', name: 'Tire Temp FL', icon: 'fa-thermometer-half' },
-                { key: 'tyreTempFR', name: 'Tire Temp FR', icon: 'fa-thermometer-half' },
-                { key: 'tyreTempRL', name: 'Tire Temp RL', icon: 'fa-thermometer-half' },
-                { key: 'tyreTempRR', name: 'Tire Temp RR', icon: 'fa-thermometer-half' },
+            { category: 'Tire Temps FL', channels: [
+                { key: 'tyreTempFLCenter', name: 'FL Center', icon: 'fa-thermometer-half' },
+                { key: 'tyreTempFLInner', name: 'FL Inner', icon: 'fa-thermometer-half' },
+                { key: 'tyreTempFLOuter', name: 'FL Outer', icon: 'fa-thermometer-half' }
+            ]},
+            { category: 'Tire Temps FR', channels: [
+                { key: 'tyreTempFRCenter', name: 'FR Center', icon: 'fa-thermometer-half' },
+                { key: 'tyreTempFRInner', name: 'FR Inner', icon: 'fa-thermometer-half' },
+                { key: 'tyreTempFROuter', name: 'FR Outer', icon: 'fa-thermometer-half' }
+            ]},
+            { category: 'Tire Temps RL', channels: [
+                { key: 'tyreTempRLCenter', name: 'RL Center', icon: 'fa-thermometer-half' },
+                { key: 'tyreTempRLInner', name: 'RL Inner', icon: 'fa-thermometer-half' },
+                { key: 'tyreTempRLOuter', name: 'RL Outer', icon: 'fa-thermometer-half' }
+            ]},
+            { category: 'Tire Temps RR', channels: [
+                { key: 'tyreTempRRCenter', name: 'RR Center', icon: 'fa-thermometer-half' },
+                { key: 'tyreTempRRInner', name: 'RR Inner', icon: 'fa-thermometer-half' },
+                { key: 'tyreTempRROuter', name: 'RR Outer', icon: 'fa-thermometer-half' }
+            ]},
+            { category: 'Brake Temps', channels: [
                 { key: 'brakeTempFL', name: 'Brake Temp FL', icon: 'fa-fire' },
-                { key: 'brakeTempFR', name: 'Brake Temp FR', icon: 'fa-fire' }
+                { key: 'brakeTempFR', name: 'Brake Temp FR', icon: 'fa-fire' },
+                { key: 'brakeTempRL', name: 'Brake Temp RL', icon: 'fa-fire' },
+                { key: 'brakeTempRR', name: 'Brake Temp RR', icon: 'fa-fire' }
             ]},
             { category: 'Position', channels: [
                 { key: 'gpsLat', name: 'GPS Latitude', icon: 'fa-map-marker-alt' },
-                { key: 'gpsLon', name: 'GPS Longitude', icon: 'fa-map-marker-alt' }
+                { key: 'gpsLon', name: 'GPS Longitude', icon: 'fa-map-marker-alt' },
+                { key: 'gpsAltitude', name: 'GPS Altitude', icon: 'fa-mountain' },
+                { key: 'gpsSpeed', name: 'GPS Speed', icon: 'fa-satellite' }
             ]},
             { category: 'Lap Info', channels: [
                 { key: 'lapTime', name: 'Lap Time', icon: 'fa-stopwatch' },
-                { key: 'lapNumber', name: 'Lap Number', icon: 'fa-hashtag' }
+                { key: 'lapNumber', name: 'Lap Number', icon: 'fa-hashtag' },
+                { key: 'sector', name: 'Sector', icon: 'fa-map-signs' }
             ]}
         ];
         
