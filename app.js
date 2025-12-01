@@ -1129,81 +1129,39 @@ class TelemetryAnalysisApp {
     }
 
     generateGraphs(analysis) {
-        // Sector Speed Delta chart
+        // Generate track map from raw telemetry data
+        this.generateTrackMap();
+        
+        // Generate speed comparison over distance
+        this.generateSpeedDistanceChart();
+        
+        // Generate throttle/brake overlay
+        this.generateThrottleBrakeChart();
+        
+        // Sector Performance chart
         if (analysis.sectors && analysis.sectors.length > 0) {
-            const speedDeltaTrace = {
+            const sectorTrace = {
                 x: analysis.sectors.map(s => `Sector ${s.sector}`),
                 y: analysis.sectors.map(s => s.avgSpeedDelta || 0),
                 type: 'bar',
-                name: 'Average Speed Delta',
+                name: 'Speed Delta',
                 marker: {
                     color: analysis.sectors.map(s => (s.avgSpeedDelta || 0) < 0 ? '#ef4444' : '#22c55e')
-                }
+                },
+                text: analysis.sectors.map(s => `${(s.avgSpeedDelta || 0) > 0 ? '+' : ''}${(s.avgSpeedDelta || 0).toFixed(1)} km/h`),
+                textposition: 'outside'
             };
 
-            const speedLayout = {
-                title: 'Sector Speed Delta (km/h)',
+            const sectorLayout = {
+                title: '',
                 xaxis: { title: '' },
-                yaxis: { title: 'Speed Delta (km/h)', zeroline: true },
-                margin: { t: 40, b: 40, l: 50, r: 20 }
+                yaxis: { title: 'Speed Delta (km/h)', zeroline: true, zerolinecolor: '#666' },
+                margin: { t: 20, b: 40, l: 50, r: 20 },
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(249,250,251,1)'
             };
 
-            Plotly.newPlot('speed-trace', [speedDeltaTrace], speedLayout, { responsive: true });
-
-            // Corner Speed Delta chart
-            const cornerSpeedTrace = {
-                x: analysis.sectors.map(s => `Sector ${s.sector}`),
-                y: analysis.sectors.map(s => s.minSpeedDelta || 0),
-                type: 'bar',
-                name: 'Corner Speed Delta',
-                marker: {
-                    color: analysis.sectors.map(s => (s.minSpeedDelta || 0) < 0 ? '#f97316' : '#3b82f6')
-                }
-            };
-
-            const cornerLayout = {
-                title: 'Corner Speed Delta (km/h)',
-                xaxis: { title: '' },
-                yaxis: { title: 'Min Speed Delta (km/h)', zeroline: true },
-                margin: { t: 40, b: 40, l: 50, r: 20 }
-            };
-
-            Plotly.newPlot('throttle-brake', [cornerSpeedTrace], cornerLayout, { responsive: true });
-        }
-
-        // G-Force comparison (if available)
-        if (analysis.gForces && analysis.gForces.maxLatRef) {
-            const gForceTrace = {
-                x: ['Lateral G', 'Longitudinal G'],
-                y: [analysis.gForces.maxLatCurr || 0, analysis.gForces.maxLongCurr || 0],
-                type: 'bar',
-                name: 'Your Max G',
-                marker: { color: '#8b5cf6' }
-            };
-
-            const gForceRefTrace = {
-                x: ['Lateral G', 'Longitudinal G'],
-                y: [analysis.gForces.maxLatRef || 0, analysis.gForces.maxLongRef || 0],
-                type: 'bar',
-                name: 'Reference Max G',
-                marker: { color: '#6b7280' }
-            };
-
-            const gLayout = {
-                title: 'G-Force Comparison',
-                barmode: 'group',
-                yaxis: { title: 'G Force' },
-                margin: { t: 40, b: 40, l: 50, r: 20 }
-            };
-
-            Plotly.newPlot('g-forces', [gForceTrace, gForceRefTrace], gLayout, { responsive: true });
-        } else {
-            // Placeholder for G-forces
-            document.getElementById('g-forces').innerHTML = `
-                <div class="h-full flex items-center justify-center text-gray-500">
-                    <p>G-Force data not available in this dataset</p>
-                </div>
-            `;
+            Plotly.newPlot('throttle-brake', [sectorTrace], sectorLayout, { responsive: true });
         }
 
         // Speed comparison chart
@@ -1225,14 +1183,574 @@ class TelemetryAnalysisApp {
             };
 
             const compareLayout = {
-                title: 'Speed Comparison (km/h)',
+                title: '',
                 barmode: 'group',
                 yaxis: { title: 'Speed (km/h)' },
-                margin: { t: 40, b: 40, l: 50, r: 20 }
+                margin: { t: 20, b: 40, l: 50, r: 20 },
+                legend: { orientation: 'h', y: -0.2 },
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(249,250,251,1)'
             };
 
             Plotly.newPlot('sector-times', [speedCompareTrace, speedCompareRefTrace], compareLayout, { responsive: true });
         }
+    }
+
+    generateTrackMap() {
+        if (!this.referenceData || !this.currentData) {
+            document.getElementById('track-map').innerHTML = '<p class="text-gray-400 text-center py-20">No track data available</p>';
+            return;
+        }
+
+        // Channel name variants for different telemetry systems
+        const CHANNELS = {
+            // GPS position channels (prioritized)
+            lat: ['GPS Latitude', 'Latitude', 'Lat', 'GPS_Lat', 'lat', 'GPS Lat'],
+            lon: ['GPS Longitude', 'Longitude', 'Lon', 'Long', 'GPS_Long', 'lon', 'GPS Long'],
+            // Alternative position channels
+            posX: ['Position X', 'Pos X', 'X', 'GPS X', 'PosX'],
+            posY: ['Position Y', 'Pos Y', 'Y', 'GPS Y', 'PosY'],
+            // Reconstruction channels (fallback)
+            distance: ['Lap Distance', 'Distance', 'Dist', 'LapDist', 'distance'],
+            speed: ['Ground Speed', 'Speed', 'Drive Speed', 'Vehicle Speed', 'speed'],
+            steer: ['Steered Angle', 'Steering Angle', 'Steer', 'steer'],
+            gLat: ['G Force Lat', 'Lateral G', 'G_Lat', 'gLat'],
+            yaw: ['Gyro Yaw Velocity', 'Yaw Rate', 'Yaw', 'yaw']
+        };
+
+        const getValue = (row, channelList, defaultVal = null) => {
+            for (const name of channelList) {
+                if (row[name] !== undefined && row[name] !== null && row[name] !== '') {
+                    const val = parseFloat(row[name]);
+                    if (!isNaN(val)) return val;
+                }
+            }
+            return defaultVal;
+        };
+
+        // Check what position data is available
+        const sampleRow = this.referenceData[0] || {};
+        const hasGPS = getValue(sampleRow, CHANNELS.lat) !== null && getValue(sampleRow, CHANNELS.lon) !== null;
+        const hasXY = getValue(sampleRow, CHANNELS.posX) !== null && getValue(sampleRow, CHANNELS.posY) !== null;
+        const hasReconstructionData = getValue(sampleRow, CHANNELS.speed) !== null;
+
+        console.log('Track map data detection:', { hasGPS, hasXY, hasReconstructionData });
+
+        let refTrack, currTrack;
+        let dataSource = '';
+
+        if (hasGPS) {
+            // Method 1: Use GPS Latitude/Longitude (best accuracy)
+            dataSource = 'GPS';
+            console.log('Using GPS coordinates for track map');
+            refTrack = this.extractGPSTrack(this.referenceData, CHANNELS, getValue);
+            currTrack = this.extractGPSTrack(this.currentData, CHANNELS, getValue);
+        } else if (hasXY) {
+            // Method 2: Use X/Y position data
+            dataSource = 'XY Position';
+            console.log('Using X/Y position data for track map');
+            refTrack = this.extractXYTrack(this.referenceData, CHANNELS, getValue);
+            currTrack = this.extractXYTrack(this.currentData, CHANNELS, getValue);
+        } else if (hasReconstructionData) {
+            // Method 3: Reconstruct from speed/steering/G-forces
+            dataSource = 'Reconstructed';
+            console.log('Reconstructing track from telemetry data');
+            refTrack = this.reconstructTrack(this.referenceData, CHANNELS, getValue);
+            currTrack = this.reconstructTrack(this.currentData, CHANNELS, getValue);
+        } else {
+            document.getElementById('track-map').innerHTML = `
+                <div class="h-full flex flex-col items-center justify-center text-gray-400">
+                    <i class="fas fa-map-marked-alt text-4xl mb-3"></i>
+                    <p>No position data available</p>
+                    <p class="text-sm mt-2">Required: GPS coordinates, X/Y position, or Speed + Steering data</p>
+                </div>
+            `;
+            return;
+        }
+
+        if (refTrack.length < 10 || currTrack.length < 10) {
+            document.getElementById('track-map').innerHTML = '<p class="text-gray-400 text-center py-20">Insufficient data to generate track map</p>';
+            return;
+        }
+
+        // Render the track map
+        this.renderTrackMap(refTrack, currTrack, dataSource);
+    }
+
+    extractGPSTrack(data, CHANNELS, getValue) {
+        // Sample rate to reduce data points for performance
+        const sampleRate = Math.max(1, Math.floor(data.length / 500));
+        const sampledData = data.filter((_, i) => i % sampleRate === 0);
+        
+        const positions = [];
+        let minLat = Infinity, maxLat = -Infinity;
+        let minLon = Infinity, maxLon = -Infinity;
+        
+        // First pass: get bounds
+        for (const row of sampledData) {
+            const lat = getValue(row, CHANNELS.lat);
+            const lon = getValue(row, CHANNELS.lon);
+            if (lat !== null && lon !== null) {
+                minLat = Math.min(minLat, lat);
+                maxLat = Math.max(maxLat, lat);
+                minLon = Math.min(minLon, lon);
+                maxLon = Math.max(maxLon, lon);
+            }
+        }
+        
+        // Convert lat/lon to local X/Y coordinates (simple equirectangular projection)
+        const centerLat = (minLat + maxLat) / 2;
+        const centerLon = (minLon + maxLon) / 2;
+        const latScale = 111320; // meters per degree latitude
+        const lonScale = 111320 * Math.cos(centerLat * Math.PI / 180); // meters per degree longitude
+        
+        for (const row of sampledData) {
+            const lat = getValue(row, CHANNELS.lat);
+            const lon = getValue(row, CHANNELS.lon);
+            const speed = getValue(row, CHANNELS.speed, 100);
+            const distance = getValue(row, CHANNELS.distance, positions.length);
+            
+            if (lat !== null && lon !== null) {
+                positions.push({
+                    x: (lon - centerLon) * lonScale,
+                    y: (lat - centerLat) * latScale,
+                    speed: speed,
+                    distance: distance
+                });
+            }
+        }
+        
+        return positions;
+    }
+
+    extractXYTrack(data, CHANNELS, getValue) {
+        const sampleRate = Math.max(1, Math.floor(data.length / 500));
+        const sampledData = data.filter((_, i) => i % sampleRate === 0);
+        
+        const positions = [];
+        
+        for (const row of sampledData) {
+            const x = getValue(row, CHANNELS.posX);
+            const y = getValue(row, CHANNELS.posY);
+            const speed = getValue(row, CHANNELS.speed, 100);
+            const distance = getValue(row, CHANNELS.distance, positions.length);
+            
+            if (x !== null && y !== null) {
+                positions.push({ x, y, speed, distance });
+            }
+        }
+        
+        return positions;
+    }
+
+    reconstructTrack(data, CHANNELS, getValue, sampleRate = 10) {
+        const positions = [];
+        let x = 0, y = 0, heading = 0;
+        const dt = 0.01; // 100Hz data typically
+        
+        // Sample the data to reduce points
+        const sampledData = data.filter((_, i) => i % sampleRate === 0);
+        
+        for (let i = 0; i < sampledData.length; i++) {
+            const row = sampledData[i];
+            const speed = getValue(row, CHANNELS.speed, 100) / 3.6; // km/h to m/s
+            const steer = getValue(row, CHANNELS.steer, 0) * (Math.PI / 180); // deg to rad
+            const gLat = getValue(row, CHANNELS.gLat, 0);
+            const yawRate = getValue(row, CHANNELS.yaw, 0) * (Math.PI / 180); // deg/s to rad/s
+            const distance = getValue(row, CHANNELS.distance, i);
+            
+            // Use yaw rate if available, otherwise estimate from steering and speed
+            let turnRate;
+            if (Math.abs(yawRate) > 0.001) {
+                turnRate = yawRate * dt * sampleRate;
+            } else if (Math.abs(gLat) > 0.05) {
+                // Estimate turn rate from lateral G: a = v²/r, ω = v/r = a/v
+                turnRate = (gLat * 9.81 / Math.max(speed, 10)) * dt * sampleRate;
+            } else {
+                // Estimate from steering angle (simplified bicycle model)
+                const wheelbase = 2.5; // Approximate wheelbase in meters
+                turnRate = (speed * Math.tan(steer * 0.1) / wheelbase) * dt * sampleRate;
+            }
+            
+            heading += turnRate;
+            
+            // Calculate position change
+            const ds = speed * dt * sampleRate;
+            x += ds * Math.cos(heading);
+            y += ds * Math.sin(heading);
+            
+            positions.push({
+                x: x,
+                y: y,
+                speed: getValue(row, CHANNELS.speed, 100),
+                distance: distance
+            });
+        }
+        
+        return positions;
+    }
+
+    renderTrackMap(refTrack, currTrack, dataSource) {
+        // Normalize and center tracks
+        const allX = [...refTrack.map(p => p.x), ...currTrack.map(p => p.x)];
+        const allY = [...refTrack.map(p => p.y), ...currTrack.map(p => p.y)];
+        const minX = Math.min(...allX), maxX = Math.max(...allX);
+        const minY = Math.min(...allY), maxY = Math.max(...allY);
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const scale = Math.max(maxX - minX, maxY - minY) || 1;
+
+        // Normalize positions
+        const normalizeTrack = (track) => track.map(p => ({
+            x: (p.x - centerX) / scale,
+            y: (p.y - centerY) / scale,
+            speed: p.speed,
+            distance: p.distance
+        }));
+
+        const refNorm = normalizeTrack(refTrack);
+        const currNorm = normalizeTrack(currTrack);
+
+        // Create color scale based on speed
+        const getSpeedColor = (speed, minSpeed, maxSpeed) => {
+            const ratio = Math.max(0, Math.min(1, (speed - minSpeed) / (maxSpeed - minSpeed || 1)));
+            // Red (slow) to Yellow to Green (fast)
+            if (ratio < 0.5) {
+                const r = 255;
+                const g = Math.round(ratio * 2 * 255);
+                return `rgb(${r},${g},0)`;
+            } else {
+                const r = Math.round((1 - (ratio - 0.5) * 2) * 255);
+                const g = 255;
+                return `rgb(${r},${g},0)`;
+            }
+        };
+
+        const refSpeeds = refNorm.map(p => p.speed);
+        const currSpeeds = currNorm.map(p => p.speed);
+        const minSpeed = Math.min(...refSpeeds, ...currSpeeds);
+        const maxSpeed = Math.max(...refSpeeds, ...currSpeeds);
+
+        // Reference track trace (thicker, semi-transparent)
+        const refTrace = {
+            x: refNorm.map(p => p.x),
+            y: refNorm.map(p => p.y),
+            mode: 'lines',
+            name: 'Reference Line',
+            line: {
+                color: 'rgba(156, 163, 175, 0.6)',
+                width: 8
+            },
+            hovertemplate: 'Reference<br>Speed: %{text} km/h<extra></extra>',
+            text: refNorm.map(p => p.speed.toFixed(0))
+        };
+
+        // Current track trace with speed coloring - create segments for color coding
+        const currTraces = [];
+        for (let i = 0; i < currNorm.length - 1; i++) {
+            currTraces.push({
+                x: [currNorm[i].x, currNorm[i + 1].x],
+                y: [currNorm[i].y, currNorm[i + 1].y],
+                mode: 'lines',
+                name: '',
+                showlegend: false,
+                line: {
+                    color: getSpeedColor(currNorm[i].speed, minSpeed, maxSpeed),
+                    width: 4
+                },
+                hovertemplate: `Your Line<br>Speed: ${currNorm[i].speed.toFixed(0)} km/h<extra></extra>`
+            });
+        }
+
+        // Add start/finish marker
+        const startMarker = {
+            x: [refNorm[0].x],
+            y: [refNorm[0].y],
+            mode: 'markers+text',
+            name: 'Start/Finish',
+            text: ['S/F'],
+            textposition: 'top center',
+            textfont: { color: '#fff', size: 10 },
+            marker: {
+                color: '#ffffff',
+                size: 12,
+                symbol: 'square',
+                line: { color: '#000', width: 2 }
+            }
+        };
+
+        // Sector markers (divide track into 3)
+        const s1End = Math.floor(refNorm.length / 3);
+        const s2End = Math.floor(refNorm.length * 2 / 3);
+        
+        const sectorMarkers = {
+            x: [refNorm[s1End].x, refNorm[s2End].x],
+            y: [refNorm[s1End].y, refNorm[s2End].y],
+            mode: 'markers+text',
+            name: 'Sectors',
+            text: ['S1|S2', 'S2|S3'],
+            textposition: 'top center',
+            textfont: { color: '#fbbf24', size: 10 },
+            marker: {
+                color: '#fbbf24',
+                size: 8,
+                symbol: 'diamond'
+            }
+        };
+
+        // Speed colorbar legend (as a dummy trace)
+        const colorbarTrace = {
+            x: [null],
+            y: [null],
+            mode: 'markers',
+            marker: {
+                colorscale: [[0, 'red'], [0.5, 'yellow'], [1, 'green']],
+                cmin: minSpeed,
+                cmax: maxSpeed,
+                colorbar: {
+                    title: 'Speed (km/h)',
+                    titleside: 'right',
+                    thickness: 15,
+                    len: 0.5,
+                    y: 0.75,
+                    tickfont: { color: '#fff' },
+                    titlefont: { color: '#fff' }
+                },
+                showscale: true
+            },
+            showlegend: false,
+            hoverinfo: 'skip'
+        };
+
+        const layout = {
+            title: {
+                text: `Track Map (${dataSource})`,
+                font: { color: '#9ca3af', size: 14 },
+                x: 0.02,
+                xanchor: 'left'
+            },
+            showlegend: true,
+            legend: { 
+                x: 0.98, 
+                y: 0.98,
+                xanchor: 'right',
+                bgcolor: 'rgba(0,0,0,0.5)',
+                font: { color: '#fff', size: 10 }
+            },
+            xaxis: { 
+                visible: false,
+                scaleanchor: 'y',
+                scaleratio: 1
+            },
+            yaxis: { 
+                visible: false 
+            },
+            margin: { t: 30, b: 10, l: 10, r: 10 },
+            paper_bgcolor: '#1f2937',
+            plot_bgcolor: '#1f2937',
+            hovermode: 'closest'
+        };
+
+        Plotly.newPlot('track-map', [refTrace, ...currTraces, startMarker, sectorMarkers, colorbarTrace], layout, { 
+            responsive: true,
+            displayModeBar: true,
+            modeBarButtonsToRemove: ['lasso2d', 'select2d']
+        });
+    }
+
+    generateSpeedDistanceChart() {
+        if (!this.referenceData || !this.currentData) return;
+
+        const CHANNELS = {
+            distance: ['Lap Distance', 'Distance', 'Dist', 'distance'],
+            speed: ['Ground Speed', 'Speed', 'Drive Speed', 'speed']
+        };
+
+        const getValue = (row, channelList, defaultVal = 0) => {
+            for (const name of channelList) {
+                if (row[name] !== undefined && row[name] !== null) {
+                    const val = parseFloat(row[name]);
+                    if (!isNaN(val)) return val;
+                }
+            }
+            return defaultVal;
+        };
+
+        // Sample data for performance (every 10th point)
+        const sampleRate = Math.max(1, Math.floor(this.referenceData.length / 500));
+        
+        const refData = this.referenceData.filter((_, i) => i % sampleRate === 0);
+        const currData = this.currentData.filter((_, i) => i % sampleRate === 0);
+
+        const refTrace = {
+            x: refData.map(row => getValue(row, CHANNELS.distance, 0)),
+            y: refData.map(row => getValue(row, CHANNELS.speed, 0)),
+            mode: 'lines',
+            name: 'Reference',
+            line: { color: '#6b7280', width: 2 }
+        };
+
+        const currTrace = {
+            x: currData.map(row => getValue(row, CHANNELS.distance, 0)),
+            y: currData.map(row => getValue(row, CHANNELS.speed, 0)),
+            mode: 'lines',
+            name: 'Your Lap',
+            line: { color: '#8b5cf6', width: 2 }
+        };
+
+        // Calculate and plot the delta
+        const deltaTrace = {
+            x: currData.map(row => getValue(row, CHANNELS.distance, 0)),
+            y: currData.map((row, i) => {
+                const currSpeed = getValue(row, CHANNELS.speed, 0);
+                const refSpeed = refData[i] ? getValue(refData[i], CHANNELS.speed, 0) : currSpeed;
+                return currSpeed - refSpeed;
+            }),
+            mode: 'lines',
+            name: 'Delta',
+            yaxis: 'y2',
+            line: { color: '#f59e0b', width: 1, dash: 'dot' },
+            fill: 'tozeroy',
+            fillcolor: 'rgba(245, 158, 11, 0.1)'
+        };
+
+        const layout = {
+            title: '',
+            xaxis: { title: 'Distance (m)' },
+            yaxis: { title: 'Speed (km/h)', side: 'left' },
+            yaxis2: { 
+                title: 'Delta (km/h)', 
+                side: 'right', 
+                overlaying: 'y',
+                showgrid: false,
+                zeroline: true,
+                zerolinecolor: '#666'
+            },
+            margin: { t: 20, b: 50, l: 50, r: 50 },
+            legend: { orientation: 'h', y: -0.25 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(249,250,251,1)'
+        };
+
+        Plotly.newPlot('speed-trace', [refTrace, currTrace, deltaTrace], layout, { responsive: true });
+    }
+
+    generateThrottleBrakeChart() {
+        if (!this.referenceData || !this.currentData) return;
+
+        const CHANNELS = {
+            distance: ['Lap Distance', 'Distance', 'Dist', 'distance'],
+            throttle: ['Throttle Pos', 'Throttle', 'TPS', 'throttle'],
+            brake: ['Brake Pres Front', 'Brake Pressure', 'Brake', 'brake']
+        };
+
+        const getValue = (row, channelList, defaultVal = null) => {
+            for (const name of channelList) {
+                if (row[name] !== undefined && row[name] !== null) {
+                    const val = parseFloat(row[name]);
+                    if (!isNaN(val)) return val;
+                }
+            }
+            return defaultVal;
+        };
+
+        // Check if we have throttle/brake data
+        const hasThrottle = this.currentData.some(row => getValue(row, CHANNELS.throttle) !== null);
+        const hasBrake = this.currentData.some(row => getValue(row, CHANNELS.brake) !== null);
+
+        if (!hasThrottle && !hasBrake) {
+            // Fall back to sector chart if no throttle/brake data
+            return;
+        }
+
+        const sampleRate = Math.max(1, Math.floor(this.currentData.length / 500));
+        const currData = this.currentData.filter((_, i) => i % sampleRate === 0);
+        const refData = this.referenceData.filter((_, i) => i % sampleRate === 0);
+
+        const traces = [];
+
+        if (hasThrottle) {
+            // Reference throttle
+            traces.push({
+                x: refData.map(row => getValue(row, CHANNELS.distance, 0)),
+                y: refData.map(row => getValue(row, CHANNELS.throttle, 0)),
+                mode: 'lines',
+                name: 'Ref Throttle',
+                line: { color: 'rgba(34, 197, 94, 0.4)', width: 2 },
+                fill: 'tozeroy',
+                fillcolor: 'rgba(34, 197, 94, 0.1)'
+            });
+            
+            // Your throttle
+            traces.push({
+                x: currData.map(row => getValue(row, CHANNELS.distance, 0)),
+                y: currData.map(row => getValue(row, CHANNELS.throttle, 0)),
+                mode: 'lines',
+                name: 'Your Throttle',
+                line: { color: '#22c55e', width: 2 }
+            });
+        }
+
+        if (hasBrake) {
+            // Normalize brake pressure to 0-100 scale
+            const maxBrake = Math.max(...currData.map(row => getValue(row, CHANNELS.brake, 0) || 0));
+            const brakeScale = maxBrake > 100 ? 100 / maxBrake : 1;
+
+            // Reference brake (inverted for visibility)
+            traces.push({
+                x: refData.map(row => getValue(row, CHANNELS.distance, 0)),
+                y: refData.map(row => -(getValue(row, CHANNELS.brake, 0) || 0) * brakeScale),
+                mode: 'lines',
+                name: 'Ref Brake',
+                line: { color: 'rgba(239, 68, 68, 0.4)', width: 2 },
+                fill: 'tozeroy',
+                fillcolor: 'rgba(239, 68, 68, 0.1)'
+            });
+            
+            // Your brake
+            traces.push({
+                x: currData.map(row => getValue(row, CHANNELS.distance, 0)),
+                y: currData.map(row => -(getValue(row, CHANNELS.brake, 0) || 0) * brakeScale),
+                mode: 'lines',
+                name: 'Your Brake',
+                line: { color: '#ef4444', width: 2 }
+            });
+        }
+
+        const layout = {
+            title: '',
+            xaxis: { title: 'Distance (m)' },
+            yaxis: { 
+                title: 'Throttle / Brake %',
+                range: [-110, 110],
+                zeroline: true,
+                zerolinecolor: '#666',
+                zerolinewidth: 2
+            },
+            margin: { t: 20, b: 50, l: 50, r: 20 },
+            legend: { orientation: 'h', y: -0.25 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(249,250,251,1)',
+            annotations: [{
+                x: 0.02,
+                y: 0.95,
+                xref: 'paper',
+                yref: 'paper',
+                text: 'Throttle ↑',
+                showarrow: false,
+                font: { color: '#22c55e', size: 10 }
+            }, {
+                x: 0.02,
+                y: 0.05,
+                xref: 'paper',
+                yref: 'paper',
+                text: 'Brake ↓',
+                showarrow: false,
+                font: { color: '#ef4444', size: 10 }
+            }]
+        };
+
+        Plotly.newPlot('g-forces', traces, layout, { responsive: true });
     }
 
     displaySetupRecommendations(analysis) {
