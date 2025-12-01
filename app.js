@@ -1586,9 +1586,10 @@ class TelemetryAnalysisApp {
 
     generateGraphs(analysis) {
         this.generateTrackMap();
-        this.generateSpeedChart();
-        this.generateSectorChart(analysis);
+        this.generateTelemetryOverlays();
+        this.generateSectorTimeChart(analysis);
         this.generateSpeedComparison(analysis);
+        this.setupCustomOverlayControls();
     }
 
     generateTrackMap() {
@@ -1738,110 +1739,536 @@ class TelemetryAnalysisApp {
         Plotly.newPlot('track-map', [refTrace].concat(currTraces), layout, { responsive: true });
     }
 
-    generateSpeedChart() {
+    // Channel definitions for overlays
+    getOverlayChannels() {
+        return {
+            speed: {
+                names: ['Ground Speed', 'Speed', 'Drive Speed', 'Vehicle Speed', 'speed'],
+                label: 'Speed',
+                unit: 'km/h',
+                color: { ref: '#6b7280', curr: '#8b5cf6' }
+            },
+            throttle: {
+                names: ['Throttle Pos', 'Throttle', 'TPS', 'throttle'],
+                label: 'Throttle',
+                unit: '%',
+                color: { ref: '#6b7280', curr: '#22c55e' }
+            },
+            brake: {
+                names: ['Brake Pres Front', 'Brake Pressure', 'Brake', 'brake'],
+                label: 'Brake',
+                unit: '%',
+                color: { ref: '#6b7280', curr: '#ef4444' }
+            },
+            steering: {
+                names: ['Steered Angle', 'Steering Angle', 'Steer', 'steer'],
+                label: 'Steering',
+                unit: 'deg',
+                color: { ref: '#6b7280', curr: '#f59e0b' }
+            },
+            gLat: {
+                names: ['G Force Lat', 'Lateral G', 'G_Lat', 'gLat'],
+                label: 'Lateral G',
+                unit: 'G',
+                color: { ref: '#6b7280', curr: '#3b82f6' }
+            },
+            gLong: {
+                names: ['G Force Long', 'Longitudinal G', 'G_Long', 'gLong'],
+                label: 'Long G',
+                unit: 'G',
+                color: { ref: '#6b7280', curr: '#ec4899' }
+            },
+            gear: {
+                names: ['Gear', 'gear', 'Gear Position'],
+                label: 'Gear',
+                unit: '',
+                color: { ref: '#6b7280', curr: '#14b8a6' }
+            },
+            rpm: {
+                names: ['Engine RPM', 'RPM', 'rpm'],
+                label: 'RPM',
+                unit: 'rpm',
+                color: { ref: '#6b7280', curr: '#f97316' }
+            },
+            wheelSpeedFL: {
+                names: ['Wheel Speed FL', 'WheelSpeed FL'],
+                label: 'Wheel FL',
+                unit: 'km/h',
+                color: { ref: '#6b7280', curr: '#8b5cf6' }
+            },
+            wheelSpeedFR: {
+                names: ['Wheel Speed FR', 'WheelSpeed FR'],
+                label: 'Wheel FR',
+                unit: 'km/h',
+                color: { ref: '#6b7280', curr: '#8b5cf6' }
+            },
+            wheelSpeedRL: {
+                names: ['Wheel Speed RL', 'WheelSpeed RL'],
+                label: 'Wheel RL',
+                unit: 'km/h',
+                color: { ref: '#6b7280', curr: '#8b5cf6' }
+            },
+            wheelSpeedRR: {
+                names: ['Wheel Speed RR', 'WheelSpeed RR'],
+                label: 'Wheel RR',
+                unit: 'km/h',
+                color: { ref: '#6b7280', curr: '#8b5cf6' }
+            },
+            suspFL: {
+                names: ['Susp Pos FL', 'Suspension FL', 'Damper FL'],
+                label: 'Susp FL',
+                unit: 'mm',
+                color: { ref: '#6b7280', curr: '#06b6d4' }
+            },
+            suspFR: {
+                names: ['Susp Pos FR', 'Suspension FR', 'Damper FR'],
+                label: 'Susp FR',
+                unit: 'mm',
+                color: { ref: '#6b7280', curr: '#06b6d4' }
+            }
+        };
+    }
+
+    getValue(row, names, defaultVal) {
+        for (var i = 0; i < names.length; i++) {
+            if (row[names[i]] !== undefined && row[names[i]] !== null && row[names[i]] !== '') {
+                var val = parseFloat(row[names[i]]);
+                if (!isNaN(val)) return val;
+            }
+        }
+        return defaultVal !== undefined ? defaultVal : null;
+    }
+
+    generateTelemetryOverlays() {
+        var self = this;
         if (!this.referenceData || !this.currentData) return;
 
-        var getValue = function(row, names, defaultVal) {
-            for (var i = 0; i < names.length; i++) {
-                if (row[names[i]] !== undefined && row[names[i]] !== null) {
-                    var val = parseFloat(row[names[i]]);
-                    if (!isNaN(val)) return val;
-                }
-            }
-            return defaultVal;
-        };
+        var distNames = ['Lap Distance', 'Distance', 'Dist', 'LapDist'];
+        var channels = this.getOverlayChannels();
 
-        var distNames = ['Lap Distance', 'Distance', 'Dist'];
-        var speedNames = ['Ground Speed', 'Speed', 'Drive Speed'];
-
+        // Sample data for performance
         var sampleRate = Math.max(1, Math.floor(this.referenceData.length / 500));
         var refData = this.referenceData.filter(function(_, i) { return i % sampleRate === 0; });
         var currData = this.currentData.filter(function(_, i) { return i % sampleRate === 0; });
 
-        var refTrace = {
-            x: refData.map(function(row) { return getValue(row, distNames, 0); }),
-            y: refData.map(function(row) { return getValue(row, speedNames, 0); }),
-            mode: 'lines',
-            name: 'Reference',
-            line: { color: '#6b7280', width: 2 }
-        };
+        // Get distance arrays
+        var refDist = refData.map(function(row) { return self.getValue(row, distNames, 0); });
+        var currDist = currData.map(function(row) { return self.getValue(row, distNames, 0); });
 
-        var currTrace = {
-            x: currData.map(function(row) { return getValue(row, distNames, 0); }),
-            y: currData.map(function(row) { return getValue(row, speedNames, 0); }),
-            mode: 'lines',
-            name: 'Your Lap',
-            line: { color: '#8b5cf6', width: 2 }
-        };
-
-        var layout = {
-            xaxis: { title: 'Distance (m)' },
-            yaxis: { title: 'Speed (km/h)' },
-            margin: { t: 20, b: 50, l: 50, r: 20 },
-            legend: { orientation: 'h', y: -0.2 }
-        };
-
-        Plotly.newPlot('speed-trace', [refTrace, currTrace], layout, { responsive: true });
+        // Generate each overlay
+        this.generateSingleOverlay('speed-overlay', refData, currData, refDist, currDist, channels.speed);
+        this.generateSingleOverlay('throttle-overlay', refData, currData, refDist, currDist, channels.throttle);
+        this.generateSingleOverlay('brake-overlay', refData, currData, refDist, currDist, channels.brake);
+        this.generateSingleOverlay('steering-overlay', refData, currData, refDist, currDist, channels.steering);
+        this.generateGForceOverlay('gforce-overlay', refData, currData, refDist, currDist, channels);
+        this.generateSingleOverlay('gear-overlay', refData, currData, refDist, currDist, channels.gear);
     }
 
-    generateSectorChart(analysis) {
-        if (!analysis.sectors || analysis.sectors.length === 0) {
-            document.getElementById('throttle-brake').innerHTML = '<p class="text-gray-500 text-center py-10">No sector data</p>';
+    generateSingleOverlay(containerId, refData, currData, refDist, currDist, channelConfig) {
+        var self = this;
+        var container = document.getElementById(containerId);
+        if (!container) return;
+
+        // Check if channel data exists
+        var sampleRow = refData[0] || {};
+        var hasData = channelConfig.names.some(function(name) { return sampleRow[name] !== undefined; });
+
+        if (!hasData) {
+            container.innerHTML = '<p class="text-gray-400 text-center py-8 text-sm">No ' + channelConfig.label + ' data available</p>';
             return;
         }
 
-        var trace = {
-            x: analysis.sectors.map(function(s) { return 'Sector ' + s.sector; }),
-            y: analysis.sectors.map(function(s) { return s.avgSpeedDelta || 0; }),
-            type: 'bar',
-            marker: {
-                color: analysis.sectors.map(function(s) { 
-                    return (s.avgSpeedDelta || 0) < 0 ? '#ef4444' : '#22c55e'; 
-                })
-            }
+        var refValues = refData.map(function(row) { return self.getValue(row, channelConfig.names, null); });
+        var currValues = currData.map(function(row) { return self.getValue(row, channelConfig.names, null); });
+
+        var refTrace = {
+            x: refDist,
+            y: refValues,
+            mode: 'lines',
+            name: 'Reference',
+            line: { color: channelConfig.color.ref, width: 1.5 },
+            hovertemplate: 'Ref: %{y:.1f} ' + channelConfig.unit + '<extra></extra>'
+        };
+
+        var currTrace = {
+            x: currDist,
+            y: currValues,
+            mode: 'lines',
+            name: 'Your Lap',
+            line: { color: channelConfig.color.curr, width: 2 },
+            hovertemplate: 'You: %{y:.1f} ' + channelConfig.unit + '<extra></extra>'
         };
 
         var layout = {
-            yaxis: { title: 'Speed Delta (km/h)', zeroline: true },
-            margin: { t: 20, b: 40, l: 50, r: 20 }
+            xaxis: { title: '', showticklabels: true, tickfont: { size: 10 } },
+            yaxis: { title: channelConfig.unit, titlefont: { size: 10 }, tickfont: { size: 10 } },
+            margin: { t: 5, b: 25, l: 40, r: 10 },
+            legend: { orientation: 'h', y: 1.1, x: 0.5, xanchor: 'center', font: { size: 9 } },
+            hovermode: 'x unified'
         };
 
-        Plotly.newPlot('throttle-brake', [trace], layout, { responsive: true });
+        Plotly.newPlot(containerId, [refTrace, currTrace], layout, { responsive: true, displayModeBar: false });
+    }
+
+    generateGForceOverlay(containerId, refData, currData, refDist, currDist, channels) {
+        var self = this;
+        var container = document.getElementById(containerId);
+        if (!container) return;
+
+        var sampleRow = refData[0] || {};
+        var hasGLat = channels.gLat.names.some(function(name) { return sampleRow[name] !== undefined; });
+        var hasGLong = channels.gLong.names.some(function(name) { return sampleRow[name] !== undefined; });
+
+        if (!hasGLat && !hasGLong) {
+            container.innerHTML = '<p class="text-gray-400 text-center py-8 text-sm">No G-Force data available</p>';
+            return;
+        }
+
+        var traces = [];
+
+        if (hasGLat) {
+            var refGLat = refData.map(function(row) { return self.getValue(row, channels.gLat.names, null); });
+            var currGLat = currData.map(function(row) { return self.getValue(row, channels.gLat.names, null); });
+
+            traces.push({
+                x: refDist,
+                y: refGLat,
+                mode: 'lines',
+                name: 'Ref Lat G',
+                line: { color: '#9ca3af', width: 1 },
+                hovertemplate: 'Ref Lat: %{y:.2f}G<extra></extra>'
+            });
+            traces.push({
+                x: currDist,
+                y: currGLat,
+                mode: 'lines',
+                name: 'Your Lat G',
+                line: { color: '#3b82f6', width: 2 },
+                hovertemplate: 'Your Lat: %{y:.2f}G<extra></extra>'
+            });
+        }
+
+        if (hasGLong) {
+            var refGLong = refData.map(function(row) { return self.getValue(row, channels.gLong.names, null); });
+            var currGLong = currData.map(function(row) { return self.getValue(row, channels.gLong.names, null); });
+
+            traces.push({
+                x: refDist,
+                y: refGLong,
+                mode: 'lines',
+                name: 'Ref Long G',
+                line: { color: '#d1d5db', width: 1, dash: 'dot' },
+                hovertemplate: 'Ref Long: %{y:.2f}G<extra></extra>'
+            });
+            traces.push({
+                x: currDist,
+                y: currGLong,
+                mode: 'lines',
+                name: 'Your Long G',
+                line: { color: '#ec4899', width: 2, dash: 'dot' },
+                hovertemplate: 'Your Long: %{y:.2f}G<extra></extra>'
+            });
+        }
+
+        var layout = {
+            xaxis: { title: '', showticklabels: true, tickfont: { size: 10 } },
+            yaxis: { title: 'G', titlefont: { size: 10 }, tickfont: { size: 10 }, zeroline: true, zerolinewidth: 1 },
+            margin: { t: 5, b: 25, l: 40, r: 10 },
+            legend: { orientation: 'h', y: 1.15, x: 0.5, xanchor: 'center', font: { size: 8 } },
+            hovermode: 'x unified'
+        };
+
+        Plotly.newPlot(containerId, traces, layout, { responsive: true, displayModeBar: false });
+    }
+
+    setupCustomOverlayControls() {
+        var self = this;
+        var select = document.getElementById('custom-channel-select');
+        var addBtn = document.getElementById('add-custom-overlay-btn');
+        var clearBtn = document.getElementById('clear-custom-overlays-btn');
+
+        if (!select) return;
+
+        // Get available channels from the data
+        var sampleRow = this.referenceData ? this.referenceData[0] : {};
+        var allColumns = Object.keys(sampleRow);
+        var channels = this.getOverlayChannels();
+
+        // Standard channels that already have overlays
+        var standardChannels = ['speed', 'throttle', 'brake', 'steering', 'gLat', 'gLong', 'gear'];
+        var standardNames = [];
+        standardChannels.forEach(function(ch) {
+            if (channels[ch]) {
+                standardNames = standardNames.concat(channels[ch].names);
+            }
+        });
+
+        // Populate select with available columns not already shown
+        select.innerHTML = '<option value="">-- Select Channel --</option>';
+        
+        // Add known optional channels first
+        var optionalChannels = ['rpm', 'wheelSpeedFL', 'wheelSpeedFR', 'wheelSpeedRL', 'wheelSpeedRR', 'suspFL', 'suspFR'];
+        optionalChannels.forEach(function(chKey) {
+            var ch = channels[chKey];
+            if (ch) {
+                var hasData = ch.names.some(function(name) { return sampleRow[name] !== undefined; });
+                if (hasData) {
+                    var optgroup = select.querySelector('optgroup[label="Common Channels"]');
+                    if (!optgroup) {
+                        optgroup = document.createElement('optgroup');
+                        optgroup.label = 'Common Channels';
+                        select.appendChild(optgroup);
+                    }
+                    var option = document.createElement('option');
+                    option.value = chKey;
+                    option.textContent = ch.label + ' (' + ch.unit + ')';
+                    optgroup.appendChild(option);
+                }
+            }
+        });
+
+        // Add other columns
+        var otherOptgroup = document.createElement('optgroup');
+        otherOptgroup.label = 'Other Columns';
+        var addedCount = 0;
+
+        allColumns.forEach(function(col) {
+            // Skip standard channels and distance/time
+            var isStandard = standardNames.some(function(name) { return col.toLowerCase() === name.toLowerCase(); });
+            var isDistTime = ['Time', 'Lap Distance', 'Distance', 'Elapsed Time'].some(function(name) {
+                return col.toLowerCase() === name.toLowerCase();
+            });
+
+            if (!isStandard && !isDistTime && addedCount < 50) {
+                var option = document.createElement('option');
+                option.value = 'custom:' + col;
+                option.textContent = col;
+                otherOptgroup.appendChild(option);
+                addedCount++;
+            }
+        });
+
+        if (otherOptgroup.children.length > 0) {
+            select.appendChild(otherOptgroup);
+        }
+
+        // Initialize custom overlays storage
+        if (!this.customOverlays) {
+            this.customOverlays = [];
+        }
+
+        // Add button click handler
+        if (addBtn) {
+            addBtn.onclick = function() {
+                var selectedValue = select.value;
+                if (!selectedValue) {
+                    self.showNotification('Please select a channel', 'error');
+                    return;
+                }
+
+                // Check if already added
+                if (self.customOverlays.indexOf(selectedValue) !== -1) {
+                    self.showNotification('Channel already added', 'error');
+                    return;
+                }
+
+                self.customOverlays.push(selectedValue);
+                self.addCustomOverlayChart(selectedValue);
+                select.value = '';
+            };
+        }
+
+        // Clear button click handler
+        if (clearBtn) {
+            clearBtn.onclick = function() {
+                self.customOverlays = [];
+                var container = document.getElementById('custom-overlays-container');
+                if (container) container.innerHTML = '';
+            };
+        }
+    }
+
+    addCustomOverlayChart(channelValue) {
+        var self = this;
+        var container = document.getElementById('custom-overlays-container');
+        if (!container) return;
+
+        var channels = this.getOverlayChannels();
+        var distNames = ['Lap Distance', 'Distance', 'Dist', 'LapDist'];
+
+        // Sample data
+        var sampleRate = Math.max(1, Math.floor(this.referenceData.length / 500));
+        var refData = this.referenceData.filter(function(_, i) { return i % sampleRate === 0; });
+        var currData = this.currentData.filter(function(_, i) { return i % sampleRate === 0; });
+        var refDist = refData.map(function(row) { return self.getValue(row, distNames, 0); });
+        var currDist = currData.map(function(row) { return self.getValue(row, distNames, 0); });
+
+        var chartId = 'custom-overlay-' + this.customOverlays.length;
+        var chartDiv = document.createElement('div');
+        chartDiv.className = 'relative';
+        chartDiv.innerHTML = '<button class="absolute top-0 right-0 z-10 bg-red-500 text-white rounded-full w-6 h-6 text-xs hover:bg-red-600" onclick="this.parentElement.remove(); window.telemetryApp.customOverlays = window.telemetryApp.customOverlays.filter(function(c) { return c !== \'' + channelValue + '\'; });">&times;</button>' +
+            '<h4 class="font-semibold mb-2 text-sm pr-8"></h4>' +
+            '<div id="' + chartId + '" class="h-48 bg-gray-50 rounded border"></div>';
+        container.appendChild(chartDiv);
+
+        var label, unit, names, colors;
+
+        if (channelValue.indexOf('custom:') === 0) {
+            // Custom column
+            var colName = channelValue.replace('custom:', '');
+            label = colName;
+            unit = '';
+            names = [colName];
+            colors = { ref: '#6b7280', curr: '#8b5cf6' };
+        } else if (channels[channelValue]) {
+            // Known channel
+            var ch = channels[channelValue];
+            label = ch.label;
+            unit = ch.unit;
+            names = ch.names;
+            colors = ch.color;
+        } else {
+            return;
+        }
+
+        chartDiv.querySelector('h4').textContent = label + (unit ? ' (' + unit + ')' : '');
+
+        // Generate chart
+        var refValues = refData.map(function(row) { return self.getValue(row, names, null); });
+        var currValues = currData.map(function(row) { return self.getValue(row, names, null); });
+
+        var refTrace = {
+            x: refDist,
+            y: refValues,
+            mode: 'lines',
+            name: 'Reference',
+            line: { color: colors.ref, width: 1.5 }
+        };
+
+        var currTrace = {
+            x: currDist,
+            y: currValues,
+            mode: 'lines',
+            name: 'Your Lap',
+            line: { color: colors.curr, width: 2 }
+        };
+
+        var layout = {
+            xaxis: { title: '', showticklabels: true, tickfont: { size: 10 } },
+            yaxis: { title: unit, titlefont: { size: 10 }, tickfont: { size: 10 } },
+            margin: { t: 5, b: 25, l: 45, r: 10 },
+            legend: { orientation: 'h', y: 1.1, x: 0.5, xanchor: 'center', font: { size: 9 } },
+            hovermode: 'x unified'
+        };
+
+        Plotly.newPlot(chartId, [refTrace, currTrace], layout, { responsive: true, displayModeBar: false });
+    }
+
+    generateSectorTimeChart(analysis) {
+        var container = document.getElementById('sector-time-chart');
+        if (!container) return;
+
+        if (!analysis.sectors || analysis.sectors.length === 0) {
+            container.innerHTML = '<p class="text-gray-500 text-center py-10">No sector data available</p>';
+            return;
+        }
+
+        // Calculate time deltas for each sector
+        var sectorLabels = analysis.sectors.map(function(s) { return 'Sector ' + s.sector; });
+        var timeDeltas = analysis.sectors.map(function(s) {
+            // Use timeDelta if available, otherwise estimate from speed
+            if (s.timeDelta !== undefined && s.timeDelta !== null) {
+                return s.timeDelta;
+            }
+            // Estimate: if slower speed, positive time delta (lost time)
+            // Rough estimate: 1 km/h difference over ~1km sector = ~0.1s
+            var avgSpeedDelta = s.avgSpeedDelta || 0;
+            return -avgSpeedDelta * 0.02; // Rough conversion
+        });
+
+        var colors = timeDeltas.map(function(t) {
+            return t > 0 ? '#ef4444' : '#22c55e'; // Red if losing time, green if gaining
+        });
+
+        var trace = {
+            x: sectorLabels,
+            y: timeDeltas,
+            type: 'bar',
+            marker: { color: colors },
+            text: timeDeltas.map(function(t) { 
+                return (t > 0 ? '+' : '') + t.toFixed(3) + 's'; 
+            }),
+            textposition: 'outside',
+            hovertemplate: '%{x}<br>%{text}<extra></extra>'
+        };
+
+        var layout = {
+            yaxis: { 
+                title: 'Time Delta (seconds)', 
+                zeroline: true, 
+                zerolinewidth: 2,
+                zerolinecolor: '#000'
+            },
+            margin: { t: 30, b: 40, l: 60, r: 20 },
+            annotations: [{
+                x: 0.5,
+                y: 1.1,
+                xref: 'paper',
+                yref: 'paper',
+                text: 'Green = Time Gained | Red = Time Lost',
+                showarrow: false,
+                font: { size: 10, color: '#666' }
+            }]
+        };
+
+        Plotly.newPlot('sector-time-chart', [trace], layout, { responsive: true });
     }
 
     generateSpeedComparison(analysis) {
+        var container = document.getElementById('speed-comparison');
+        if (!container) return;
+
         if (!analysis.avgSpeedCurr) {
-            document.getElementById('sector-times').innerHTML = '<p class="text-gray-500 text-center py-10">No speed data</p>';
+            container.innerHTML = '<p class="text-gray-500 text-center py-10">No speed data available</p>';
             return;
         }
 
         var yourTrace = {
-            x: ['Average', 'Top', 'Min'],
+            x: ['Average', 'Top Speed', 'Min Corner'],
             y: [analysis.avgSpeedCurr || 0, analysis.maxSpeedCurr || 0, analysis.minSpeedCurr || 0],
             type: 'bar',
             name: 'Your Lap',
-            marker: { color: '#8b5cf6' }
+            marker: { color: '#8b5cf6' },
+            text: [
+                (analysis.avgSpeedCurr || 0).toFixed(1),
+                (analysis.maxSpeedCurr || 0).toFixed(0),
+                (analysis.minSpeedCurr || 0).toFixed(0)
+            ],
+            textposition: 'outside'
         };
 
         var refTrace = {
-            x: ['Average', 'Top', 'Min'],
+            x: ['Average', 'Top Speed', 'Min Corner'],
             y: [analysis.avgSpeedRef || 0, analysis.maxSpeedRef || 0, analysis.minSpeedRef || 0],
             type: 'bar',
             name: 'Reference',
-            marker: { color: '#6b7280' }
+            marker: { color: '#6b7280' },
+            text: [
+                (analysis.avgSpeedRef || 0).toFixed(1),
+                (analysis.maxSpeedRef || 0).toFixed(0),
+                (analysis.minSpeedRef || 0).toFixed(0)
+            ],
+            textposition: 'outside'
         };
 
         var layout = {
             barmode: 'group',
             yaxis: { title: 'Speed (km/h)' },
-            margin: { t: 20, b: 40, l: 50, r: 20 },
-            legend: { orientation: 'h', y: -0.2 }
+            margin: { t: 30, b: 40, l: 50, r: 20 },
+            legend: { orientation: 'h', y: -0.15 }
         };
 
-        Plotly.newPlot('sector-times', [yourTrace, refTrace], layout, { responsive: true });
-
-        // G-forces placeholder
-        document.getElementById('g-forces').innerHTML = '<p class="text-gray-500 text-center py-10">Throttle/Brake chart will appear here</p>';
+        Plotly.newPlot('speed-comparison', [yourTrace, refTrace], layout, { responsive: true });
     }
 
     displaySetupRecommendations(analysis) {
