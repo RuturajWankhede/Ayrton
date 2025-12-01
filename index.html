@@ -135,11 +135,32 @@
                     </div>
 
                     <div id="graphs-tab" class="tab-content">
+                        <div class="mb-6">
+                            <h3 class="text-lg font-bold mb-3"><i class="fas fa-route mr-2"></i>Track Map - Racing Line Comparison</h3>
+                            <div id="track-map" class="h-96 bg-gray-900 rounded-lg"></div>
+                            <p class="text-xs text-gray-500 mt-2">
+                                <span class="inline-block w-3 h-3 bg-gray-400 rounded mr-1"></span>Reference Line
+                                <span class="inline-block w-3 h-3 bg-purple-500 rounded ml-4 mr-1"></span>Your Line
+                                (Colors indicate speed: red=slow, green=fast)
+                            </p>
+                        </div>
                         <div class="grid md:grid-cols-2 gap-6">
-                            <div id="speed-trace" class="h-64 bg-gray-50 rounded"></div>
-                            <div id="throttle-brake" class="h-64 bg-gray-50 rounded"></div>
-                            <div id="g-forces" class="h-64 bg-gray-50 rounded"></div>
-                            <div id="sector-times" class="h-64 bg-gray-50 rounded"></div>
+                            <div>
+                                <h4 class="font-semibold mb-2">Speed Comparison Over Distance</h4>
+                                <div id="speed-trace" class="h-64 bg-gray-50 rounded"></div>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold mb-2">Sector Performance</h4>
+                                <div id="throttle-brake" class="h-64 bg-gray-50 rounded"></div>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold mb-2">Throttle/Brake Overlay</h4>
+                                <div id="g-forces" class="h-64 bg-gray-50 rounded"></div>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold mb-2">Speed Metrics Comparison</h4>
+                                <div id="sector-times" class="h-64 bg-gray-50 rounded"></div>
+                            </div>
                         </div>
                     </div>
 
