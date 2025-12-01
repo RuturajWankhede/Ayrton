@@ -327,85 +327,85 @@ class TelemetryAnalysisApp {
                 },
                 tyreTempFLCentre: {
                     variants: ['Tyre Temp FL Centre', 'Tire Temp FL Center', 'TireTempFLC'],
-                    description: 'Front left tire center temperature (°C)',
+                    description: 'Front left tire center temperature (deg C)',
                     icon: 'fa-temperature-high',
                     category: 'Tyre Temperatures'
                 },
                 tyreTempFLInner: {
                     variants: ['Tyre Temp FL Inner', 'Tire Temp FL Inner', 'TireTempFLI'],
-                    description: 'Front left tire inner temperature (°C)',
+                    description: 'Front left tire inner temperature (deg C)',
                     icon: 'fa-temperature-high',
                     category: 'Tyre Temperatures'
                 },
                 tyreTempFLOuter: {
                     variants: ['Tyre Temp FL Outer', 'Tire Temp FL Outer', 'TireTempFLO'],
-                    description: 'Front left tire outer temperature (°C)',
+                    description: 'Front left tire outer temperature (deg C)',
                     icon: 'fa-temperature-high',
                     category: 'Tyre Temperatures'
                 },
                 tyreTempFRCenter: {
                     variants: ['Tyre Temp FR Center', 'Tire Temp FR Center', 'TireTempFRC'],
-                    description: 'Front right tire center temperature (°C)',
+                    description: 'Front right tire center temperature (deg C)',
                     icon: 'fa-temperature-high',
                     category: 'Tyre Temperatures'
                 },
                 tyreTempFRInner: {
                     variants: ['Tyre Temp FR Inner', 'Tire Temp FR Inner', 'TireTempFRI'],
-                    description: 'Front right tire inner temperature (°C)',
+                    description: 'Front right tire inner temperature (deg C)',
                     icon: 'fa-temperature-high',
                     category: 'Tyre Temperatures'
                 },
                 tyreTempFROuter: {
                     variants: ['Tyre Temp FR Outer', 'Tire Temp FR Outer', 'TireTempFRO'],
-                    description: 'Front right tire outer temperature (°C)',
+                    description: 'Front right tire outer temperature (deg C)',
                     icon: 'fa-temperature-high',
                     category: 'Tyre Temperatures'
                 },
                 tyreTempRL: {
                     variants: ['Tyre Temp RL', 'Tire Temp RL', 'TireTempRL'],
-                    description: 'Rear left tire temperature (°C)',
+                    description: 'Rear left tire temperature (deg C)',
                     icon: 'fa-temperature-high',
                     category: 'Tyre Temperatures'
                 },
                 tyreTempRR: {
                     variants: ['Tyre Temp RR', 'Tire Temp RR', 'TireTempRR'],
-                    description: 'Rear right tire temperature (°C)',
+                    description: 'Rear right tire temperature (deg C)',
                     icon: 'fa-temperature-high',
                     category: 'Tyre Temperatures'
                 },
                 brakeTempFL: {
                     variants: ['Brake Temp FL', 'BrakeTempFL', 'Front Left Brake Temp'],
-                    description: 'Front left brake temperature (°C)',
+                    description: 'Front left brake temperature (deg C)',
                     icon: 'fa-fire',
                     category: 'Brake Temperatures'
                 },
                 brakeTempRL: {
                     variants: ['Brake Temp RL', 'BrakeTempRL', 'Rear Left Brake Temp'],
-                    description: 'Rear left brake temperature (°C)',
+                    description: 'Rear left brake temperature (deg C)',
                     icon: 'fa-fire',
                     category: 'Brake Temperatures'
                 },
                 engineTemp: {
                     variants: ['Engine Temp', 'Water Temp', 'Coolant Temp', 'EngineTemp'],
-                    description: 'Engine/coolant temperature (°C)',
+                    description: 'Engine/coolant temperature (deg C)',
                     icon: 'fa-thermometer-half',
                     category: 'Engine Temperatures'
                 },
                 oilTemp: {
                     variants: ['Eng Oil Temp', 'Oil Temp', 'OilTemp', 'Engine Oil Temp'],
-                    description: 'Engine oil temperature (°C)',
+                    description: 'Engine oil temperature (deg C)',
                     icon: 'fa-oil-can',
                     category: 'Engine Temperatures'
                 },
                 diffOilTemp: {
                     variants: ['Diff Oil Temp', 'Differential Oil Temp', 'DiffOilTemp'],
-                    description: 'Differential oil temperature (°C)',
+                    description: 'Differential oil temperature (deg C)',
                     icon: 'fa-oil-can',
                     category: 'Engine Temperatures'
                 },
                 gboxOilTemp: {
                     variants: ['Gbox Oil Temp', 'Gearbox Oil Temp', 'Trans Temp'],
-                    description: 'Gearbox oil temperature (°C)',
+                    description: 'Gearbox oil temperature (deg C)',
                     icon: 'fa-oil-can',
                     category: 'Engine Temperatures'
                 },
@@ -453,7 +453,7 @@ class TelemetryAnalysisApp {
                 },
                 ignAdvance: {
                     variants: ['Ign Advance', 'Ignition Advance', 'Spark Advance'],
-                    description: 'Ignition timing advance (°BTDC)',
+                    description: 'Ignition timing advance (deg BTDC)',
                     icon: 'fa-bolt',
                     category: 'Engine'
                 },
@@ -507,7 +507,7 @@ class TelemetryAnalysisApp {
                 },
                 airTempInlet: {
                     variants: ['Air Temp Inlet', 'Inlet Air Temp', 'IAT', 'Air Temp'],
-                    description: 'Inlet air temperature (°C)',
+                    description: 'Inlet air temperature (deg C)',
                     icon: 'fa-wind',
                     category: 'Environment'
                 },
@@ -677,7 +677,7 @@ class TelemetryAnalysisApp {
         } else {
             const requiredCount = Object.keys(detected.required).length;
             const optionalCount = Object.keys(detected.optional).length;
-            message = `✅ Ready for analysis! ${requiredCount} required + ${optionalCount} optional channels detected.`;
+            message = `[OK]  Ready for analysis! ${requiredCount} required + ${optionalCount} optional channels detected.`;
             
             this.showNotification(`Channels detected! ${detected.capabilities.length} analysis types available.`, 'success');
         }
@@ -712,7 +712,7 @@ class TelemetryAnalysisApp {
                             <i class="fas fa-microchip mr-2"></i>Channel Detection Results
                         </h3>
                         <p class="text-indigo-200 text-sm mt-1">
-                            ${columns.length} columns found in CSV → 
+                            ${columns.length} columns found in CSV to  
                             ${Object.keys(detected.required).length + Object.keys(detected.optional).length} channels mapped
                         </p>
                     </div>
@@ -758,7 +758,7 @@ class TelemetryAnalysisApp {
                                 <span class="font-medium text-green-800 flex items-center">
                                     <i class="fas ${info.icon} mr-2 text-green-600"></i>${key.charAt(0).toUpperCase() + key.slice(1)}
                                 </span>
-                                <span class="bg-green-500 text-white text-xs px-2 py-0.5 rounded">✓ Found</span>
+                                <span class="bg-green-500 text-white text-xs px-2 py-0.5 rounded">OK  Found</span>
                             </div>
                             <div class="text-sm">
                                 <p class="text-gray-600 mb-1">${info.description}</p>
@@ -773,7 +773,7 @@ class TelemetryAnalysisApp {
                         <div class="bg-red-50 border border-red-200 rounded-lg p-3">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="font-medium text-red-800">${m.channel.charAt(0).toUpperCase() + m.channel.slice(1)}</span>
-                                <span class="bg-red-500 text-white text-xs px-2 py-0.5 rounded">✗ Missing</span>
+                                <span class="bg-red-500 text-white text-xs px-2 py-0.5 rounded">X Missing</span>
                             </div>
                             <div class="text-sm">
                                 <p class="text-gray-600 mb-1">${m.description}</p>
@@ -1364,7 +1364,7 @@ class TelemetryAnalysisApp {
             if (Math.abs(yawRate) > 0.001) {
                 turnRate = yawRate * dt * sampleRate;
             } else if (Math.abs(gLat) > 0.05) {
-                // Estimate turn rate from lateral G: a = v²/r, ω = v/r = a/v
+                // Estimate turn rate from lateral G: a = v^2/r, w = v/r = a/v
                 turnRate = (gLat * 9.81 / Math.max(speed, 10)) * dt * sampleRate;
             } else {
                 // Estimate from steering angle (simplified bicycle model)
@@ -1736,7 +1736,7 @@ class TelemetryAnalysisApp {
                 y: 0.95,
                 xref: 'paper',
                 yref: 'paper',
-                text: 'Throttle ↑',
+                text: 'Throttle up',
                 showarrow: false,
                 font: { color: '#22c55e', size: 10 }
             }, {
@@ -1744,7 +1744,7 @@ class TelemetryAnalysisApp {
                 y: 0.05,
                 xref: 'paper',
                 yref: 'paper',
-                text: 'Brake ↓',
+                text: 'Brake down',
                 showarrow: false,
                 font: { color: '#ef4444', size: 10 }
             }]
@@ -2011,7 +2011,7 @@ class TelemetryAnalysisApp {
                     ${sectors.map(sector => {
                         const avgDelta = sector.avgSpeedDelta || 0;
                         const minDelta = sector.minSpeedDelta || 0;
-                        const status = avgDelta >= 0 ? '✓ Good' : avgDelta > -5 ? '⚠️ Needs Work' : '❌ Critical';
+                        const status = avgDelta >= 0 ? 'OK  Good' : avgDelta > -5 ? '!  Needs Work' : 'X  Critical';
                         const statusColor = avgDelta >= 0 ? 'text-green-600' : avgDelta > -5 ? 'text-yellow-600' : 'text-red-600';
                         return `
                         <tr>
