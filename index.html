@@ -64,11 +64,7 @@
                     </div>
                 </div>
                 
-                <div class="mt-6 text-center">
-                    <button id="analyze-btn" disabled class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:from-purple-700 hover:to-indigo-700 transition">
-                        <i class="fas fa-chart-line mr-2"></i>Analyze Telemetry
-                    </button>
-                </div>
+                <!-- Channel detection results and analyze button will appear here -->
             </div>
         </div>
 
@@ -142,30 +138,31 @@
                         
                         <div class="mb-6">
                             <h3 class="text-lg font-bold mb-3"><i class="fas fa-chart-area mr-2"></i>Telemetry Overlays</h3>
-                            <div class="grid md:grid-cols-2 gap-4">
+                            <p class="text-xs text-gray-500 mb-4"><span class="inline-block w-3 h-3 bg-gray-400 rounded mr-1"></span> Reference Lap | <span class="inline-block w-3 h-3 bg-purple-500 rounded mr-1"></span> Your Lap</p>
+                            <div class="space-y-4">
                                 <div>
                                     <h4 class="font-semibold mb-2 text-sm">Speed Overlay</h4>
-                                    <div id="speed-overlay" class="h-48 bg-gray-50 rounded border"></div>
+                                    <div id="speed-overlay" class="h-56 bg-gray-50 rounded border"></div>
                                 </div>
                                 <div>
                                     <h4 class="font-semibold mb-2 text-sm">Throttle Overlay</h4>
-                                    <div id="throttle-overlay" class="h-48 bg-gray-50 rounded border"></div>
+                                    <div id="throttle-overlay" class="h-56 bg-gray-50 rounded border"></div>
                                 </div>
                                 <div>
                                     <h4 class="font-semibold mb-2 text-sm">Brake Overlay</h4>
-                                    <div id="brake-overlay" class="h-48 bg-gray-50 rounded border"></div>
+                                    <div id="brake-overlay" class="h-56 bg-gray-50 rounded border"></div>
                                 </div>
                                 <div>
                                     <h4 class="font-semibold mb-2 text-sm">Steering Angle Overlay</h4>
-                                    <div id="steering-overlay" class="h-48 bg-gray-50 rounded border"></div>
+                                    <div id="steering-overlay" class="h-56 bg-gray-50 rounded border"></div>
                                 </div>
                                 <div>
                                     <h4 class="font-semibold mb-2 text-sm">G-Force Overlay</h4>
-                                    <div id="gforce-overlay" class="h-48 bg-gray-50 rounded border"></div>
+                                    <div id="gforce-overlay" class="h-56 bg-gray-50 rounded border"></div>
                                 </div>
                                 <div>
                                     <h4 class="font-semibold mb-2 text-sm">Gear Overlay</h4>
-                                    <div id="gear-overlay" class="h-48 bg-gray-50 rounded border"></div>
+                                    <div id="gear-overlay" class="h-56 bg-gray-50 rounded border"></div>
                                 </div>
                             </div>
                         </div>
@@ -183,7 +180,7 @@
                                     <i class="fas fa-trash mr-1"></i>Clear Custom
                                 </button>
                             </div>
-                            <div id="custom-overlays-container" class="mt-4 grid md:grid-cols-2 gap-4"></div>
+                            <div id="custom-overlays-container" class="mt-4 space-y-4"></div>
                         </div>
                         
                         <div class="grid md:grid-cols-2 gap-6">
