@@ -493,8 +493,13 @@ class TelemetryAnalysisApp {
     }
 
     displayChannelInfo(detected) {
+        var self = this;
         var existingDisplay = document.getElementById('channel-detection-display');
         if (existingDisplay) existingDisplay.remove();
+        
+        // Remove existing modal if any
+        var existingModal = document.getElementById('channel-mapping-modal');
+        if (existingModal) existingModal.remove();
         
         var requiredCount = Object.keys(detected.required).length;
         var optionalCount = Object.keys(detected.optional).length;
@@ -577,45 +582,409 @@ class TelemetryAnalysisApp {
         });
         html += '</div>';
         
-        // Unrecognized columns
+        // Unrecognized columns with expand all and manual mapping
         if (detected.unrecognized.length > 0) {
             html += '<div class="p-4 bg-gray-50" id="unrecognized-section" style="display:none;">';
-            html += '<details><summary class="font-semibold text-gray-600 cursor-pointer">';
-            html += '<i class="fas fa-question-circle text-gray-400 mr-2"></i>';
-            html += 'Unrecognized Columns (' + detected.unrecognized.length + ')</summary>';
-            html += '<div class="mt-2 flex flex-wrap gap-1">';
-            detected.unrecognized.slice(0, 20).forEach(function(col) {
-                html += '<span class="bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded">' + col + '</span>';
+            html += '<div class="flex items-center justify-between mb-3">';
+            html += '<h4 class="font-semibold text-gray-600"><i class="fas fa-question-circle text-gray-400 mr-2"></i>Unrecognized Columns (' + detected.unrecognized.length + ')</h4>';
+            html += '<button id="expand-all-columns" class="text-sm bg-white px-3 py-1 rounded border hover:bg-gray-100">';
+            html += '<i class="fas fa-expand-alt mr-1"></i>Show All</button>';
+            html += '</div>';
+            html += '<p class="text-xs text-blue-600 mb-3"><i class="fas fa-info-circle mr-1"></i>Click on any column to manually assign it to a telemetry channel</p>';
+            html += '<div id="unrecognized-columns-list" class="flex flex-wrap gap-1">';
+            
+            detected.unrecognized.forEach(function(col, index) {
+                var hiddenClass = index >= 20 ? ' hidden-column' : '';
+                var displayStyle = index >= 20 ? ' style="display:none;"' : '';
+                html += '<button class="unrecognized-col-btn' + hiddenClass + ' bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded hover:bg-blue-200 hover:text-blue-800 cursor-pointer transition"';
+                html += ' data-column="' + self.escapeHtml(col) + '"' + displayStyle + '>' + self.escapeHtml(col) + '</button>';
             });
+            
+            html += '</div>';
             if (detected.unrecognized.length > 20) {
-                html += '<span class="text-gray-500 text-xs">...and ' + (detected.unrecognized.length - 20) + ' more</span>';
+                html += '<p id="columns-count-text" class="text-gray-500 text-xs mt-2">Showing 20 of ' + detected.unrecognized.length + ' columns</p>';
             }
-            html += '</div></details></div>';
+            html += '</div>';
         }
+        
+        // Custom mappings section
+        html += '<div class="p-4 bg-blue-50 border-t" id="custom-mappings-section" style="display:none;">';
+        html += '<h4 class="font-semibold text-gray-700 mb-2"><i class="fas fa-link text-blue-500 mr-2"></i>Custom Channel Mappings</h4>';
+        html += '<div id="custom-mappings-list" class="space-y-1"></div>';
+        html += '<button id="reanalyze-btn" class="mt-3 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition">';
+        html += '<i class="fas fa-sync-alt mr-2"></i>Re-Analyze with Custom Mappings</button>';
+        html += '</div>';
         
         displayContainer.innerHTML = html;
         
         var uploadSection = document.querySelector('#upload-section .bg-white');
         uploadSection.appendChild(displayContainer);
         
-        // Toggle functionality
-        setTimeout(function() {
-            var toggleBtn = document.getElementById('toggle-channel-details');
-            var optionalSection = document.getElementById('optional-channels-section');
-            var unrecognizedSection = document.getElementById('unrecognized-section');
-            var isExpanded = false;
-            
-            if (toggleBtn) {
-                toggleBtn.addEventListener('click', function() {
-                    isExpanded = !isExpanded;
-                    if (optionalSection) optionalSection.style.display = isExpanded ? 'block' : 'none';
-                    if (unrecognizedSection) unrecognizedSection.style.display = isExpanded ? 'block' : 'none';
-                    toggleBtn.innerHTML = isExpanded ? 
-                        '<i class="fas fa-chevron-up mr-1"></i>Hide' : 
-                        '<i class="fas fa-chevron-down mr-1"></i>Details';
+        // Create mapping modal
+        this.createMappingModal();
+        
+        // Setup event listeners
+        this.setupChannelMappingEvents(detected);
+    }
+
+    escapeHtml(text) {
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    createMappingModal() {
+        var modal = document.createElement('div');
+        modal.id = 'channel-mapping-modal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50';
+        
+        var channelOptions = [
+            { category: 'Required', channels: [
+                { key: 'time', name: 'Time', icon: 'fa-clock' },
+                { key: 'distance', name: 'Lap Distance', icon: 'fa-road' },
+                { key: 'speed', name: 'Speed', icon: 'fa-tachometer-alt' }
+            ]},
+            { category: 'Driver Inputs', channels: [
+                { key: 'throttle', name: 'Throttle Position', icon: 'fa-gas-pump' },
+                { key: 'brake', name: 'Brake Pressure', icon: 'fa-hand-paper' },
+                { key: 'gear', name: 'Gear', icon: 'fa-cog' },
+                { key: 'steer', name: 'Steering Angle', icon: 'fa-dharmachakra' }
+            ]},
+            { category: 'Engine', channels: [
+                { key: 'rpm', name: 'Engine RPM', icon: 'fa-tachometer-alt' },
+                { key: 'engineTemp', name: 'Engine Temperature', icon: 'fa-thermometer-full' },
+                { key: 'oilTemp', name: 'Oil Temperature', icon: 'fa-oil-can' },
+                { key: 'fuelLevel', name: 'Fuel Level', icon: 'fa-gas-pump' }
+            ]},
+            { category: 'Vehicle Dynamics', channels: [
+                { key: 'gLat', name: 'Lateral G-Force', icon: 'fa-arrows-alt-h' },
+                { key: 'gLong', name: 'Longitudinal G-Force', icon: 'fa-arrows-alt-v' },
+                { key: 'yaw', name: 'Yaw Rate', icon: 'fa-sync' }
+            ]},
+            { category: 'Wheel Speeds', channels: [
+                { key: 'wheelSpeedFL', name: 'Wheel Speed FL', icon: 'fa-circle' },
+                { key: 'wheelSpeedFR', name: 'Wheel Speed FR', icon: 'fa-circle' },
+                { key: 'wheelSpeedRL', name: 'Wheel Speed RL', icon: 'fa-circle' },
+                { key: 'wheelSpeedRR', name: 'Wheel Speed RR', icon: 'fa-circle' }
+            ]},
+            { category: 'Suspension', channels: [
+                { key: 'suspFL', name: 'Suspension FL', icon: 'fa-arrows-alt-v' },
+                { key: 'suspFR', name: 'Suspension FR', icon: 'fa-arrows-alt-v' },
+                { key: 'suspRL', name: 'Suspension RL', icon: 'fa-arrows-alt-v' },
+                { key: 'suspRR', name: 'Suspension RR', icon: 'fa-arrows-alt-v' }
+            ]},
+            { category: 'Temperatures', channels: [
+                { key: 'tyreTempFL', name: 'Tire Temp FL', icon: 'fa-thermometer-half' },
+                { key: 'tyreTempFR', name: 'Tire Temp FR', icon: 'fa-thermometer-half' },
+                { key: 'tyreTempRL', name: 'Tire Temp RL', icon: 'fa-thermometer-half' },
+                { key: 'tyreTempRR', name: 'Tire Temp RR', icon: 'fa-thermometer-half' },
+                { key: 'brakeTempFL', name: 'Brake Temp FL', icon: 'fa-fire' },
+                { key: 'brakeTempFR', name: 'Brake Temp FR', icon: 'fa-fire' }
+            ]},
+            { category: 'Position', channels: [
+                { key: 'gpsLat', name: 'GPS Latitude', icon: 'fa-map-marker-alt' },
+                { key: 'gpsLon', name: 'GPS Longitude', icon: 'fa-map-marker-alt' }
+            ]},
+            { category: 'Lap Info', channels: [
+                { key: 'lapTime', name: 'Lap Time', icon: 'fa-stopwatch' },
+                { key: 'lapNumber', name: 'Lap Number', icon: 'fa-hashtag' }
+            ]}
+        ];
+        
+        var modalHtml = '<div class="bg-white rounded-lg p-6 max-w-lg w-full mx-4 max-h-screen overflow-y-auto">';
+        modalHtml += '<div class="flex items-center justify-between mb-4 sticky top-0 bg-white pb-2 border-b">';
+        modalHtml += '<h3 class="text-lg font-bold"><i class="fas fa-link text-blue-500 mr-2"></i>Map Column to Channel</h3>';
+        modalHtml += '<button id="close-mapping-modal" class="text-gray-500 hover:text-gray-700 text-xl"><i class="fas fa-times"></i></button>';
+        modalHtml += '</div>';
+        modalHtml += '<div class="mb-4 p-3 bg-blue-50 rounded">';
+        modalHtml += '<p class="text-sm text-gray-600">CSV Column:</p>';
+        modalHtml += '<p id="mapping-column-name" class="font-bold text-blue-700 text-lg"></p>';
+        modalHtml += '</div>';
+        modalHtml += '<p class="text-sm text-gray-500 mb-4">Select the telemetry channel this column represents:</p>';
+        
+        channelOptions.forEach(function(group) {
+            modalHtml += '<div class="mb-4">';
+            modalHtml += '<h4 class="text-sm font-semibold text-gray-600 mb-2">' + group.category + '</h4>';
+            modalHtml += '<div class="grid grid-cols-2 gap-2">';
+            group.channels.forEach(function(ch) {
+                modalHtml += '<button class="channel-option-btn text-left p-2 border rounded hover:bg-blue-50 hover:border-blue-300 transition text-sm" data-channel="' + ch.key + '">';
+                modalHtml += '<i class="fas ' + ch.icon + ' text-gray-400 mr-2"></i>' + ch.name + '</button>';
+            });
+            modalHtml += '</div></div>';
+        });
+        
+        modalHtml += '<div class="mt-4 pt-4 border-t">';
+        modalHtml += '<button id="remove-mapping-btn" class="w-full p-2 border border-red-300 text-red-600 rounded hover:bg-red-50 transition text-sm">';
+        modalHtml += '<i class="fas fa-trash mr-2"></i>Remove This Mapping</button>';
+        modalHtml += '</div></div>';
+        
+        modal.innerHTML = modalHtml;
+        document.body.appendChild(modal);
+    }
+
+    setupChannelMappingEvents(detected) {
+        var self = this;
+        
+        // Initialize custom mappings storage
+        if (!this.customMappings) {
+            this.customMappings = {};
+        }
+        
+        // Toggle details button
+        var toggleBtn = document.getElementById('toggle-channel-details');
+        var optionalSection = document.getElementById('optional-channels-section');
+        var unrecognizedSection = document.getElementById('unrecognized-section');
+        var isExpanded = false;
+        
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function() {
+                isExpanded = !isExpanded;
+                if (optionalSection) optionalSection.style.display = isExpanded ? 'block' : 'none';
+                if (unrecognizedSection) unrecognizedSection.style.display = isExpanded ? 'block' : 'none';
+                toggleBtn.innerHTML = isExpanded ? 
+                    '<i class="fas fa-chevron-up mr-1"></i>Hide' : 
+                    '<i class="fas fa-chevron-down mr-1"></i>Details';
+            });
+        }
+        
+        // Expand all columns button
+        var expandBtn = document.getElementById('expand-all-columns');
+        var isAllExpanded = false;
+        
+        if (expandBtn) {
+            expandBtn.addEventListener('click', function() {
+                isAllExpanded = !isAllExpanded;
+                var hiddenCols = document.querySelectorAll('.hidden-column');
+                hiddenCols.forEach(function(col) {
+                    col.style.display = isAllExpanded ? 'inline-block' : 'none';
                 });
+                var countText = document.getElementById('columns-count-text');
+                if (countText) {
+                    countText.textContent = isAllExpanded ? 
+                        'Showing all ' + detected.unrecognized.length + ' columns' :
+                        'Showing 20 of ' + detected.unrecognized.length + ' columns';
+                }
+                expandBtn.innerHTML = isAllExpanded ?
+                    '<i class="fas fa-compress-alt mr-1"></i>Show Less' :
+                    '<i class="fas fa-expand-alt mr-1"></i>Show All';
+            });
+        }
+        
+        // Click on unrecognized column to map it
+        var colButtons = document.querySelectorAll('.unrecognized-col-btn');
+        colButtons.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var columnName = this.getAttribute('data-column');
+                self.openMappingModal(columnName);
+            });
+        });
+        
+        // Modal close button
+        var closeBtn = document.getElementById('close-mapping-modal');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function() {
+                self.closeMappingModal();
+            });
+        }
+        
+        // Modal background click to close
+        var modal = document.getElementById('channel-mapping-modal');
+        if (modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    self.closeMappingModal();
+                }
+            });
+        }
+        
+        // Channel option buttons
+        var channelBtns = document.querySelectorAll('.channel-option-btn');
+        channelBtns.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var channelKey = this.getAttribute('data-channel');
+                var columnName = document.getElementById('mapping-column-name').textContent;
+                self.addCustomMapping(columnName, channelKey);
+                self.closeMappingModal();
+            });
+        });
+        
+        // Remove mapping button
+        var removeBtn = document.getElementById('remove-mapping-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', function() {
+                var columnName = document.getElementById('mapping-column-name').textContent;
+                self.removeCustomMapping(columnName);
+                self.closeMappingModal();
+            });
+        }
+        
+        // Re-analyze button
+        var reanalyzeBtn = document.getElementById('reanalyze-btn');
+        if (reanalyzeBtn) {
+            reanalyzeBtn.addEventListener('click', function() {
+                self.reanalyzeWithMappings();
+            });
+        }
+    }
+
+    openMappingModal(columnName) {
+        var modal = document.getElementById('channel-mapping-modal');
+        var columnNameEl = document.getElementById('mapping-column-name');
+        
+        if (modal && columnNameEl) {
+            columnNameEl.textContent = columnName;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            
+            // Highlight if already mapped
+            var existingMapping = this.customMappings[columnName];
+            var channelBtns = document.querySelectorAll('.channel-option-btn');
+            channelBtns.forEach(function(btn) {
+                btn.classList.remove('bg-green-100', 'border-green-500');
+                if (existingMapping && btn.getAttribute('data-channel') === existingMapping) {
+                    btn.classList.add('bg-green-100', 'border-green-500');
+                }
+            });
+        }
+    }
+
+    closeMappingModal() {
+        var modal = document.getElementById('channel-mapping-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+    }
+
+    addCustomMapping(columnName, channelKey) {
+        this.customMappings[columnName] = channelKey;
+        this.updateCustomMappingsDisplay();
+        this.showNotification('Mapped "' + columnName + '" to ' + channelKey, 'success');
+        
+        // Update the button style for the mapped column
+        var colBtn = document.querySelector('.unrecognized-col-btn[data-column="' + columnName.replace(/"/g, '\\"') + '"]');
+        if (colBtn) {
+            colBtn.classList.remove('bg-gray-200', 'text-gray-700');
+            colBtn.classList.add('bg-green-200', 'text-green-800');
+        }
+    }
+
+    removeCustomMapping(columnName) {
+        if (this.customMappings[columnName]) {
+            delete this.customMappings[columnName];
+            this.updateCustomMappingsDisplay();
+            this.showNotification('Removed mapping for "' + columnName + '"', 'info');
+            
+            // Reset the button style
+            var colBtn = document.querySelector('.unrecognized-col-btn[data-column="' + columnName.replace(/"/g, '\\"') + '"]');
+            if (colBtn) {
+                colBtn.classList.remove('bg-green-200', 'text-green-800');
+                colBtn.classList.add('bg-gray-200', 'text-gray-700');
             }
-        }, 0);
+        }
+    }
+
+    updateCustomMappingsDisplay() {
+        var mappingsSection = document.getElementById('custom-mappings-section');
+        var mappingsList = document.getElementById('custom-mappings-list');
+        
+        var mappingKeys = Object.keys(this.customMappings);
+        
+        if (mappingKeys.length > 0) {
+            mappingsSection.style.display = 'block';
+            
+            var html = '';
+            var self = this;
+            mappingKeys.forEach(function(col) {
+                var channel = self.customMappings[col];
+                html += '<div class="flex items-center justify-between bg-white p-2 rounded border">';
+                html += '<div>';
+                html += '<code class="text-sm text-gray-600">' + self.escapeHtml(col) + '</code>';
+                html += '<span class="text-gray-400 mx-2"><i class="fas fa-arrow-right"></i></span>';
+                html += '<span class="text-blue-600 font-medium">' + channel + '</span>';
+                html += '</div>';
+                html += '<button class="remove-single-mapping text-red-500 hover:text-red-700" data-column="' + self.escapeHtml(col) + '">';
+                html += '<i class="fas fa-times"></i></button>';
+                html += '</div>';
+            });
+            
+            mappingsList.innerHTML = html;
+            
+            // Add event listeners to remove buttons
+            var removeBtns = mappingsList.querySelectorAll('.remove-single-mapping');
+            removeBtns.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var col = this.getAttribute('data-column');
+                    self.removeCustomMapping(col);
+                });
+            });
+        } else {
+            mappingsSection.style.display = 'none';
+        }
+    }
+
+    reanalyzeWithMappings() {
+        var self = this;
+        
+        // Apply custom mappings to the data
+        if (Object.keys(this.customMappings).length > 0) {
+            console.log('Applying custom mappings:', this.customMappings);
+            
+            // Create column rename map
+            var renameMap = {};
+            Object.keys(this.customMappings).forEach(function(originalCol) {
+                var targetChannel = self.customMappings[originalCol];
+                // Map to the standard column name the system expects
+                var standardNames = {
+                    'time': 'Time',
+                    'distance': 'Lap Distance', 
+                    'speed': 'Ground Speed',
+                    'throttle': 'Throttle Pos',
+                    'brake': 'Brake Pres Front',
+                    'gear': 'Gear',
+                    'steer': 'Steered Angle',
+                    'rpm': 'Engine RPM',
+                    'gLat': 'G Force Lat',
+                    'gLong': 'G Force Long',
+                    'yaw': 'Gyro Yaw Velocity',
+                    'gpsLat': 'GPS Latitude',
+                    'gpsLon': 'GPS Longitude'
+                };
+                if (standardNames[targetChannel]) {
+                    renameMap[originalCol] = standardNames[targetChannel];
+                }
+            });
+            
+            // Apply renames to reference data
+            this.referenceData = this.referenceData.map(function(row) {
+                var newRow = Object.assign({}, row);
+                Object.keys(renameMap).forEach(function(oldName) {
+                    if (newRow[oldName] !== undefined) {
+                        newRow[renameMap[oldName]] = newRow[oldName];
+                    }
+                });
+                return newRow;
+            });
+            
+            // Apply renames to current data
+            this.currentData = this.currentData.map(function(row) {
+                var newRow = Object.assign({}, row);
+                Object.keys(renameMap).forEach(function(oldName) {
+                    if (newRow[oldName] !== undefined) {
+                        newRow[renameMap[oldName]] = newRow[oldName];
+                    }
+                });
+                return newRow;
+            });
+            
+            console.log('Data columns remapped');
+        }
+        
+        // Re-detect channels with new mappings
+        this.detectChannels();
+        
+        // Run analysis
+        this.analyzeTelemetry();
     }
 
     async analyzeTelemetry() {
