@@ -139,22 +139,61 @@
                             <div id="track-map" class="h-96 bg-gray-900 rounded-lg"></div>
                             <p class="text-xs text-gray-500 mt-2">Gray = Reference Line | Colored = Your Line (red=slow, green=fast)</p>
                         </div>
+                        
+                        <div class="mb-6">
+                            <h3 class="text-lg font-bold mb-3"><i class="fas fa-chart-area mr-2"></i>Telemetry Overlays</h3>
+                            <div class="grid md:grid-cols-2 gap-4">
+                                <div>
+                                    <h4 class="font-semibold mb-2 text-sm">Speed Overlay</h4>
+                                    <div id="speed-overlay" class="h-48 bg-gray-50 rounded border"></div>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold mb-2 text-sm">Throttle Overlay</h4>
+                                    <div id="throttle-overlay" class="h-48 bg-gray-50 rounded border"></div>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold mb-2 text-sm">Brake Overlay</h4>
+                                    <div id="brake-overlay" class="h-48 bg-gray-50 rounded border"></div>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold mb-2 text-sm">Steering Angle Overlay</h4>
+                                    <div id="steering-overlay" class="h-48 bg-gray-50 rounded border"></div>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold mb-2 text-sm">G-Force Overlay</h4>
+                                    <div id="gforce-overlay" class="h-48 bg-gray-50 rounded border"></div>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold mb-2 text-sm">Gear Overlay</h4>
+                                    <div id="gear-overlay" class="h-48 bg-gray-50 rounded border"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-6 p-4 bg-gray-50 rounded-lg border">
+                            <h4 class="font-semibold mb-3"><i class="fas fa-plus-circle text-blue-500 mr-2"></i>Add Custom Overlay</h4>
+                            <div class="flex flex-wrap gap-2 items-center">
+                                <select id="custom-channel-select" class="border rounded px-3 py-2 text-sm">
+                                    <option value="">-- Select Channel --</option>
+                                </select>
+                                <button id="add-custom-overlay-btn" class="bg-blue-500 text-white px-4 py-2 rounded text-sm hover:bg-blue-600">
+                                    <i class="fas fa-plus mr-1"></i>Add Overlay
+                                </button>
+                                <button id="clear-custom-overlays-btn" class="bg-gray-500 text-white px-4 py-2 rounded text-sm hover:bg-gray-600">
+                                    <i class="fas fa-trash mr-1"></i>Clear Custom
+                                </button>
+                            </div>
+                            <div id="custom-overlays-container" class="mt-4 grid md:grid-cols-2 gap-4"></div>
+                        </div>
+                        
                         <div class="grid md:grid-cols-2 gap-6">
                             <div>
-                                <h4 class="font-semibold mb-2">Speed Over Distance</h4>
-                                <div id="speed-trace" class="h-64 bg-gray-50 rounded"></div>
-                            </div>
-                            <div>
-                                <h4 class="font-semibold mb-2">Sector Performance</h4>
-                                <div id="throttle-brake" class="h-64 bg-gray-50 rounded"></div>
-                            </div>
-                            <div>
-                                <h4 class="font-semibold mb-2">Throttle and Brake</h4>
-                                <div id="g-forces" class="h-64 bg-gray-50 rounded"></div>
+                                <h4 class="font-semibold mb-2">Sector Time Delta</h4>
+                                <div id="sector-time-chart" class="h-64 bg-gray-50 rounded"></div>
                             </div>
                             <div>
                                 <h4 class="font-semibold mb-2">Speed Comparison</h4>
-                                <div id="sector-times" class="h-64 bg-gray-50 rounded"></div>
+                                <div id="speed-comparison" class="h-64 bg-gray-50 rounded"></div>
                             </div>
                         </div>
                     </div>
