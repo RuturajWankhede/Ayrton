@@ -1175,8 +1175,65 @@ class TelemetryAnalysisApp {
             btn.addEventListener('click', function() {
                 var channelKey = this.getAttribute('data-channel');
                 var columnName = document.getElementById('mapping-column-name').textContent;
-                self.addCustomMapping(columnName, channelKey);
-                self.closeMappingModal();
+                
+                // Check if this channel is already mapped to a different column
+                var existingColumnForChannel = null;
+                Object.keys(self.customMappings).forEach(function(col) {
+                    if (self.customMappings[col] === channelKey && col !== columnName) {
+                        existingColumnForChannel = col;
+                    }
+                });
+                
+                // Also check auto-detected channels
+                var isAutoDetected = false;
+                var autoDetectedColumn = null;
+                if (self.detectedChannels) {
+                    var checkDetected = function(channels) {
+                        Object.keys(channels || {}).forEach(function(key) {
+                            if (key === channelKey && channels[key].csvColumn) {
+                                isAutoDetected = true;
+                                autoDetectedColumn = channels[key].csvColumn;
+                            }
+                        });
+                    };
+                    checkDetected(self.detectedChannels.required);
+                    checkDetected(self.detectedChannels.optional);
+                }
+                
+                if (existingColumnForChannel) {
+                    // Show confirmation dialog for overwriting custom mapping
+                    var confirmMsg = 'Warning: "' + channelKey + '" is already mapped to "' + existingColumnForChannel + '".\n\n';
+                    confirmMsg += 'Do you want to replace it with "' + columnName + '"?';
+                    
+                    if (confirm(confirmMsg)) {
+                        // Remove the old mapping
+                        delete self.customMappings[existingColumnForChannel];
+                        
+                        // Reset the old column button style
+                        var oldColBtn = document.querySelector('.unrecognized-col-btn[data-column="' + existingColumnForChannel.replace(/"/g, '\\"') + '"]');
+                        if (oldColBtn) {
+                            oldColBtn.classList.remove('bg-green-200', 'text-green-800');
+                            oldColBtn.classList.add('bg-gray-200', 'text-gray-700');
+                        }
+                        
+                        // Add the new mapping
+                        self.addCustomMapping(columnName, channelKey);
+                        self.closeMappingModal();
+                    }
+                } else if (isAutoDetected) {
+                    // Show warning for overriding auto-detected mapping
+                    var confirmMsg = 'Note: "' + channelKey + '" was auto-detected from "' + autoDetectedColumn + '".\n\n';
+                    confirmMsg += 'Your custom mapping will take priority. Continue?';
+                    
+                    if (confirm(confirmMsg)) {
+                        self.addCustomMapping(columnName, channelKey);
+                        self.closeMappingModal();
+                    }
+                } else {
+                    // No conflict, just add the mapping
+                    self.addCustomMapping(columnName, channelKey);
+                    self.closeMappingModal();
+                }
             });
         });
         
@@ -1200,6 +1257,7 @@ class TelemetryAnalysisApp {
     }
 
     openMappingModal(columnName) {
+        var self = this;
         var modal = document.getElementById('channel-mapping-modal');
         var columnNameEl = document.getElementById('mapping-column-name');
         
@@ -1208,13 +1266,60 @@ class TelemetryAnalysisApp {
             modal.classList.remove('hidden');
             modal.classList.add('flex');
             
-            // Highlight if already mapped
+            // Build a reverse map: channelKey -> columnName (for channels that already have mappings)
+            var channelToColumn = {};
+            Object.keys(this.customMappings).forEach(function(col) {
+                var ch = self.customMappings[col];
+                channelToColumn[ch] = col;
+            });
+            
+            // Also check detected channels (auto-mapped)
+            if (this.detectedChannels) {
+                Object.keys(this.detectedChannels.required || {}).forEach(function(key) {
+                    var ch = self.detectedChannels.required[key];
+                    if (ch && ch.csvColumn) {
+                        channelToColumn[key] = ch.csvColumn + ' (auto-detected)';
+                    }
+                });
+                Object.keys(this.detectedChannels.optional || {}).forEach(function(key) {
+                    var ch = self.detectedChannels.optional[key];
+                    if (ch && ch.csvColumn) {
+                        channelToColumn[key] = ch.csvColumn + ' (auto-detected)';
+                    }
+                });
+            }
+            
+            // Highlight buttons based on mapping status
             var existingMapping = this.customMappings[columnName];
             var channelBtns = document.querySelectorAll('.channel-option-btn');
+            
             channelBtns.forEach(function(btn) {
-                btn.classList.remove('bg-green-100', 'border-green-500');
-                if (existingMapping && btn.getAttribute('data-channel') === existingMapping) {
+                var channelKey = btn.getAttribute('data-channel');
+                var mappedColumn = channelToColumn[channelKey];
+                
+                // Reset classes
+                btn.classList.remove('bg-green-100', 'border-green-500', 'bg-yellow-100', 'border-yellow-500', 'bg-gray-100');
+                
+                // Remove old indicator if exists
+                var oldIndicator = btn.querySelector('.mapping-indicator');
+                if (oldIndicator) oldIndicator.remove();
+                
+                if (existingMapping && channelKey === existingMapping) {
+                    // This is the current mapping for this column
                     btn.classList.add('bg-green-100', 'border-green-500');
+                    var indicator = document.createElement('span');
+                    indicator.className = 'mapping-indicator ml-1 text-xs text-green-600';
+                    indicator.innerHTML = '<i class="fas fa-check"></i> Current';
+                    btn.appendChild(indicator);
+                } else if (mappedColumn) {
+                    // This channel is already mapped to another column
+                    btn.classList.add('bg-yellow-100', 'border-yellow-500');
+                    var indicator = document.createElement('span');
+                    indicator.className = 'mapping-indicator block text-xs text-yellow-700 mt-1 truncate';
+                    indicator.style.maxWidth = '120px';
+                    indicator.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + self.escapeHtml(mappedColumn);
+                    indicator.title = 'Currently mapped to: ' + mappedColumn;
+                    btn.appendChild(indicator);
                 }
             });
         }
