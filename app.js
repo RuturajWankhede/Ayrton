@@ -182,12 +182,440 @@ class TelemetryAnalysisApp {
         if (!this.referenceData || this.referenceData.length === 0) return;
         
         var columns = Object.keys(this.referenceData[0]);
-        console.log('Detected ' + columns.length + ' columns');
+        var self = this;
         
-        this.detectedChannels = {
-            columns: columns,
-            count: columns.length
+        // Channel definitions with variants
+        var channelDefinitions = {
+            required: {
+                time: {
+                    variants: ['Time', 'Elapsed Time', 'Session Time', 'time'],
+                    description: 'Timestamp data',
+                    icon: 'fa-clock'
+                },
+                distance: {
+                    variants: ['Lap Distance', 'Distance', 'Dist', 'LapDist', 'distance'],
+                    description: 'Position around lap',
+                    icon: 'fa-road'
+                },
+                speed: {
+                    variants: ['Ground Speed', 'Speed', 'Drive Speed', 'Vehicle Speed', 'speed'],
+                    description: 'Vehicle speed',
+                    icon: 'fa-tachometer-alt'
+                }
+            },
+            optional: {
+                throttle: {
+                    variants: ['Throttle Pos', 'Throttle', 'TPS', 'throttle', 'Throttle Position'],
+                    description: 'Throttle position',
+                    icon: 'fa-gas-pump',
+                    category: 'Driver Inputs'
+                },
+                brake: {
+                    variants: ['Brake Pres Front', 'Brake Pressure', 'Brake', 'brake', 'Brake Pres Rear'],
+                    description: 'Brake pressure',
+                    icon: 'fa-hand-paper',
+                    category: 'Driver Inputs'
+                },
+                gear: {
+                    variants: ['Gear', 'gear', 'Gear Position'],
+                    description: 'Current gear',
+                    icon: 'fa-cog',
+                    category: 'Driver Inputs'
+                },
+                steer: {
+                    variants: ['Steered Angle', 'Steering Angle', 'Steer', 'steer'],
+                    description: 'Steering angle',
+                    icon: 'fa-dharmachakra',
+                    category: 'Driver Inputs'
+                },
+                rpm: {
+                    variants: ['Engine RPM', 'RPM', 'rpm', 'Engine Speed'],
+                    description: 'Engine RPM',
+                    icon: 'fa-tachometer-alt',
+                    category: 'Engine'
+                },
+                gLat: {
+                    variants: ['G Force Lat', 'Lateral G', 'G_Lat', 'gLat'],
+                    description: 'Lateral G-force',
+                    icon: 'fa-arrows-alt-h',
+                    category: 'Vehicle Dynamics'
+                },
+                gLong: {
+                    variants: ['G Force Long', 'Longitudinal G', 'G_Long', 'gLong'],
+                    description: 'Longitudinal G-force',
+                    icon: 'fa-arrows-alt-v',
+                    category: 'Vehicle Dynamics'
+                },
+                yaw: {
+                    variants: ['Gyro Yaw Velocity', 'Yaw Rate', 'Yaw', 'yaw'],
+                    description: 'Yaw rate',
+                    icon: 'fa-sync',
+                    category: 'Vehicle Dynamics'
+                },
+                wheelSpeedFL: {
+                    variants: ['Wheel Speed FL', 'WheelSpeed FL', 'Wheel Speed LF'],
+                    description: 'Front left wheel speed',
+                    icon: 'fa-circle',
+                    category: 'Wheel Speeds'
+                },
+                wheelSpeedFR: {
+                    variants: ['Wheel Speed FR', 'WheelSpeed FR', 'Wheel Speed RF'],
+                    description: 'Front right wheel speed',
+                    icon: 'fa-circle',
+                    category: 'Wheel Speeds'
+                },
+                wheelSpeedRL: {
+                    variants: ['Wheel Speed RL', 'WheelSpeed RL', 'Wheel Speed LR'],
+                    description: 'Rear left wheel speed',
+                    icon: 'fa-circle',
+                    category: 'Wheel Speeds'
+                },
+                wheelSpeedRR: {
+                    variants: ['Wheel Speed RR', 'WheelSpeed RR', 'Wheel Speed RR'],
+                    description: 'Rear right wheel speed',
+                    icon: 'fa-circle',
+                    category: 'Wheel Speeds'
+                },
+                suspFL: {
+                    variants: ['Susp Pos FL', 'Suspension FL', 'Damper FL'],
+                    description: 'Front left suspension',
+                    icon: 'fa-arrows-alt-v',
+                    category: 'Suspension'
+                },
+                suspFR: {
+                    variants: ['Susp Pos FR', 'Suspension FR', 'Damper FR'],
+                    description: 'Front right suspension',
+                    icon: 'fa-arrows-alt-v',
+                    category: 'Suspension'
+                },
+                tyreTempFL: {
+                    variants: ['Tyre Temp FL Centre', 'Tire Temp FL', 'TyreTemp FL'],
+                    description: 'Front left tire temp',
+                    icon: 'fa-thermometer-half',
+                    category: 'Temperatures'
+                },
+                tyreTempFR: {
+                    variants: ['Tyre Temp FR Center', 'Tire Temp FR', 'TyreTemp FR'],
+                    description: 'Front right tire temp',
+                    icon: 'fa-thermometer-half',
+                    category: 'Temperatures'
+                },
+                brakeTempFL: {
+                    variants: ['Brake Temp FL', 'BrakeTemp FL'],
+                    description: 'Front left brake temp',
+                    icon: 'fa-fire',
+                    category: 'Temperatures'
+                },
+                engineTemp: {
+                    variants: ['Engine Temp', 'Water Temp', 'Coolant Temp'],
+                    description: 'Engine temperature',
+                    icon: 'fa-thermometer-full',
+                    category: 'Engine'
+                },
+                oilTemp: {
+                    variants: ['Eng Oil Temp', 'Oil Temp', 'Engine Oil Temp'],
+                    description: 'Oil temperature',
+                    icon: 'fa-oil-can',
+                    category: 'Engine'
+                },
+                fuelLevel: {
+                    variants: ['Fuel Level', 'Fuel', 'Fuel Qty'],
+                    description: 'Fuel level',
+                    icon: 'fa-gas-pump',
+                    category: 'Engine'
+                },
+                gpsLat: {
+                    variants: ['GPS Latitude', 'Latitude', 'Lat', 'GPS_Lat'],
+                    description: 'GPS Latitude',
+                    icon: 'fa-map-marker-alt',
+                    category: 'Position'
+                },
+                gpsLon: {
+                    variants: ['GPS Longitude', 'Longitude', 'Lon', 'GPS_Long'],
+                    description: 'GPS Longitude',
+                    icon: 'fa-map-marker-alt',
+                    category: 'Position'
+                },
+                lapTime: {
+                    variants: ['Lap Time', 'LapTime', 'Running Lap Time'],
+                    description: 'Lap timing',
+                    icon: 'fa-stopwatch',
+                    category: 'Lap Info'
+                }
+            }
         };
+        
+        var detected = {
+            required: {},
+            optional: {},
+            missing: [],
+            unrecognized: [],
+            capabilities: [],
+            totalColumns: columns.length
+        };
+        
+        var matchedColumns = new Set();
+        
+        // Check required channels
+        Object.keys(channelDefinitions.required).forEach(function(key) {
+            var def = channelDefinitions.required[key];
+            var found = columns.find(function(col) {
+                return def.variants.some(function(variant) {
+                    return col.toLowerCase() === variant.toLowerCase();
+                });
+            });
+            if (found) {
+                detected.required[key] = {
+                    csvColumn: found,
+                    description: def.description,
+                    icon: def.icon
+                };
+                matchedColumns.add(found);
+            } else {
+                detected.missing.push({
+                    channel: key,
+                    description: def.description,
+                    expectedNames: def.variants.slice(0, 3).join(', ')
+                });
+            }
+        });
+        
+        // Check optional channels
+        Object.keys(channelDefinitions.optional).forEach(function(key) {
+            var def = channelDefinitions.optional[key];
+            var found = columns.find(function(col) {
+                return def.variants.some(function(variant) {
+                    return col.toLowerCase() === variant.toLowerCase();
+                });
+            });
+            if (found) {
+                detected.optional[key] = {
+                    csvColumn: found,
+                    description: def.description,
+                    icon: def.icon,
+                    category: def.category
+                };
+                matchedColumns.add(found);
+            }
+        });
+        
+        // Find unrecognized columns
+        columns.forEach(function(col) {
+            if (!matchedColumns.has(col)) {
+                detected.unrecognized.push(col);
+            }
+        });
+        
+        // Determine capabilities
+        if (Object.keys(detected.required).length === 3) {
+            detected.capabilities.push({
+                name: 'Basic Lap Analysis',
+                description: 'Speed traces, sector times, lap comparison',
+                icon: 'fa-chart-line',
+                color: 'green'
+            });
+        }
+        
+        if (detected.optional.throttle && detected.optional.brake) {
+            detected.capabilities.push({
+                name: 'Driver Input Analysis',
+                description: 'Throttle/brake traces, pedal overlap detection',
+                icon: 'fa-shoe-prints',
+                color: 'blue'
+            });
+        }
+        
+        if (detected.optional.gLat && detected.optional.gLong) {
+            detected.capabilities.push({
+                name: 'G-Force Analysis',
+                description: 'Traction circle, grip utilization',
+                icon: 'fa-circle-notch',
+                color: 'purple'
+            });
+        }
+        
+        if (detected.optional.wheelSpeedFL && detected.optional.wheelSpeedFR) {
+            detected.capabilities.push({
+                name: 'Wheel Speed Analysis',
+                description: 'Slip detection, differential behavior',
+                icon: 'fa-circle',
+                color: 'orange'
+            });
+        }
+        
+        if (detected.optional.suspFL || detected.optional.suspFR) {
+            detected.capabilities.push({
+                name: 'Suspension Analysis',
+                description: 'Damper travel, weight transfer',
+                icon: 'fa-car',
+                color: 'cyan'
+            });
+        }
+        
+        if (detected.optional.tyreTempFL || detected.optional.brakeTempFL) {
+            detected.capabilities.push({
+                name: 'Thermal Analysis',
+                description: 'Tire/brake temperature monitoring',
+                icon: 'fa-temperature-high',
+                color: 'red'
+            });
+        }
+        
+        if (detected.optional.steer) {
+            detected.capabilities.push({
+                name: 'Steering Analysis',
+                description: 'Input smoothness, corrections',
+                icon: 'fa-dharmachakra',
+                color: 'indigo'
+            });
+        }
+        
+        if (detected.optional.rpm && detected.optional.gear) {
+            detected.capabilities.push({
+                name: 'Powertrain Analysis',
+                description: 'Shift points, gear usage',
+                icon: 'fa-cogs',
+                color: 'yellow'
+            });
+        }
+        
+        if (detected.optional.gpsLat && detected.optional.gpsLon) {
+            detected.capabilities.push({
+                name: 'GPS Track Mapping',
+                description: 'Accurate track position from GPS',
+                icon: 'fa-map-marked-alt',
+                color: 'teal'
+            });
+        }
+        
+        this.detectedChannels = detected;
+        this.displayChannelInfo(detected);
+    }
+
+    displayChannelInfo(detected) {
+        var existingDisplay = document.getElementById('channel-detection-display');
+        if (existingDisplay) existingDisplay.remove();
+        
+        var requiredCount = Object.keys(detected.required).length;
+        var optionalCount = Object.keys(detected.optional).length;
+        var totalMatched = requiredCount + optionalCount;
+        
+        var displayContainer = document.createElement('div');
+        displayContainer.id = 'channel-detection-display';
+        displayContainer.className = 'mt-6 border rounded-lg overflow-hidden';
+        
+        // Header
+        var statusColor = requiredCount === 3 ? 'green' : 'yellow';
+        var statusText = requiredCount === 3 ? 'Ready for analysis' : 'Missing required channels';
+        
+        var html = '<div class="bg-' + statusColor + '-50 p-4 border-b">';
+        html += '<div class="flex items-center justify-between">';
+        html += '<div>';
+        html += '<h3 class="font-bold text-lg flex items-center">';
+        html += '<i class="fas fa-search text-' + statusColor + '-500 mr-2"></i>';
+        html += 'Channel Detection Results</h3>';
+        html += '<p class="text-sm text-gray-600">' + detected.totalColumns + ' columns found - ' + totalMatched + ' channels mapped</p>';
+        html += '</div>';
+        html += '<button id="toggle-channel-details" class="text-sm bg-white px-3 py-1 rounded border hover:bg-gray-50">';
+        html += '<i class="fas fa-chevron-down mr-1"></i>Details</button>';
+        html += '</div></div>';
+        
+        // Capabilities
+        if (detected.capabilities.length > 0) {
+            html += '<div class="p-4 bg-white border-b">';
+            html += '<h4 class="font-semibold text-gray-700 mb-2"><i class="fas fa-bolt text-yellow-500 mr-2"></i>Analysis Capabilities Unlocked</h4>';
+            html += '<div class="flex flex-wrap gap-2">';
+            detected.capabilities.forEach(function(cap) {
+                html += '<span class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-' + cap.color + '-100 text-' + cap.color + '-800">';
+                html += '<i class="fas ' + cap.icon + ' mr-1"></i>' + cap.name + '</span>';
+            });
+            html += '</div></div>';
+        }
+        
+        // Required channels
+        html += '<div class="p-4 border-b" id="required-channels-section">';
+        html += '<h4 class="font-semibold text-gray-700 mb-2"><i class="fas fa-star text-yellow-500 mr-2"></i>Required Channels (' + requiredCount + '/3)</h4>';
+        html += '<div class="grid md:grid-cols-3 gap-2">';
+        
+        ['time', 'distance', 'speed'].forEach(function(key) {
+            if (detected.required[key]) {
+                var ch = detected.required[key];
+                html += '<div class="bg-green-50 border border-green-200 rounded p-2">';
+                html += '<div class="flex items-center justify-between">';
+                html += '<span class="font-medium text-green-800"><i class="fas ' + ch.icon + ' mr-1"></i>' + key + '</span>';
+                html += '<i class="fas fa-check-circle text-green-500"></i></div>';
+                html += '<code class="text-xs text-gray-500">' + ch.csvColumn + '</code></div>';
+            } else {
+                html += '<div class="bg-red-50 border border-red-200 rounded p-2">';
+                html += '<div class="flex items-center justify-between">';
+                html += '<span class="font-medium text-red-800">' + key + '</span>';
+                html += '<i class="fas fa-times-circle text-red-500"></i></div>';
+                html += '<span class="text-xs text-red-500">Missing</span></div>';
+            }
+        });
+        html += '</div></div>';
+        
+        // Optional channels by category
+        html += '<div class="p-4 border-b" id="optional-channels-section" style="display:none;">';
+        html += '<h4 class="font-semibold text-gray-700 mb-2"><i class="fas fa-plus-circle text-blue-500 mr-2"></i>Optional Channels (' + optionalCount + ' found)</h4>';
+        
+        var categories = {};
+        Object.keys(detected.optional).forEach(function(key) {
+            var ch = detected.optional[key];
+            if (!categories[ch.category]) categories[ch.category] = [];
+            categories[ch.category].push({ key: key, data: ch });
+        });
+        
+        Object.keys(categories).forEach(function(cat) {
+            html += '<div class="mb-3"><h5 class="text-sm font-medium text-gray-600 mb-1">' + cat + '</h5>';
+            html += '<div class="flex flex-wrap gap-1">';
+            categories[cat].forEach(function(item) {
+                html += '<span class="inline-flex items-center px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">';
+                html += '<i class="fas ' + item.data.icon + ' mr-1"></i>' + item.key + '</span>';
+            });
+            html += '</div></div>';
+        });
+        html += '</div>';
+        
+        // Unrecognized columns
+        if (detected.unrecognized.length > 0) {
+            html += '<div class="p-4 bg-gray-50" id="unrecognized-section" style="display:none;">';
+            html += '<details><summary class="font-semibold text-gray-600 cursor-pointer">';
+            html += '<i class="fas fa-question-circle text-gray-400 mr-2"></i>';
+            html += 'Unrecognized Columns (' + detected.unrecognized.length + ')</summary>';
+            html += '<div class="mt-2 flex flex-wrap gap-1">';
+            detected.unrecognized.slice(0, 20).forEach(function(col) {
+                html += '<span class="bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded">' + col + '</span>';
+            });
+            if (detected.unrecognized.length > 20) {
+                html += '<span class="text-gray-500 text-xs">...and ' + (detected.unrecognized.length - 20) + ' more</span>';
+            }
+            html += '</div></details></div>';
+        }
+        
+        displayContainer.innerHTML = html;
+        
+        var uploadSection = document.querySelector('#upload-section .bg-white');
+        uploadSection.appendChild(displayContainer);
+        
+        // Toggle functionality
+        setTimeout(function() {
+            var toggleBtn = document.getElementById('toggle-channel-details');
+            var optionalSection = document.getElementById('optional-channels-section');
+            var unrecognizedSection = document.getElementById('unrecognized-section');
+            var isExpanded = false;
+            
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function() {
+                    isExpanded = !isExpanded;
+                    if (optionalSection) optionalSection.style.display = isExpanded ? 'block' : 'none';
+                    if (unrecognizedSection) unrecognizedSection.style.display = isExpanded ? 'block' : 'none';
+                    toggleBtn.innerHTML = isExpanded ? 
+                        '<i class="fas fa-chevron-up mr-1"></i>Hide' : 
+                        '<i class="fas fa-chevron-down mr-1"></i>Details';
+                });
+            }
+        }, 0);
     }
 
     async analyzeTelemetry() {
