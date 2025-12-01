@@ -31,8 +31,6 @@ class TelemetryAnalysisApp {
         this.setupFileUpload('ref');
         this.setupFileUpload('curr');
 
-        document.getElementById('analyze-btn').addEventListener('click', () => this.analyzeTelemetry());
-
         document.getElementById('send-btn').addEventListener('click', () => this.sendChatMessage());
         document.getElementById('chat-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.sendChatMessage();
@@ -147,7 +145,6 @@ class TelemetryAnalysisApp {
                     console.log('Parsed ' + cleanedData.length + ' data rows with ' + Object.keys(cleanedData[0] || {}).length + ' columns');
                     
                     if (self.referenceData && self.currentData) {
-                        document.getElementById('analyze-btn').disabled = false;
                         self.detectChannels();
                     }
                 },
@@ -932,7 +929,13 @@ class TelemetryAnalysisApp {
         html += '<h4 class="font-semibold text-gray-700 mb-2"><i class="fas fa-link text-blue-500 mr-2"></i>Custom Channel Mappings</h4>';
         html += '<div id="custom-mappings-list" class="space-y-1"></div>';
         html += '<button id="reanalyze-btn" class="mt-3 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition">';
-        html += '<i class="fas fa-sync-alt mr-2"></i>Re-Analyze with Custom Mappings</button>';
+        html += '<i class="fas fa-sync-alt mr-2"></i>Apply Mappings and Analyze</button>';
+        html += '</div>';
+        
+        // Analyze button - shown only after channel detection
+        html += '<div class="p-4 border-t bg-gradient-to-r from-purple-50 to-blue-50">';
+        html += '<button id="start-analysis-btn" class="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-lg hover:from-purple-700 hover:to-blue-700 transition font-semibold text-lg shadow-lg">';
+        html += '<i class="fas fa-play-circle mr-2"></i>Analyze Telemetry</button>';
         html += '</div>';
         
         displayContainer.innerHTML = html;
@@ -1247,11 +1250,19 @@ class TelemetryAnalysisApp {
             });
         }
         
-        // Re-analyze button
+        // Re-analyze button (for custom mappings)
         var reanalyzeBtn = document.getElementById('reanalyze-btn');
         if (reanalyzeBtn) {
             reanalyzeBtn.addEventListener('click', function() {
                 self.reanalyzeWithMappings();
+            });
+        }
+        
+        // Start analysis button
+        var startAnalysisBtn = document.getElementById('start-analysis-btn');
+        if (startAnalysisBtn) {
+            startAnalysisBtn.addEventListener('click', function() {
+                self.analyzeTelemetry();
             });
         }
     }
@@ -1739,92 +1750,95 @@ class TelemetryAnalysisApp {
         Plotly.newPlot('track-map', [refTrace].concat(currTraces), layout, { responsive: true });
     }
 
-    // Channel definitions for overlays
+    // Channel definitions for overlays - consistent colors: gray for reference, purple for your lap
     getOverlayChannels() {
+        var refColor = '#6b7280';   // Gray for reference
+        var yourColor = '#8b5cf6';  // Purple for your lap
+        
         return {
             speed: {
                 names: ['Ground Speed', 'Speed', 'Drive Speed', 'Vehicle Speed', 'speed'],
                 label: 'Speed',
                 unit: 'km/h',
-                color: { ref: '#6b7280', curr: '#8b5cf6' }
+                color: { ref: refColor, curr: yourColor }
             },
             throttle: {
                 names: ['Throttle Pos', 'Throttle', 'TPS', 'throttle'],
                 label: 'Throttle',
                 unit: '%',
-                color: { ref: '#6b7280', curr: '#22c55e' }
+                color: { ref: refColor, curr: yourColor }
             },
             brake: {
                 names: ['Brake Pres Front', 'Brake Pressure', 'Brake', 'brake'],
                 label: 'Brake',
                 unit: '%',
-                color: { ref: '#6b7280', curr: '#ef4444' }
+                color: { ref: refColor, curr: yourColor }
             },
             steering: {
                 names: ['Steered Angle', 'Steering Angle', 'Steer', 'steer'],
                 label: 'Steering',
                 unit: 'deg',
-                color: { ref: '#6b7280', curr: '#f59e0b' }
+                color: { ref: refColor, curr: yourColor }
             },
             gLat: {
                 names: ['G Force Lat', 'Lateral G', 'G_Lat', 'gLat'],
                 label: 'Lateral G',
                 unit: 'G',
-                color: { ref: '#6b7280', curr: '#3b82f6' }
+                color: { ref: refColor, curr: yourColor }
             },
             gLong: {
                 names: ['G Force Long', 'Longitudinal G', 'G_Long', 'gLong'],
                 label: 'Long G',
                 unit: 'G',
-                color: { ref: '#6b7280', curr: '#ec4899' }
+                color: { ref: '#9ca3af', curr: '#a78bfa' }  // Lighter variants for secondary G trace
             },
             gear: {
                 names: ['Gear', 'gear', 'Gear Position'],
                 label: 'Gear',
                 unit: '',
-                color: { ref: '#6b7280', curr: '#14b8a6' }
+                color: { ref: refColor, curr: yourColor }
             },
             rpm: {
                 names: ['Engine RPM', 'RPM', 'rpm'],
                 label: 'RPM',
                 unit: 'rpm',
-                color: { ref: '#6b7280', curr: '#f97316' }
+                color: { ref: refColor, curr: yourColor }
             },
             wheelSpeedFL: {
                 names: ['Wheel Speed FL', 'WheelSpeed FL'],
                 label: 'Wheel FL',
                 unit: 'km/h',
-                color: { ref: '#6b7280', curr: '#8b5cf6' }
+                color: { ref: refColor, curr: yourColor }
             },
             wheelSpeedFR: {
                 names: ['Wheel Speed FR', 'WheelSpeed FR'],
                 label: 'Wheel FR',
                 unit: 'km/h',
-                color: { ref: '#6b7280', curr: '#8b5cf6' }
+                color: { ref: refColor, curr: yourColor }
             },
             wheelSpeedRL: {
                 names: ['Wheel Speed RL', 'WheelSpeed RL'],
                 label: 'Wheel RL',
                 unit: 'km/h',
-                color: { ref: '#6b7280', curr: '#8b5cf6' }
+                color: { ref: refColor, curr: yourColor }
             },
             wheelSpeedRR: {
                 names: ['Wheel Speed RR', 'WheelSpeed RR'],
                 label: 'Wheel RR',
                 unit: 'km/h',
-                color: { ref: '#6b7280', curr: '#8b5cf6' }
+                color: { ref: refColor, curr: yourColor }
             },
             suspFL: {
                 names: ['Susp Pos FL', 'Suspension FL', 'Damper FL'],
                 label: 'Susp FL',
                 unit: 'mm',
-                color: { ref: '#6b7280', curr: '#06b6d4' }
+                color: { ref: refColor, curr: yourColor }
             },
             suspFR: {
                 names: ['Susp Pos FR', 'Suspension FR', 'Damper FR'],
                 label: 'Susp FR',
                 unit: 'mm',
-                color: { ref: '#6b7280', curr: '#06b6d4' }
+                color: { ref: refColor, curr: yourColor }
             }
         };
     }
@@ -1874,12 +1888,19 @@ class TelemetryAnalysisApp {
         var hasData = channelConfig.names.some(function(name) { return sampleRow[name] !== undefined; });
 
         if (!hasData) {
-            container.innerHTML = '<p class="text-gray-400 text-center py-8 text-sm">No ' + channelConfig.label + ' data available</p>';
+            container.innerHTML = '<p class="text-gray-400 text-center py-16 text-sm">No ' + channelConfig.label + ' data available</p>';
             return;
         }
 
-        var refValues = refData.map(function(row) { return self.getValue(row, channelConfig.names, null); });
-        var currValues = currData.map(function(row) { return self.getValue(row, channelConfig.names, null); });
+        // Get values, converting nulls to NaN so Plotly doesn't draw lines through them
+        var refValues = refData.map(function(row) { 
+            var val = self.getValue(row, channelConfig.names, null);
+            return val === null ? NaN : val;
+        });
+        var currValues = currData.map(function(row) { 
+            var val = self.getValue(row, channelConfig.names, null);
+            return val === null ? NaN : val;
+        });
 
         var refTrace = {
             x: refDist,
@@ -1887,7 +1908,8 @@ class TelemetryAnalysisApp {
             mode: 'lines',
             name: 'Reference',
             line: { color: channelConfig.color.ref, width: 1.5 },
-            hovertemplate: 'Ref: %{y:.1f} ' + channelConfig.unit + '<extra></extra>'
+            hovertemplate: 'Ref: %{y:.1f} ' + channelConfig.unit + '<extra></extra>',
+            connectgaps: false
         };
 
         var currTrace = {
@@ -1896,14 +1918,15 @@ class TelemetryAnalysisApp {
             mode: 'lines',
             name: 'Your Lap',
             line: { color: channelConfig.color.curr, width: 2 },
-            hovertemplate: 'You: %{y:.1f} ' + channelConfig.unit + '<extra></extra>'
+            hovertemplate: 'You: %{y:.1f} ' + channelConfig.unit + '<extra></extra>',
+            connectgaps: false
         };
 
         var layout = {
-            xaxis: { title: '', showticklabels: true, tickfont: { size: 10 } },
+            xaxis: { title: 'Distance (m)', showticklabels: true, tickfont: { size: 10 } },
             yaxis: { title: channelConfig.unit, titlefont: { size: 10 }, tickfont: { size: 10 } },
-            margin: { t: 5, b: 25, l: 40, r: 10 },
-            legend: { orientation: 'h', y: 1.1, x: 0.5, xanchor: 'center', font: { size: 9 } },
+            margin: { t: 10, b: 40, l: 50, r: 20 },
+            legend: { orientation: 'h', y: 1.05, x: 0.5, xanchor: 'center', font: { size: 10 } },
             hovermode: 'x unified'
         };
 
@@ -1920,61 +1943,79 @@ class TelemetryAnalysisApp {
         var hasGLong = channels.gLong.names.some(function(name) { return sampleRow[name] !== undefined; });
 
         if (!hasGLat && !hasGLong) {
-            container.innerHTML = '<p class="text-gray-400 text-center py-8 text-sm">No G-Force data available</p>';
+            container.innerHTML = '<p class="text-gray-400 text-center py-16 text-sm">No G-Force data available</p>';
             return;
         }
 
         var traces = [];
+        var refColor = '#6b7280';
+        var yourColor = '#8b5cf6';
 
         if (hasGLat) {
-            var refGLat = refData.map(function(row) { return self.getValue(row, channels.gLat.names, null); });
-            var currGLat = currData.map(function(row) { return self.getValue(row, channels.gLat.names, null); });
+            var refGLat = refData.map(function(row) { 
+                var val = self.getValue(row, channels.gLat.names, null);
+                return val === null ? NaN : val;
+            });
+            var currGLat = currData.map(function(row) { 
+                var val = self.getValue(row, channels.gLat.names, null);
+                return val === null ? NaN : val;
+            });
 
             traces.push({
                 x: refDist,
                 y: refGLat,
                 mode: 'lines',
                 name: 'Ref Lat G',
-                line: { color: '#9ca3af', width: 1 },
-                hovertemplate: 'Ref Lat: %{y:.2f}G<extra></extra>'
+                line: { color: refColor, width: 1.5 },
+                hovertemplate: 'Ref Lat: %{y:.2f}G<extra></extra>',
+                connectgaps: false
             });
             traces.push({
                 x: currDist,
                 y: currGLat,
                 mode: 'lines',
                 name: 'Your Lat G',
-                line: { color: '#3b82f6', width: 2 },
-                hovertemplate: 'Your Lat: %{y:.2f}G<extra></extra>'
+                line: { color: yourColor, width: 2 },
+                hovertemplate: 'Your Lat: %{y:.2f}G<extra></extra>',
+                connectgaps: false
             });
         }
 
         if (hasGLong) {
-            var refGLong = refData.map(function(row) { return self.getValue(row, channels.gLong.names, null); });
-            var currGLong = currData.map(function(row) { return self.getValue(row, channels.gLong.names, null); });
+            var refGLong = refData.map(function(row) { 
+                var val = self.getValue(row, channels.gLong.names, null);
+                return val === null ? NaN : val;
+            });
+            var currGLong = currData.map(function(row) { 
+                var val = self.getValue(row, channels.gLong.names, null);
+                return val === null ? NaN : val;
+            });
 
             traces.push({
                 x: refDist,
                 y: refGLong,
                 mode: 'lines',
                 name: 'Ref Long G',
-                line: { color: '#d1d5db', width: 1, dash: 'dot' },
-                hovertemplate: 'Ref Long: %{y:.2f}G<extra></extra>'
+                line: { color: '#9ca3af', width: 1.5, dash: 'dot' },
+                hovertemplate: 'Ref Long: %{y:.2f}G<extra></extra>',
+                connectgaps: false
             });
             traces.push({
                 x: currDist,
                 y: currGLong,
                 mode: 'lines',
                 name: 'Your Long G',
-                line: { color: '#ec4899', width: 2, dash: 'dot' },
-                hovertemplate: 'Your Long: %{y:.2f}G<extra></extra>'
+                line: { color: '#a78bfa', width: 2, dash: 'dot' },
+                hovertemplate: 'Your Long: %{y:.2f}G<extra></extra>',
+                connectgaps: false
             });
         }
 
         var layout = {
-            xaxis: { title: '', showticklabels: true, tickfont: { size: 10 } },
+            xaxis: { title: 'Distance (m)', showticklabels: true, tickfont: { size: 10 } },
             yaxis: { title: 'G', titlefont: { size: 10 }, tickfont: { size: 10 }, zeroline: true, zerolinewidth: 1 },
-            margin: { t: 5, b: 25, l: 40, r: 10 },
-            legend: { orientation: 'h', y: 1.15, x: 0.5, xanchor: 'center', font: { size: 8 } },
+            margin: { t: 10, b: 40, l: 50, r: 20 },
+            legend: { orientation: 'h', y: 1.08, x: 0.5, xanchor: 'center', font: { size: 9 } },
             hovermode: 'x unified'
         };
 
@@ -2108,10 +2149,12 @@ class TelemetryAnalysisApp {
         chartDiv.className = 'relative';
         chartDiv.innerHTML = '<button class="absolute top-0 right-0 z-10 bg-red-500 text-white rounded-full w-6 h-6 text-xs hover:bg-red-600" onclick="this.parentElement.remove(); window.telemetryApp.customOverlays = window.telemetryApp.customOverlays.filter(function(c) { return c !== \'' + channelValue + '\'; });">&times;</button>' +
             '<h4 class="font-semibold mb-2 text-sm pr-8"></h4>' +
-            '<div id="' + chartId + '" class="h-48 bg-gray-50 rounded border"></div>';
+            '<div id="' + chartId + '" class="h-56 bg-gray-50 rounded border"></div>';
         container.appendChild(chartDiv);
 
         var label, unit, names, colors;
+        var refColor = '#6b7280';
+        var yourColor = '#8b5cf6';
 
         if (channelValue.indexOf('custom:') === 0) {
             // Custom column
@@ -2119,30 +2162,37 @@ class TelemetryAnalysisApp {
             label = colName;
             unit = '';
             names = [colName];
-            colors = { ref: '#6b7280', curr: '#8b5cf6' };
+            colors = { ref: refColor, curr: yourColor };
         } else if (channels[channelValue]) {
             // Known channel
             var ch = channels[channelValue];
             label = ch.label;
             unit = ch.unit;
             names = ch.names;
-            colors = ch.color;
+            colors = { ref: refColor, curr: yourColor };
         } else {
             return;
         }
 
         chartDiv.querySelector('h4').textContent = label + (unit ? ' (' + unit + ')' : '');
 
-        // Generate chart
-        var refValues = refData.map(function(row) { return self.getValue(row, names, null); });
-        var currValues = currData.map(function(row) { return self.getValue(row, names, null); });
+        // Generate chart with null handling
+        var refValues = refData.map(function(row) { 
+            var val = self.getValue(row, names, null);
+            return val === null ? NaN : val;
+        });
+        var currValues = currData.map(function(row) { 
+            var val = self.getValue(row, names, null);
+            return val === null ? NaN : val;
+        });
 
         var refTrace = {
             x: refDist,
             y: refValues,
             mode: 'lines',
             name: 'Reference',
-            line: { color: colors.ref, width: 1.5 }
+            line: { color: colors.ref, width: 1.5 },
+            connectgaps: false
         };
 
         var currTrace = {
@@ -2150,14 +2200,15 @@ class TelemetryAnalysisApp {
             y: currValues,
             mode: 'lines',
             name: 'Your Lap',
-            line: { color: colors.curr, width: 2 }
+            line: { color: colors.curr, width: 2 },
+            connectgaps: false
         };
 
         var layout = {
-            xaxis: { title: '', showticklabels: true, tickfont: { size: 10 } },
+            xaxis: { title: 'Distance (m)', showticklabels: true, tickfont: { size: 10 } },
             yaxis: { title: unit, titlefont: { size: 10 }, tickfont: { size: 10 } },
-            margin: { t: 5, b: 25, l: 45, r: 10 },
-            legend: { orientation: 'h', y: 1.1, x: 0.5, xanchor: 'center', font: { size: 9 } },
+            margin: { t: 10, b: 40, l: 50, r: 20 },
+            legend: { orientation: 'h', y: 1.05, x: 0.5, xanchor: 'center', font: { size: 10 } },
             hovermode: 'x unified'
         };
 
