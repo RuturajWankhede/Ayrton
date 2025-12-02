@@ -1742,9 +1742,10 @@ class TelemetryAnalysisApp {
             legend: { x: 0, y: 1, bgcolor: 'rgba(0,0,0,0.5)', font: { color: '#fff' } },
             xaxis: { visible: false, scaleanchor: 'y' },
             yaxis: { visible: false },
-            margin: { t: 10, b: 10, l: 10, r: 10 },
+            margin: { t: 5, b: 5, l: 5, r: 5 },
             paper_bgcolor: '#1f2937',
-            plot_bgcolor: '#1f2937'
+            plot_bgcolor: '#1f2937',
+            autosize: true
         };
 
         Plotly.newPlot('track-map', [refTrace].concat(currTraces), layout, { responsive: true });
@@ -1892,42 +1893,51 @@ class TelemetryAnalysisApp {
             return;
         }
 
-        // Get values, converting nulls to NaN so Plotly doesn't draw lines through them
-        var refValues = refData.map(function(row) { 
+        // Get values and filter out invalid points (where value is null, NaN, or distance is invalid)
+        var refPoints = [];
+        var currPoints = [];
+        
+        refData.forEach(function(row, i) {
             var val = self.getValue(row, channelConfig.names, null);
-            return val === null ? NaN : val;
+            var dist = refDist[i];
+            if (val !== null && !isNaN(val) && dist !== null && !isNaN(dist)) {
+                refPoints.push({ x: dist, y: val });
+            }
         });
-        var currValues = currData.map(function(row) { 
+        
+        currData.forEach(function(row, i) {
             var val = self.getValue(row, channelConfig.names, null);
-            return val === null ? NaN : val;
+            var dist = currDist[i];
+            if (val !== null && !isNaN(val) && dist !== null && !isNaN(dist)) {
+                currPoints.push({ x: dist, y: val });
+            }
         });
 
         var refTrace = {
-            x: refDist,
-            y: refValues,
+            x: refPoints.map(function(p) { return p.x; }),
+            y: refPoints.map(function(p) { return p.y; }),
             mode: 'lines',
             name: 'Reference',
             line: { color: channelConfig.color.ref, width: 1.5 },
-            hovertemplate: 'Ref: %{y:.1f} ' + channelConfig.unit + '<extra></extra>',
-            connectgaps: false
+            hovertemplate: 'Ref: %{y:.1f} ' + channelConfig.unit + '<extra></extra>'
         };
 
         var currTrace = {
-            x: currDist,
-            y: currValues,
+            x: currPoints.map(function(p) { return p.x; }),
+            y: currPoints.map(function(p) { return p.y; }),
             mode: 'lines',
             name: 'Your Lap',
             line: { color: channelConfig.color.curr, width: 2 },
-            hovertemplate: 'You: %{y:.1f} ' + channelConfig.unit + '<extra></extra>',
-            connectgaps: false
+            hovertemplate: 'You: %{y:.1f} ' + channelConfig.unit + '<extra></extra>'
         };
 
         var layout = {
             xaxis: { title: 'Distance (m)', showticklabels: true, tickfont: { size: 10 } },
             yaxis: { title: channelConfig.unit, titlefont: { size: 10 }, tickfont: { size: 10 } },
-            margin: { t: 10, b: 40, l: 50, r: 20 },
+            margin: { t: 10, b: 40, l: 50, r: 10 },
             legend: { orientation: 'h', y: 1.05, x: 0.5, xanchor: 'center', font: { size: 10 } },
-            hovermode: 'x unified'
+            hovermode: 'x unified',
+            autosize: true
         };
 
         Plotly.newPlot(containerId, [refTrace, currTrace], layout, { responsive: true, displayModeBar: false });
@@ -1951,72 +1961,70 @@ class TelemetryAnalysisApp {
         var refColor = '#6b7280';
         var yourColor = '#8b5cf6';
 
+        // Helper to filter valid points
+        var filterValidPoints = function(data, distArr, channelNames) {
+            var points = [];
+            data.forEach(function(row, i) {
+                var val = self.getValue(row, channelNames, null);
+                var dist = distArr[i];
+                if (val !== null && !isNaN(val) && dist !== null && !isNaN(dist)) {
+                    points.push({ x: dist, y: val });
+                }
+            });
+            return points;
+        };
+
         if (hasGLat) {
-            var refGLat = refData.map(function(row) { 
-                var val = self.getValue(row, channels.gLat.names, null);
-                return val === null ? NaN : val;
-            });
-            var currGLat = currData.map(function(row) { 
-                var val = self.getValue(row, channels.gLat.names, null);
-                return val === null ? NaN : val;
-            });
+            var refGLatPoints = filterValidPoints(refData, refDist, channels.gLat.names);
+            var currGLatPoints = filterValidPoints(currData, currDist, channels.gLat.names);
 
             traces.push({
-                x: refDist,
-                y: refGLat,
+                x: refGLatPoints.map(function(p) { return p.x; }),
+                y: refGLatPoints.map(function(p) { return p.y; }),
                 mode: 'lines',
                 name: 'Ref Lat G',
                 line: { color: refColor, width: 1.5 },
-                hovertemplate: 'Ref Lat: %{y:.2f}G<extra></extra>',
-                connectgaps: false
+                hovertemplate: 'Ref Lat: %{y:.2f}G<extra></extra>'
             });
             traces.push({
-                x: currDist,
-                y: currGLat,
+                x: currGLatPoints.map(function(p) { return p.x; }),
+                y: currGLatPoints.map(function(p) { return p.y; }),
                 mode: 'lines',
                 name: 'Your Lat G',
                 line: { color: yourColor, width: 2 },
-                hovertemplate: 'Your Lat: %{y:.2f}G<extra></extra>',
-                connectgaps: false
+                hovertemplate: 'Your Lat: %{y:.2f}G<extra></extra>'
             });
         }
 
         if (hasGLong) {
-            var refGLong = refData.map(function(row) { 
-                var val = self.getValue(row, channels.gLong.names, null);
-                return val === null ? NaN : val;
-            });
-            var currGLong = currData.map(function(row) { 
-                var val = self.getValue(row, channels.gLong.names, null);
-                return val === null ? NaN : val;
-            });
+            var refGLongPoints = filterValidPoints(refData, refDist, channels.gLong.names);
+            var currGLongPoints = filterValidPoints(currData, currDist, channels.gLong.names);
 
             traces.push({
-                x: refDist,
-                y: refGLong,
+                x: refGLongPoints.map(function(p) { return p.x; }),
+                y: refGLongPoints.map(function(p) { return p.y; }),
                 mode: 'lines',
                 name: 'Ref Long G',
                 line: { color: '#9ca3af', width: 1.5, dash: 'dot' },
-                hovertemplate: 'Ref Long: %{y:.2f}G<extra></extra>',
-                connectgaps: false
+                hovertemplate: 'Ref Long: %{y:.2f}G<extra></extra>'
             });
             traces.push({
-                x: currDist,
-                y: currGLong,
+                x: currGLongPoints.map(function(p) { return p.x; }),
+                y: currGLongPoints.map(function(p) { return p.y; }),
                 mode: 'lines',
                 name: 'Your Long G',
                 line: { color: '#a78bfa', width: 2, dash: 'dot' },
-                hovertemplate: 'Your Long: %{y:.2f}G<extra></extra>',
-                connectgaps: false
+                hovertemplate: 'Your Long: %{y:.2f}G<extra></extra>'
             });
         }
 
         var layout = {
             xaxis: { title: 'Distance (m)', showticklabels: true, tickfont: { size: 10 } },
             yaxis: { title: 'G', titlefont: { size: 10 }, tickfont: { size: 10 }, zeroline: true, zerolinewidth: 1 },
-            margin: { t: 10, b: 40, l: 50, r: 20 },
+            margin: { t: 10, b: 40, l: 50, r: 10 },
             legend: { orientation: 'h', y: 1.08, x: 0.5, xanchor: 'center', font: { size: 9 } },
-            hovermode: 'x unified'
+            hovermode: 'x unified',
+            autosize: true
         };
 
         Plotly.newPlot(containerId, traces, layout, { responsive: true, displayModeBar: false });
@@ -2152,7 +2160,7 @@ class TelemetryAnalysisApp {
             '<div id="' + chartId + '" class="h-56 bg-gray-50 rounded border"></div>';
         container.appendChild(chartDiv);
 
-        var label, unit, names, colors;
+        var label, unit, names;
         var refColor = '#6b7280';
         var yourColor = '#8b5cf6';
 
@@ -2162,54 +2170,61 @@ class TelemetryAnalysisApp {
             label = colName;
             unit = '';
             names = [colName];
-            colors = { ref: refColor, curr: yourColor };
         } else if (channels[channelValue]) {
             // Known channel
             var ch = channels[channelValue];
             label = ch.label;
             unit = ch.unit;
             names = ch.names;
-            colors = { ref: refColor, curr: yourColor };
         } else {
             return;
         }
 
         chartDiv.querySelector('h4').textContent = label + (unit ? ' (' + unit + ')' : '');
 
-        // Generate chart with null handling
-        var refValues = refData.map(function(row) { 
+        // Filter valid points
+        var refPoints = [];
+        var currPoints = [];
+        
+        refData.forEach(function(row, i) {
             var val = self.getValue(row, names, null);
-            return val === null ? NaN : val;
+            var dist = refDist[i];
+            if (val !== null && !isNaN(val) && dist !== null && !isNaN(dist)) {
+                refPoints.push({ x: dist, y: val });
+            }
         });
-        var currValues = currData.map(function(row) { 
+        
+        currData.forEach(function(row, i) {
             var val = self.getValue(row, names, null);
-            return val === null ? NaN : val;
+            var dist = currDist[i];
+            if (val !== null && !isNaN(val) && dist !== null && !isNaN(dist)) {
+                currPoints.push({ x: dist, y: val });
+            }
         });
 
         var refTrace = {
-            x: refDist,
-            y: refValues,
+            x: refPoints.map(function(p) { return p.x; }),
+            y: refPoints.map(function(p) { return p.y; }),
             mode: 'lines',
             name: 'Reference',
-            line: { color: colors.ref, width: 1.5 },
-            connectgaps: false
+            line: { color: refColor, width: 1.5 }
         };
 
         var currTrace = {
-            x: currDist,
-            y: currValues,
+            x: currPoints.map(function(p) { return p.x; }),
+            y: currPoints.map(function(p) { return p.y; }),
             mode: 'lines',
             name: 'Your Lap',
-            line: { color: colors.curr, width: 2 },
-            connectgaps: false
+            line: { color: yourColor, width: 2 }
         };
 
         var layout = {
             xaxis: { title: 'Distance (m)', showticklabels: true, tickfont: { size: 10 } },
             yaxis: { title: unit, titlefont: { size: 10 }, tickfont: { size: 10 } },
-            margin: { t: 10, b: 40, l: 50, r: 20 },
+            margin: { t: 10, b: 40, l: 50, r: 10 },
             legend: { orientation: 'h', y: 1.05, x: 0.5, xanchor: 'center', font: { size: 10 } },
-            hovermode: 'x unified'
+            hovermode: 'x unified',
+            autosize: true
         };
 
         Plotly.newPlot(chartId, [refTrace, currTrace], layout, { responsive: true, displayModeBar: false });
