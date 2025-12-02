@@ -1882,39 +1882,24 @@ class TelemetryAnalysisApp {
         var refData = this.referenceData.filter(function(_, i) { return i % sampleRate === 0; });
         var currData = this.currentData.filter(function(_, i) { return i % sampleRate === 0; });
 
-        // Get distance arrays and filter to only include points where distance is increasing
-        var refDist = [];
-        var refDataFiltered = [];
-        var lastRefDist = -1;
-        refData.forEach(function(row) {
-            var dist = self.getValue(row, distNames, null);
-            if (dist !== null && !isNaN(dist) && dist > lastRefDist) {
-                refDist.push(dist);
-                refDataFiltered.push(row);
-                lastRefDist = dist;
-            }
+        // Get distance arrays - filter out invalid distances only
+        var refDist = refData.map(function(row) { 
+            var d = self.getValue(row, distNames, null);
+            return (d !== null && !isNaN(d)) ? d : null;
         });
-        
-        var currDist = [];
-        var currDataFiltered = [];
-        var lastCurrDist = -1;
-        currData.forEach(function(row) {
-            var dist = self.getValue(row, distNames, null);
-            if (dist !== null && !isNaN(dist) && dist > lastCurrDist) {
-                currDist.push(dist);
-                currDataFiltered.push(row);
-                lastCurrDist = dist;
-            }
+        var currDist = currData.map(function(row) { 
+            var d = self.getValue(row, distNames, null);
+            return (d !== null && !isNaN(d)) ? d : null;
         });
 
         // Generate each overlay
-        this.generateSingleOverlay('speed-overlay', refDataFiltered, currDataFiltered, refDist, currDist, channels.speed);
-        this.generateSingleOverlay('throttle-overlay', refDataFiltered, currDataFiltered, refDist, currDist, channels.throttle);
-        this.generateSingleOverlay('brake-overlay', refDataFiltered, currDataFiltered, refDist, currDist, channels.brake);
-        this.generateSingleOverlay('steering-overlay', refDataFiltered, currDataFiltered, refDist, currDist, channels.steering);
-        this.generateSingleOverlay('glat-overlay', refDataFiltered, currDataFiltered, refDist, currDist, channels.gLat);
-        this.generateSingleOverlay('glong-overlay', refDataFiltered, currDataFiltered, refDist, currDist, channels.gLong);
-        this.generateSingleOverlay('gear-overlay', refDataFiltered, currDataFiltered, refDist, currDist, channels.gear);
+        this.generateSingleOverlay('speed-overlay', refData, currData, refDist, currDist, channels.speed);
+        this.generateSingleOverlay('throttle-overlay', refData, currData, refDist, currDist, channels.throttle);
+        this.generateSingleOverlay('brake-overlay', refData, currData, refDist, currDist, channels.brake);
+        this.generateSingleOverlay('steering-overlay', refData, currData, refDist, currDist, channels.steering);
+        this.generateSingleOverlay('glat-overlay', refData, currData, refDist, currDist, channels.gLat);
+        this.generateSingleOverlay('glong-overlay', refData, currData, refDist, currDist, channels.gLong);
+        this.generateSingleOverlay('gear-overlay', refData, currData, refDist, currDist, channels.gear);
     }
 
     generateSingleOverlay(containerId, refData, currData, refDist, currDist, channelConfig) {
@@ -1922,51 +1907,64 @@ class TelemetryAnalysisApp {
         var container = document.getElementById(containerId);
         if (!container) return;
 
-        // Check if channel data exists
-        var sampleRow = refData[0] || {};
-        var hasData = channelConfig.names.some(function(name) { return sampleRow[name] !== undefined; });
+        // Check if channel data exists in at least some rows
+        var hasRefData = refData.some(function(row) {
+            return channelConfig.names.some(function(name) { 
+                return row[name] !== undefined && row[name] !== null && row[name] !== ''; 
+            });
+        });
+        var hasCurrData = currData.some(function(row) {
+            return channelConfig.names.some(function(name) { 
+                return row[name] !== undefined && row[name] !== null && row[name] !== ''; 
+            });
+        });
 
-        if (!hasData) {
+        if (!hasRefData && !hasCurrData) {
             container.innerHTML = '<p class="text-gray-400 text-center py-16 text-sm">No ' + channelConfig.label + ' data available</p>';
             return;
         }
 
-        // Get values and filter out invalid points (where value is null, NaN, or distance is invalid)
-        var refPoints = [];
-        var currPoints = [];
-        
+        // Build arrays - use null for missing values so Plotly creates gaps
+        var refX = [];
+        var refY = [];
         refData.forEach(function(row, i) {
-            var val = self.getValue(row, channelConfig.names, null);
             var dist = refDist[i];
-            if (val !== null && !isNaN(val) && dist !== null && !isNaN(dist)) {
-                refPoints.push({ x: dist, y: val });
+            var val = self.getValue(row, channelConfig.names, null);
+            if (dist !== null) {
+                refX.push(dist);
+                refY.push(val); // Keep null as null - Plotly will create gaps
             }
         });
-        
+
+        var currX = [];
+        var currY = [];
         currData.forEach(function(row, i) {
-            var val = self.getValue(row, channelConfig.names, null);
             var dist = currDist[i];
-            if (val !== null && !isNaN(val) && dist !== null && !isNaN(dist)) {
-                currPoints.push({ x: dist, y: val });
+            var val = self.getValue(row, channelConfig.names, null);
+            if (dist !== null) {
+                currX.push(dist);
+                currY.push(val); // Keep null as null - Plotly will create gaps
             }
         });
 
         var refTrace = {
-            x: refPoints.map(function(p) { return p.x; }),
-            y: refPoints.map(function(p) { return p.y; }),
+            x: refX,
+            y: refY,
             mode: 'lines',
             name: 'Reference',
             line: { color: channelConfig.color.ref, width: 1.5 },
-            hovertemplate: 'Ref: %{y:.1f} ' + channelConfig.unit + '<extra></extra>'
+            hovertemplate: 'Ref: %{y:.1f} ' + channelConfig.unit + '<extra></extra>',
+            connectgaps: false
         };
 
         var currTrace = {
-            x: currPoints.map(function(p) { return p.x; }),
-            y: currPoints.map(function(p) { return p.y; }),
+            x: currX,
+            y: currY,
             mode: 'lines',
             name: 'Your Lap',
             line: { color: channelConfig.color.curr, width: 2 },
-            hovertemplate: 'You: %{y:.1f} ' + channelConfig.unit + '<extra></extra>'
+            hovertemplate: 'You: %{y:.1f} ' + channelConfig.unit + '<extra></extra>',
+            connectgaps: false
         };
 
         var layout = {
@@ -2100,15 +2098,13 @@ class TelemetryAnalysisApp {
         var sampleRate = Math.max(1, Math.floor(this.referenceData.length / 500));
         var refData = this.referenceData.filter(function(_, i) { return i % sampleRate === 0; });
         var currData = this.currentData.filter(function(_, i) { return i % sampleRate === 0; });
-        var refDist = refData.map(function(row) { return self.getValue(row, distNames, 0); });
-        var currDist = currData.map(function(row) { return self.getValue(row, distNames, 0); });
 
         var chartId = 'custom-overlay-' + this.customOverlays.length;
         var chartDiv = document.createElement('div');
         chartDiv.className = 'relative';
         chartDiv.innerHTML = '<button class="absolute top-0 right-0 z-10 bg-red-500 text-white rounded-full w-6 h-6 text-xs hover:bg-red-600" onclick="this.parentElement.remove(); window.telemetryApp.customOverlays = window.telemetryApp.customOverlays.filter(function(c) { return c !== \'' + channelValue + '\'; });">&times;</button>' +
             '<h4 class="font-semibold mb-2 text-sm pr-8"></h4>' +
-            '<div id="' + chartId + '" class="h-56 bg-gray-50 rounded border"></div>';
+            '<div id="' + chartId + '" class="bg-gray-50 rounded border" style="height: 280px; width: 100%;"></div>';
         container.appendChild(chartDiv);
 
         var label, unit, names;
@@ -2133,40 +2129,45 @@ class TelemetryAnalysisApp {
 
         chartDiv.querySelector('h4').textContent = label + (unit ? ' (' + unit + ')' : '');
 
-        // Filter valid points
-        var refPoints = [];
-        var currPoints = [];
-        
-        refData.forEach(function(row, i) {
+        // Build arrays with nulls for gaps
+        var refX = [];
+        var refY = [];
+        refData.forEach(function(row) {
+            var dist = self.getValue(row, distNames, null);
             var val = self.getValue(row, names, null);
-            var dist = refDist[i];
-            if (val !== null && !isNaN(val) && dist !== null && !isNaN(dist)) {
-                refPoints.push({ x: dist, y: val });
+            if (dist !== null) {
+                refX.push(dist);
+                refY.push(val);
             }
         });
-        
-        currData.forEach(function(row, i) {
+
+        var currX = [];
+        var currY = [];
+        currData.forEach(function(row) {
+            var dist = self.getValue(row, distNames, null);
             var val = self.getValue(row, names, null);
-            var dist = currDist[i];
-            if (val !== null && !isNaN(val) && dist !== null && !isNaN(dist)) {
-                currPoints.push({ x: dist, y: val });
+            if (dist !== null) {
+                currX.push(dist);
+                currY.push(val);
             }
         });
 
         var refTrace = {
-            x: refPoints.map(function(p) { return p.x; }),
-            y: refPoints.map(function(p) { return p.y; }),
+            x: refX,
+            y: refY,
             mode: 'lines',
             name: 'Reference',
-            line: { color: refColor, width: 1.5 }
+            line: { color: refColor, width: 1.5 },
+            connectgaps: false
         };
 
         var currTrace = {
-            x: currPoints.map(function(p) { return p.x; }),
-            y: currPoints.map(function(p) { return p.y; }),
+            x: currX,
+            y: currY,
             mode: 'lines',
             name: 'Your Lap',
-            line: { color: yourColor, width: 2 }
+            line: { color: yourColor, width: 2 },
+            connectgaps: false
         };
 
         var layout = {
