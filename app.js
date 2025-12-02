@@ -1,5 +1,5 @@
 // Racing Telemetry Analysis App
-// Clean version without special characters v1
+// Clean version without special characters
 
 class TelemetryAnalysisApp {
     constructor() {
@@ -1596,11 +1596,27 @@ class TelemetryAnalysisApp {
     }
 
     generateGraphs(analysis) {
+        var self = this;
+        
+        // Generate all charts
         this.generateTrackMap();
         this.generateTelemetryOverlays();
         this.generateSectorTimeChart(analysis);
         this.generateSpeedComparison(analysis);
         this.setupCustomOverlayControls();
+        
+        // Resize charts after a short delay to ensure proper sizing
+        setTimeout(function() {
+            var chartIds = ['track-map', 'speed-overlay', 'throttle-overlay', 'brake-overlay', 
+                           'steering-overlay', 'gforce-overlay', 'gear-overlay',
+                           'sector-time-chart', 'speed-comparison'];
+            chartIds.forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el && el.data) {
+                    Plotly.Plots.resize(el);
+                }
+            });
+        }, 200);
     }
 
     generateTrackMap() {
@@ -2495,6 +2511,21 @@ class TelemetryAnalysisApp {
                 btn.classList.add('border-transparent', 'text-gray-600');
             }
         });
+        
+        // Resize all Plotly charts when switching to graphs tab
+        if (tabName === 'graphs') {
+            setTimeout(function() {
+                var chartIds = ['track-map', 'speed-overlay', 'throttle-overlay', 'brake-overlay', 
+                               'steering-overlay', 'gforce-overlay', 'gear-overlay',
+                               'sector-time-chart', 'speed-comparison'];
+                chartIds.forEach(function(id) {
+                    var el = document.getElementById(id);
+                    if (el && el.data) {
+                        Plotly.Plots.resize(el);
+                    }
+                });
+            }, 100);
+        }
     }
 
     showNotification(message, type) {
