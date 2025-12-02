@@ -1608,7 +1608,7 @@ class TelemetryAnalysisApp {
         // Resize charts after a short delay to ensure proper sizing
         setTimeout(function() {
             var chartIds = ['track-map', 'speed-overlay', 'throttle-overlay', 'brake-overlay', 
-                           'steering-overlay', 'gforce-overlay', 'gear-overlay',
+                           'steering-overlay', 'glat-overlay', 'glong-overlay', 'gear-overlay',
                            'sector-time-chart', 'speed-comparison'];
             chartIds.forEach(function(id) {
                 var el = document.getElementById(id);
@@ -1882,17 +1882,39 @@ class TelemetryAnalysisApp {
         var refData = this.referenceData.filter(function(_, i) { return i % sampleRate === 0; });
         var currData = this.currentData.filter(function(_, i) { return i % sampleRate === 0; });
 
-        // Get distance arrays
-        var refDist = refData.map(function(row) { return self.getValue(row, distNames, 0); });
-        var currDist = currData.map(function(row) { return self.getValue(row, distNames, 0); });
+        // Get distance arrays and filter to only include points where distance is increasing
+        var refDist = [];
+        var refDataFiltered = [];
+        var lastRefDist = -1;
+        refData.forEach(function(row) {
+            var dist = self.getValue(row, distNames, null);
+            if (dist !== null && !isNaN(dist) && dist > lastRefDist) {
+                refDist.push(dist);
+                refDataFiltered.push(row);
+                lastRefDist = dist;
+            }
+        });
+        
+        var currDist = [];
+        var currDataFiltered = [];
+        var lastCurrDist = -1;
+        currData.forEach(function(row) {
+            var dist = self.getValue(row, distNames, null);
+            if (dist !== null && !isNaN(dist) && dist > lastCurrDist) {
+                currDist.push(dist);
+                currDataFiltered.push(row);
+                lastCurrDist = dist;
+            }
+        });
 
         // Generate each overlay
-        this.generateSingleOverlay('speed-overlay', refData, currData, refDist, currDist, channels.speed);
-        this.generateSingleOverlay('throttle-overlay', refData, currData, refDist, currDist, channels.throttle);
-        this.generateSingleOverlay('brake-overlay', refData, currData, refDist, currDist, channels.brake);
-        this.generateSingleOverlay('steering-overlay', refData, currData, refDist, currDist, channels.steering);
-        this.generateGForceOverlay('gforce-overlay', refData, currData, refDist, currDist, channels);
-        this.generateSingleOverlay('gear-overlay', refData, currData, refDist, currDist, channels.gear);
+        this.generateSingleOverlay('speed-overlay', refDataFiltered, currDataFiltered, refDist, currDist, channels.speed);
+        this.generateSingleOverlay('throttle-overlay', refDataFiltered, currDataFiltered, refDist, currDist, channels.throttle);
+        this.generateSingleOverlay('brake-overlay', refDataFiltered, currDataFiltered, refDist, currDist, channels.brake);
+        this.generateSingleOverlay('steering-overlay', refDataFiltered, currDataFiltered, refDist, currDist, channels.steering);
+        this.generateSingleOverlay('glat-overlay', refDataFiltered, currDataFiltered, refDist, currDist, channels.gLat);
+        this.generateSingleOverlay('glong-overlay', refDataFiltered, currDataFiltered, refDist, currDist, channels.gLong);
+        this.generateSingleOverlay('gear-overlay', refDataFiltered, currDataFiltered, refDist, currDist, channels.gear);
     }
 
     generateSingleOverlay(containerId, refData, currData, refDist, currDist, channelConfig) {
@@ -1957,93 +1979,6 @@ class TelemetryAnalysisApp {
         };
 
         Plotly.newPlot(containerId, [refTrace, currTrace], layout, { responsive: true, displayModeBar: false });
-    }
-
-    generateGForceOverlay(containerId, refData, currData, refDist, currDist, channels) {
-        var self = this;
-        var container = document.getElementById(containerId);
-        if (!container) return;
-
-        var sampleRow = refData[0] || {};
-        var hasGLat = channels.gLat.names.some(function(name) { return sampleRow[name] !== undefined; });
-        var hasGLong = channels.gLong.names.some(function(name) { return sampleRow[name] !== undefined; });
-
-        if (!hasGLat && !hasGLong) {
-            container.innerHTML = '<p class="text-gray-400 text-center py-16 text-sm">No G-Force data available</p>';
-            return;
-        }
-
-        var traces = [];
-        var refColor = '#6b7280';
-        var yourColor = '#8b5cf6';
-
-        // Helper to filter valid points
-        var filterValidPoints = function(data, distArr, channelNames) {
-            var points = [];
-            data.forEach(function(row, i) {
-                var val = self.getValue(row, channelNames, null);
-                var dist = distArr[i];
-                if (val !== null && !isNaN(val) && dist !== null && !isNaN(dist)) {
-                    points.push({ x: dist, y: val });
-                }
-            });
-            return points;
-        };
-
-        if (hasGLat) {
-            var refGLatPoints = filterValidPoints(refData, refDist, channels.gLat.names);
-            var currGLatPoints = filterValidPoints(currData, currDist, channels.gLat.names);
-
-            traces.push({
-                x: refGLatPoints.map(function(p) { return p.x; }),
-                y: refGLatPoints.map(function(p) { return p.y; }),
-                mode: 'lines',
-                name: 'Ref Lat G',
-                line: { color: refColor, width: 1.5 },
-                hovertemplate: 'Ref Lat: %{y:.2f}G<extra></extra>'
-            });
-            traces.push({
-                x: currGLatPoints.map(function(p) { return p.x; }),
-                y: currGLatPoints.map(function(p) { return p.y; }),
-                mode: 'lines',
-                name: 'Your Lat G',
-                line: { color: yourColor, width: 2 },
-                hovertemplate: 'Your Lat: %{y:.2f}G<extra></extra>'
-            });
-        }
-
-        if (hasGLong) {
-            var refGLongPoints = filterValidPoints(refData, refDist, channels.gLong.names);
-            var currGLongPoints = filterValidPoints(currData, currDist, channels.gLong.names);
-
-            traces.push({
-                x: refGLongPoints.map(function(p) { return p.x; }),
-                y: refGLongPoints.map(function(p) { return p.y; }),
-                mode: 'lines',
-                name: 'Ref Long G',
-                line: { color: '#9ca3af', width: 1.5, dash: 'dot' },
-                hovertemplate: 'Ref Long: %{y:.2f}G<extra></extra>'
-            });
-            traces.push({
-                x: currGLongPoints.map(function(p) { return p.x; }),
-                y: currGLongPoints.map(function(p) { return p.y; }),
-                mode: 'lines',
-                name: 'Your Long G',
-                line: { color: '#a78bfa', width: 2, dash: 'dot' },
-                hovertemplate: 'Your Long: %{y:.2f}G<extra></extra>'
-            });
-        }
-
-        var layout = {
-            xaxis: { title: 'Distance (m)', showticklabels: true, tickfont: { size: 10 } },
-            yaxis: { title: 'G', titlefont: { size: 10 }, tickfont: { size: 10 }, zeroline: true, zerolinewidth: 1 },
-            margin: { t: 10, b: 40, l: 50, r: 10 },
-            legend: { orientation: 'h', y: 1.08, x: 0.5, xanchor: 'center', font: { size: 9 } },
-            hovermode: 'x unified',
-            autosize: true
-        };
-
-        Plotly.newPlot(containerId, traces, layout, { responsive: true, displayModeBar: false });
     }
 
     setupCustomOverlayControls() {
@@ -2516,7 +2451,7 @@ class TelemetryAnalysisApp {
         if (tabName === 'graphs') {
             setTimeout(function() {
                 var chartIds = ['track-map', 'speed-overlay', 'throttle-overlay', 'brake-overlay', 
-                               'steering-overlay', 'gforce-overlay', 'gear-overlay',
+                               'steering-overlay', 'glat-overlay', 'glong-overlay', 'gear-overlay',
                                'sector-time-chart', 'speed-comparison'];
                 chartIds.forEach(function(id) {
                     var el = document.getElementById(id);
