@@ -1,5 +1,5 @@
 // Racing Telemetry Analysis App
-// Clean version without special characters
+// Clean version without special characters v1
 
 class TelemetryAnalysisApp {
     constructor() {
