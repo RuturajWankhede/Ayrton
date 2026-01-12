@@ -190,7 +190,7 @@ class TelemetryAnalysisApp {
                     icon: 'fa-clock'
                 },
                 distance: {
-                    variants: ['Lap Distance', 'Distance', 'Dist', 'LapDist', 'distance'],
+                    variants: ['Distance', 'Dist', 'LapDist', 'Lap Distance', 'distance'],
                     description: 'Position around lap',
                     icon: 'fa-road'
                 },
@@ -696,7 +696,7 @@ class TelemetryAnalysisApp {
         var self = this;
         if (!this.referenceData || !this.currentData) return;
 
-        var distNames = ['Lap Distance', 'Distance', 'Dist', 'LapDist'];
+        var distNames = ['Distance', 'Dist', 'Lap Distance', 'LapDist'];
         var channels = this.getOverlayChannels();
 
         var sampleRate = Math.max(1, Math.floor(this.referenceData.length / 500));
@@ -882,8 +882,7 @@ class TelemetryAnalysisApp {
         if (!container) return;
 
         var channels = this.getOverlayChannels();
-        var distNames = ['Lap Distance', 'Distance', 'Dist', 'LapDist'];
-
+        var distNames = ['Distance', 'Dist', 'Lap Distance', 'LapDist'];
         var sampleRate = Math.max(1, Math.floor(this.referenceData.length / 500));
         var refData = this.referenceData.filter(function(_, i) { return i % sampleRate === 0; });
         var currData = this.currentData.filter(function(_, i) { return i % sampleRate === 0; });
