@@ -687,66 +687,87 @@ class TelemetryAnalysisApp {
         var yawNames = ['Gyro Yaw Velocity', 'Yaw Rate'];
         var latNames = ['GPS Latitude', 'Latitude', 'Lat'];
         var lonNames = ['GPS Longitude', 'Longitude', 'Lon'];
+        // iRacing position channels
+        var iRacingPosXNames = ['CarPosX', 'PosX', 'Car Pos X'];
+        var iRacingPosYNames = ['CarPosY', 'PosY', 'Car Pos Y']; // Y is up in iRacing
+        var iRacingPosZNames = ['CarPosZ', 'PosZ', 'Car Pos Z'];
 
         var sampleRate = Math.max(1, Math.floor(this.referenceData.length / 500));
         
-        // Check if we have GPS data
+        // Check what position data we have
         var sampleRow = this.referenceData[0];
         var hasGPS = getValue(sampleRow, latNames, null) !== null && getValue(sampleRow, lonNames, null) !== null;
+        var hasIRacingPos = getValue(sampleRow, iRacingPosXNames, null) !== null && getValue(sampleRow, iRacingPosZNames, null) !== null;
+        
+        var positionSource = 'reconstructed';
+        if (hasGPS) positionSource = 'GPS';
+        else if (hasIRacingPos) positionSource = 'iRacing';
 
-        // Build track centerline first, then offset based on steering for racing line
-        var buildTrackWithLateralOffset = function(data, useGPS) {
-            var centerline = [];
+        var buildTrack = function(data, source) {
+            var positions = [];
             
-            // First pass: build centerline (integrated path)
-            if (useGPS) {
+            if (source === 'GPS') {
+                // Use actual GPS coordinates - this shows real track position
                 for (var i = 0; i < data.length; i += sampleRate) {
                     var row = data[i];
                     var lat = getValue(row, latNames, null);
                     var lon = getValue(row, lonNames, null);
                     var speed = getValue(row, speedNames, 100);
-                    var steer = getValue(row, steerNames, 0);
                     if (lat !== null && lon !== null) {
-                        centerline.push({ x: lon, y: lat, speed: speed, steer: steer, heading: 0 });
+                        positions.push({ x: lon, y: lat, speed: speed, heading: 0 });
                     }
                 }
-                // Calculate headings from positions
-                for (var i = 0; i < centerline.length - 1; i++) {
-                    var dx = centerline[i + 1].x - centerline[i].x;
-                    var dy = centerline[i + 1].y - centerline[i].y;
-                    centerline[i].heading = Math.atan2(dy, dx);
-                }
-                if (centerline.length > 1) {
-                    centerline[centerline.length - 1].heading = centerline[centerline.length - 2].heading;
+            } else if (source === 'iRacing') {
+                // Use iRacing world coordinates (X = lateral, Y = up, Z = forward)
+                // We use X and Z for the 2D track map (top-down view)
+                for (var i = 0; i < data.length; i += sampleRate) {
+                    var row = data[i];
+                    var posX = getValue(row, iRacingPosXNames, null);
+                    var posZ = getValue(row, iRacingPosZNames, null);
+                    var speed = getValue(row, speedNames, 100);
+                    if (posX !== null && posZ !== null) {
+                        positions.push({ x: posX, y: posZ, speed: speed, heading: 0 });
+                    }
                 }
             } else {
-                // Reconstruct from telemetry - this gives us the RACING LINE directly
+                // Reconstruct from telemetry (no position data)
                 var x = 0, y = 0, heading = 0, dt = 0.01;
                 for (var i = 0; i < data.length; i += sampleRate) {
                     var row = data[i];
                     var speed = getValue(row, speedNames, 100) / 3.6;
-                    var steer = getValue(row, steerNames, 0);
+                    var steer = getValue(row, steerNames, 0) * (Math.PI / 180);
                     var gLat = getValue(row, gLatNames, 0);
                     var yawRate = getValue(row, yawNames, 0) * (Math.PI / 180);
                     
                     var turnRate;
                     if (Math.abs(yawRate) > 0.001) turnRate = yawRate * dt * sampleRate;
                     else if (Math.abs(gLat) > 0.05) turnRate = (gLat * 9.81 / Math.max(speed, 10)) * dt * sampleRate;
-                    else turnRate = (speed * Math.tan(steer * 0.1 * Math.PI / 180) / 2.5) * dt * sampleRate;
+                    else turnRate = (speed * Math.tan(steer * 0.1) / 2.5) * dt * sampleRate;
                     
                     heading += turnRate;
                     var ds = speed * dt * sampleRate;
                     x += ds * Math.cos(heading);
                     y += ds * Math.sin(heading);
-                    centerline.push({ x: x, y: y, speed: getValue(row, speedNames, 100), steer: steer, heading: heading, gLat: gLat });
+                    positions.push({ x: x, y: y, speed: getValue(row, speedNames, 100), heading: heading });
                 }
+                return positions;
             }
             
-            return centerline;
+            // Calculate headings from positions (for GPS and iRacing)
+            for (var i = 0; i < positions.length - 1; i++) {
+                var dx = positions[i + 1].x - positions[i].x;
+                var dy = positions[i + 1].y - positions[i].y;
+                positions[i].heading = Math.atan2(dy, dx);
+            }
+            if (positions.length > 1) {
+                positions[positions.length - 1].heading = positions[positions.length - 2].heading;
+            }
+            
+            return positions;
         };
 
-        var refTrack = buildTrackWithLateralOffset(this.referenceData, hasGPS);
-        var currTrack = buildTrackWithLateralOffset(this.currentData, hasGPS);
+        var refTrack = buildTrack(this.referenceData, positionSource);
+        var currTrack = buildTrack(this.currentData, positionSource);
         
         if (refTrack.length < 10) { 
             document.getElementById('track-map').innerHTML = '<p class="text-gray-400 text-center py-20">Insufficient data</p>'; 
@@ -767,9 +788,7 @@ class TelemetryAnalysisApp {
                     x: (p.x - centerX) / scale, 
                     y: (p.y - centerY) / scale, 
                     speed: p.speed, 
-                    heading: p.heading,
-                    steer: p.steer || 0,
-                    gLat: p.gLat || 0
+                    heading: p.heading 
                 }; 
             }); 
         };
@@ -781,62 +800,23 @@ class TelemetryAnalysisApp {
         
         // Get track name from selector or default
         var trackName = this.selectedTrack ? this.selectedTrack.name : 'Track';
+        var sourceLabel = positionSource === 'GPS' ? ' (GPS)' : positionSource === 'iRacing' ? ' (iRacing)' : '';
         
-        // Calculate track boundaries based on racing line
-        // The racing line IS the driven path - we create track edges around it
-        var trackHalfWidth = 0.025;
+        // Generate track boundary from racing line with constant width
+        var trackWidth = 0.03;
         var outerEdge = { x: [], y: [] };
         var innerEdge = { x: [], y: [] };
-        
-        // Find max steering to normalize
-        var maxSteer = Math.max.apply(null, refNorm.map(function(p) { return Math.abs(p.steer); })) || 10;
         
         for (var i = 0; i < refNorm.length; i++) {
             var p = refNorm[i];
             var perpX = Math.cos(p.heading + Math.PI / 2);
             var perpY = Math.sin(p.heading + Math.PI / 2);
             
-            // Use steering to determine which side has more space
-            // Positive steering = turning left = car is on right side of track = more space on left
-            // Negative steering = turning right = car is on left side of track = more space on right
-            var steerRatio = p.steer / maxSteer; // -1 to 1
-            
-            // Base width plus adjustment based on steering
-            // When turning left (positive steer), inner edge (left) is close, outer edge (right) is far
-            var innerWidth = trackHalfWidth * (1.2 - steerRatio * 0.7);
-            var outerWidth = trackHalfWidth * (1.2 + steerRatio * 0.7);
-            
-            // Clamp to reasonable values
-            innerWidth = Math.max(0.008, Math.min(0.05, innerWidth));
-            outerWidth = Math.max(0.008, Math.min(0.05, outerWidth));
-            
-            outerEdge.x.push(p.x + perpX * outerWidth);
-            outerEdge.y.push(p.y + perpY * outerWidth);
-            innerEdge.x.push(p.x - perpX * innerWidth);
-            innerEdge.y.push(p.y - perpY * innerWidth);
+            outerEdge.x.push(p.x + perpX * trackWidth);
+            outerEdge.y.push(p.y + perpY * trackWidth);
+            innerEdge.x.push(p.x - perpX * trackWidth);
+            innerEdge.y.push(p.y - perpY * trackWidth);
         }
-        
-        // Smooth the edges
-        var smoothEdge = function(edge, iterations) {
-            for (var iter = 0; iter < iterations; iter++) {
-                var newX = [], newY = [];
-                for (var i = 0; i < edge.x.length; i++) {
-                    if (i === 0 || i === edge.x.length - 1) {
-                        newX.push(edge.x[i]);
-                        newY.push(edge.y[i]);
-                    } else {
-                        newX.push((edge.x[i-1] + edge.x[i] + edge.x[i+1]) / 3);
-                        newY.push((edge.y[i-1] + edge.y[i] + edge.y[i+1]) / 3);
-                    }
-                }
-                edge.x = newX;
-                edge.y = newY;
-            }
-            return edge;
-        };
-        
-        outerEdge = smoothEdge(outerEdge, 5);
-        innerEdge = smoothEdge(innerEdge, 5);
 
         var trackSurfaceX = outerEdge.x.concat(innerEdge.x.slice().reverse());
         var trackSurfaceY = outerEdge.y.concat(innerEdge.y.slice().reverse());
@@ -848,7 +828,7 @@ class TelemetryAnalysisApp {
             fillcolor: 'rgba(55, 65, 81, 0.8)',
             line: { color: 'rgba(55, 65, 81, 0.8)', width: 0 },
             mode: 'lines',
-            name: trackName,
+            name: trackName + sourceLabel,
             hoverinfo: 'skip',
             showlegend: true
         };
