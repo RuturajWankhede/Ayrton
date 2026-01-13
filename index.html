@@ -38,6 +38,17 @@
                     <input type="text" id="track-name" placeholder="Track Name" class="border rounded px-3 py-2 w-full">
                 </div>
                 
+                <!-- Track Selector Dropdown -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        <i class="fas fa-map-marker-alt mr-1 text-purple-500"></i>Select Track (for accurate boundaries)
+                    </label>
+                    <select id="track-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        <option value="">-- Select Track (Optional) --</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">Optional: Select your track for accurate track map boundaries</p>
+                </div>
+                
                 <div class="grid md:grid-cols-2 gap-6">
                     <div>
                         <h3 class="font-semibold mb-2">Reference Lap (Best/Target)</h3>
@@ -229,6 +240,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="tracks-database.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
