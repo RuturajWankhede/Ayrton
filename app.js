@@ -1,4 +1,4 @@
-// Racing Telemetry Analysis App - Complete Version with Channel Mapping.
+// Racing Telemetry Analysis App - Complete Version with Channel Mapping
 // Generated app.js with all features
 
 class TelemetryAnalysisApp {
@@ -11,14 +11,57 @@ class TelemetryAnalysisApp {
         this.detectedChannels = null;
         this.customMappings = {};
         this.customOverlays = [];
+        this.selectedTrack = null;
         this.webhookUrl = localStorage.getItem('n8n_webhook_url') || 'https://ruturajw.app.n8n.cloud';
         this.init();
     }
 
     init() {
         this.setupEventListeners();
+        this.setupTrackSelector();
         this.checkConfiguration();
         console.log('Telemetry Analysis App initialized');
+    }
+
+    setupTrackSelector() {
+        var trackSelect = document.getElementById('track-select');
+        if (!trackSelect || typeof TRACK_DATABASE === 'undefined') return;
+        
+        var self = this;
+        
+        // Group tracks by type
+        var tracksByType = {};
+        Object.entries(TRACK_DATABASE).forEach(function([key, track]) {
+            if (!tracksByType[track.type]) tracksByType[track.type] = [];
+            tracksByType[track.type].push({ key: key, name: track.name, location: track.location });
+        });
+        
+        // Build options HTML
+        var html = '<option value="">-- Select Track (Optional) --</option>';
+        var typeOrder = ['F1', 'IMSA', 'WEC', 'IndyCar', 'NASCAR', 'MotoGP', 'DTM', 'BTCC', 'V8Supercars', 'Club'];
+        
+        typeOrder.forEach(function(type) {
+            if (tracksByType[type] && tracksByType[type].length > 0) {
+                html += '<optgroup label="' + type + '">';
+                tracksByType[type].sort(function(a, b) { return a.name.localeCompare(b.name); });
+                tracksByType[type].forEach(function(track) {
+                    html += '<option value="' + track.key + '">' + track.name + ' (' + track.location + ')</option>';
+                });
+                html += '</optgroup>';
+            }
+        });
+        
+        trackSelect.innerHTML = html;
+        
+        trackSelect.addEventListener('change', function() {
+            if (this.value && TRACK_DATABASE[this.value]) {
+                self.selectedTrack = TRACK_DATABASE[this.value];
+                self.selectedTrack.key = this.value;
+                self.showNotification('Track selected: ' + self.selectedTrack.name, 'success');
+            } else {
+                self.selectedTrack = null;
+            }
+        });
     }
 
     checkConfiguration() {
@@ -623,7 +666,10 @@ class TelemetryAnalysisApp {
 
     generateTrackMap() {
         var self = this;
-        if (!this.referenceData || !this.currentData) { document.getElementById('track-map').innerHTML = '<p class="text-gray-400 text-center py-20">No track data</p>'; return; }
+        if (!this.referenceData || !this.currentData) { 
+            document.getElementById('track-map').innerHTML = '<p class="text-gray-400 text-center py-20">No track data</p>'; 
+            return; 
+        }
 
         var getValue = function(row, names, def) {
             for (var i = 0; i < names.length; i++) {
@@ -639,37 +685,72 @@ class TelemetryAnalysisApp {
         var steerNames = ['Steered Angle', 'Steering Angle', 'Steer'];
         var gLatNames = ['G Force Lat', 'Lateral G'];
         var yawNames = ['Gyro Yaw Velocity', 'Yaw Rate'];
+        var latNames = ['GPS Latitude', 'Latitude', 'Lat'];
+        var lonNames = ['GPS Longitude', 'Longitude', 'Lon'];
 
         var sampleRate = Math.max(1, Math.floor(this.referenceData.length / 500));
+        
+        // Check if we have GPS data
+        var sampleRow = this.referenceData[0];
+        var hasGPS = getValue(sampleRow, latNames, null) !== null && getValue(sampleRow, lonNames, null) !== null;
 
-        var buildTrack = function(data) {
+        var buildTrack = function(data, useGPS) {
             var positions = [];
-            var x = 0, y = 0, heading = 0, dt = 0.01;
-            for (var i = 0; i < data.length; i += sampleRate) {
-                var row = data[i];
-                var speed = getValue(row, speedNames, 100) / 3.6;
-                var steer = getValue(row, steerNames, 0) * (Math.PI / 180);
-                var gLat = getValue(row, gLatNames, 0);
-                var yawRate = getValue(row, yawNames, 0) * (Math.PI / 180);
-                
-                var turnRate;
-                if (Math.abs(yawRate) > 0.001) turnRate = yawRate * dt * sampleRate;
-                else if (Math.abs(gLat) > 0.05) turnRate = (gLat * 9.81 / Math.max(speed, 10)) * dt * sampleRate;
-                else turnRate = (speed * Math.tan(steer * 0.1) / 2.5) * dt * sampleRate;
-                
-                heading += turnRate;
-                var ds = speed * dt * sampleRate;
-                x += ds * Math.cos(heading);
-                y += ds * Math.sin(heading);
-                positions.push({ x: x, y: y, speed: getValue(row, speedNames, 100), heading: heading });
+            
+            if (useGPS) {
+                // Use actual GPS coordinates
+                for (var i = 0; i < data.length; i += sampleRate) {
+                    var row = data[i];
+                    var lat = getValue(row, latNames, null);
+                    var lon = getValue(row, lonNames, null);
+                    var speed = getValue(row, speedNames, 100);
+                    if (lat !== null && lon !== null) {
+                        positions.push({ x: lon, y: lat, speed: speed, heading: 0 });
+                    }
+                }
+                // Calculate headings from GPS positions
+                for (var i = 0; i < positions.length - 1; i++) {
+                    var dx = positions[i + 1].x - positions[i].x;
+                    var dy = positions[i + 1].y - positions[i].y;
+                    positions[i].heading = Math.atan2(dy, dx);
+                }
+                if (positions.length > 0) {
+                    positions[positions.length - 1].heading = positions[positions.length - 2].heading;
+                }
+            } else {
+                // Reconstruct from telemetry
+                var x = 0, y = 0, heading = 0, dt = 0.01;
+                for (var i = 0; i < data.length; i += sampleRate) {
+                    var row = data[i];
+                    var speed = getValue(row, speedNames, 100) / 3.6;
+                    var steer = getValue(row, steerNames, 0) * (Math.PI / 180);
+                    var gLat = getValue(row, gLatNames, 0);
+                    var yawRate = getValue(row, yawNames, 0) * (Math.PI / 180);
+                    
+                    var turnRate;
+                    if (Math.abs(yawRate) > 0.001) turnRate = yawRate * dt * sampleRate;
+                    else if (Math.abs(gLat) > 0.05) turnRate = (gLat * 9.81 / Math.max(speed, 10)) * dt * sampleRate;
+                    else turnRate = (speed * Math.tan(steer * 0.1) / 2.5) * dt * sampleRate;
+                    
+                    heading += turnRate;
+                    var ds = speed * dt * sampleRate;
+                    x += ds * Math.cos(heading);
+                    y += ds * Math.sin(heading);
+                    positions.push({ x: x, y: y, speed: getValue(row, speedNames, 100), heading: heading });
+                }
             }
             return positions;
         };
 
-        var refTrack = buildTrack(this.referenceData);
-        var currTrack = buildTrack(this.currentData);
-        if (refTrack.length < 10) { document.getElementById('track-map').innerHTML = '<p class="text-gray-400 text-center py-20">Insufficient data</p>'; return; }
+        var refTrack = buildTrack(this.referenceData, hasGPS);
+        var currTrack = buildTrack(this.currentData, hasGPS);
+        
+        if (refTrack.length < 10) { 
+            document.getElementById('track-map').innerHTML = '<p class="text-gray-400 text-center py-20">Insufficient data</p>'; 
+            return; 
+        }
 
+        // Normalize coordinates
         var allX = refTrack.map(function(p) { return p.x; }).concat(currTrack.map(function(p) { return p.x; }));
         var allY = refTrack.map(function(p) { return p.y; }).concat(currTrack.map(function(p) { return p.y; }));
         var minX = Math.min.apply(null, allX), maxX = Math.max.apply(null, allX);
@@ -677,67 +758,110 @@ class TelemetryAnalysisApp {
         var centerX = (minX + maxX) / 2, centerY = (minY + maxY) / 2;
         var scale = Math.max(maxX - minX, maxY - minY) || 1;
 
-        var normalize = function(track) { return track.map(function(p) { return { x: (p.x - centerX) / scale, y: (p.y - centerY) / scale, speed: p.speed, heading: p.heading }; }); };
+        var normalize = function(track) { 
+            return track.map(function(p) { 
+                return { 
+                    x: (p.x - centerX) / scale, 
+                    y: (p.y - centerY) / scale, 
+                    speed: p.speed, 
+                    heading: p.heading 
+                }; 
+            }); 
+        };
+        
         var refNorm = normalize(refTrack);
         var currNorm = normalize(currTrack);
 
-        // Create track boundary by offsetting the reference line
-        var trackWidth = 0.025; // Track half-width in normalized units
-        var outerEdge = { x: [], y: [] };
-        var innerEdge = { x: [], y: [] };
+        var allTraces = [];
         
-        for (var i = 0; i < refNorm.length; i++) {
-            var p = refNorm[i];
-            // Calculate perpendicular direction (90 degrees from heading)
-            var perpX = Math.cos(p.heading + Math.PI / 2);
-            var perpY = Math.sin(p.heading + Math.PI / 2);
+        // Check if we have a selected track with outline data
+        if (this.selectedTrack && this.selectedTrack.outline && this.selectedTrack.outline.length > 0) {
+            // Use the real track outline from database
+            var outline = this.selectedTrack.outline;
             
-            // Outer edge (left side of track)
-            outerEdge.x.push(p.x + perpX * trackWidth);
-            outerEdge.y.push(p.y + perpY * trackWidth);
+            // Normalize the track outline to match our coordinate system
+            var outlineX = outline.map(function(p) { return p[1]; }); // lon
+            var outlineY = outline.map(function(p) { return p[0]; }); // lat
             
-            // Inner edge (right side of track)
-            innerEdge.x.push(p.x - perpX * trackWidth);
-            innerEdge.y.push(p.y - perpY * trackWidth);
+            var outMinX = Math.min.apply(null, outlineX), outMaxX = Math.max.apply(null, outlineX);
+            var outMinY = Math.min.apply(null, outlineY), outMaxY = Math.max.apply(null, outlineY);
+            var outCenterX = (outMinX + outMaxX) / 2, outCenterY = (outMinY + outMaxY) / 2;
+            var outScale = Math.max(outMaxX - outMinX, outMaxY - outMinY) || 1;
+            
+            var normalizedOutline = outline.map(function(p) {
+                return {
+                    x: (p[1] - outCenterX) / outScale,
+                    y: (p[0] - outCenterY) / outScale
+                };
+            });
+            
+            // Track boundary from database
+            var trackBoundary = {
+                x: normalizedOutline.map(function(p) { return p.x; }),
+                y: normalizedOutline.map(function(p) { return p.y; }),
+                fill: 'toself',
+                fillcolor: 'rgba(55, 65, 81, 0.6)',
+                line: { color: '#ffffff', width: 3 },
+                mode: 'lines',
+                name: this.selectedTrack.name,
+                hoverinfo: 'name',
+                showlegend: true
+            };
+            allTraces.push(trackBoundary);
+        } else {
+            // Generate track boundary from racing line
+            var trackWidth = 0.03;
+            var outerEdge = { x: [], y: [] };
+            var innerEdge = { x: [], y: [] };
+            
+            for (var i = 0; i < refNorm.length; i++) {
+                var p = refNorm[i];
+                var perpX = Math.cos(p.heading + Math.PI / 2);
+                var perpY = Math.sin(p.heading + Math.PI / 2);
+                
+                outerEdge.x.push(p.x + perpX * trackWidth);
+                outerEdge.y.push(p.y + perpY * trackWidth);
+                innerEdge.x.push(p.x - perpX * trackWidth);
+                innerEdge.y.push(p.y - perpY * trackWidth);
+            }
+
+            var trackSurfaceX = outerEdge.x.concat(innerEdge.x.slice().reverse());
+            var trackSurfaceY = outerEdge.y.concat(innerEdge.y.slice().reverse());
+            
+            var trackSurface = {
+                x: trackSurfaceX,
+                y: trackSurfaceY,
+                fill: 'toself',
+                fillcolor: 'rgba(55, 65, 81, 0.8)',
+                line: { color: 'rgba(55, 65, 81, 0.8)', width: 0 },
+                mode: 'lines',
+                name: 'Track',
+                hoverinfo: 'skip',
+                showlegend: true
+            };
+            
+            var outerEdgeTrace = {
+                x: outerEdge.x,
+                y: outerEdge.y,
+                mode: 'lines',
+                line: { color: '#ffffff', width: 2 },
+                hoverinfo: 'skip',
+                showlegend: false
+            };
+            
+            var innerEdgeTrace = {
+                x: innerEdge.x,
+                y: innerEdge.y,
+                mode: 'lines',
+                line: { color: '#ffffff', width: 2 },
+                hoverinfo: 'skip',
+                showlegend: false
+            };
+            
+            allTraces.push(trackSurface, outerEdgeTrace, innerEdgeTrace);
         }
 
-        // Create filled track surface using a shape
-        var trackSurfaceX = outerEdge.x.concat(innerEdge.x.slice().reverse());
-        var trackSurfaceY = outerEdge.y.concat(innerEdge.y.slice().reverse());
-        
-        // Track surface (gray asphalt)
-        var trackSurface = {
-            x: trackSurfaceX,
-            y: trackSurfaceY,
-            fill: 'toself',
-            fillcolor: 'rgba(55, 65, 81, 0.8)',
-            line: { color: 'rgba(55, 65, 81, 0.8)', width: 0 },
-            mode: 'lines',
-            name: 'Track',
-            hoverinfo: 'skip',
-            showlegend: true
-        };
-        
-        // Track edges (white lines)
-        var outerEdgeTrace = {
-            x: outerEdge.x,
-            y: outerEdge.y,
-            mode: 'lines',
-            line: { color: '#ffffff', width: 2 },
-            hoverinfo: 'skip',
-            showlegend: false
-        };
-        
-        var innerEdgeTrace = {
-            x: innerEdge.x,
-            y: innerEdge.y,
-            mode: 'lines',
-            line: { color: '#ffffff', width: 2 },
-            hoverinfo: 'skip',
-            showlegend: false
-        };
-
-        // Reference lap - solid colored line
+        // Reference lap line
         var refTrace = { 
             x: refNorm.map(function(p) { return p.x; }), 
             y: refNorm.map(function(p) { return p.y; }), 
@@ -746,6 +870,7 @@ class TelemetryAnalysisApp {
             line: { color: '#9ca3af', width: 4 }, 
             hoverinfo: 'name' 
         };
+        allTraces.push(refTrace);
 
         // Current lap - speed colored
         var allSpeeds = currNorm.map(function(p) { return p.speed; });
@@ -758,9 +883,8 @@ class TelemetryAnalysisApp {
             return 'rgb(' + Math.round((1 - (ratio - 0.5) * 2) * 255) + ',255,0)';
         };
 
-        var currTraces = [];
         for (var i = 0; i < currNorm.length - 1; i++) {
-            currTraces.push({ 
+            allTraces.push({ 
                 x: [currNorm[i].x, currNorm[i + 1].x], 
                 y: [currNorm[i].y, currNorm[i + 1].y], 
                 mode: 'lines', 
@@ -782,8 +906,6 @@ class TelemetryAnalysisApp {
             autosize: true 
         };
 
-        // Layer order: track surface -> edges -> reference line -> current lap
-        var allTraces = [trackSurface, outerEdgeTrace, innerEdgeTrace, refTrace].concat(currTraces);
         Plotly.newPlot('track-map', allTraces, layout, { responsive: true, displayModeBar: false });
     }
 
