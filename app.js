@@ -1,4 +1,4 @@
-// Racing Telemetry Analysis App - Complete Version with Channel Mapping.
+// Racing Telemetry Analysis App - Complete Version with Channel Mapping
 // Generated app.js with all features
 
 class TelemetryAnalysisApp {
@@ -774,92 +774,59 @@ class TelemetryAnalysisApp {
 
         var allTraces = [];
         
-        // Check if we have a selected track with outline data
-        if (this.selectedTrack && this.selectedTrack.outline && this.selectedTrack.outline.length > 0) {
-            // Use the real track outline from database
-            var outline = this.selectedTrack.outline;
+        // Get track name from selector or default
+        var trackName = this.selectedTrack ? this.selectedTrack.name : 'Track';
+        
+        // Always generate track boundary from racing line (most accurate)
+        var trackWidth = 0.03;
+        var outerEdge = { x: [], y: [] };
+        var innerEdge = { x: [], y: [] };
+        
+        for (var i = 0; i < refNorm.length; i++) {
+            var p = refNorm[i];
+            var perpX = Math.cos(p.heading + Math.PI / 2);
+            var perpY = Math.sin(p.heading + Math.PI / 2);
             
-            // Normalize the track outline to match our coordinate system
-            var outlineX = outline.map(function(p) { return p[1]; }); // lon
-            var outlineY = outline.map(function(p) { return p[0]; }); // lat
-            
-            var outMinX = Math.min.apply(null, outlineX), outMaxX = Math.max.apply(null, outlineX);
-            var outMinY = Math.min.apply(null, outlineY), outMaxY = Math.max.apply(null, outlineY);
-            var outCenterX = (outMinX + outMaxX) / 2, outCenterY = (outMinY + outMaxY) / 2;
-            var outScale = Math.max(outMaxX - outMinX, outMaxY - outMinY) || 1;
-            
-            var normalizedOutline = outline.map(function(p) {
-                return {
-                    x: (p[1] - outCenterX) / outScale,
-                    y: (p[0] - outCenterY) / outScale
-                };
-            });
-            
-            // Track boundary from database
-            var trackBoundary = {
-                x: normalizedOutline.map(function(p) { return p.x; }),
-                y: normalizedOutline.map(function(p) { return p.y; }),
-                fill: 'toself',
-                fillcolor: 'rgba(55, 65, 81, 0.6)',
-                line: { color: '#ffffff', width: 3 },
-                mode: 'lines',
-                name: this.selectedTrack.name,
-                hoverinfo: 'name',
-                showlegend: true
-            };
-            allTraces.push(trackBoundary);
-        } else {
-            // Generate track boundary from racing line
-            var trackWidth = 0.03;
-            var outerEdge = { x: [], y: [] };
-            var innerEdge = { x: [], y: [] };
-            
-            for (var i = 0; i < refNorm.length; i++) {
-                var p = refNorm[i];
-                var perpX = Math.cos(p.heading + Math.PI / 2);
-                var perpY = Math.sin(p.heading + Math.PI / 2);
-                
-                outerEdge.x.push(p.x + perpX * trackWidth);
-                outerEdge.y.push(p.y + perpY * trackWidth);
-                innerEdge.x.push(p.x - perpX * trackWidth);
-                innerEdge.y.push(p.y - perpY * trackWidth);
-            }
-
-            var trackSurfaceX = outerEdge.x.concat(innerEdge.x.slice().reverse());
-            var trackSurfaceY = outerEdge.y.concat(innerEdge.y.slice().reverse());
-            
-            var trackSurface = {
-                x: trackSurfaceX,
-                y: trackSurfaceY,
-                fill: 'toself',
-                fillcolor: 'rgba(55, 65, 81, 0.8)',
-                line: { color: 'rgba(55, 65, 81, 0.8)', width: 0 },
-                mode: 'lines',
-                name: 'Track',
-                hoverinfo: 'skip',
-                showlegend: true
-            };
-            
-            var outerEdgeTrace = {
-                x: outerEdge.x,
-                y: outerEdge.y,
-                mode: 'lines',
-                line: { color: '#ffffff', width: 2 },
-                hoverinfo: 'skip',
-                showlegend: false
-            };
-            
-            var innerEdgeTrace = {
-                x: innerEdge.x,
-                y: innerEdge.y,
-                mode: 'lines',
-                line: { color: '#ffffff', width: 2 },
-                hoverinfo: 'skip',
-                showlegend: false
-            };
-            
-            allTraces.push(trackSurface, outerEdgeTrace, innerEdgeTrace);
+            outerEdge.x.push(p.x + perpX * trackWidth);
+            outerEdge.y.push(p.y + perpY * trackWidth);
+            innerEdge.x.push(p.x - perpX * trackWidth);
+            innerEdge.y.push(p.y - perpY * trackWidth);
         }
+
+        var trackSurfaceX = outerEdge.x.concat(innerEdge.x.slice().reverse());
+        var trackSurfaceY = outerEdge.y.concat(innerEdge.y.slice().reverse());
+        
+        var trackSurface = {
+            x: trackSurfaceX,
+            y: trackSurfaceY,
+            fill: 'toself',
+            fillcolor: 'rgba(55, 65, 81, 0.8)',
+            line: { color: 'rgba(55, 65, 81, 0.8)', width: 0 },
+            mode: 'lines',
+            name: trackName,
+            hoverinfo: 'skip',
+            showlegend: true
+        };
+        
+        var outerEdgeTrace = {
+            x: outerEdge.x,
+            y: outerEdge.y,
+            mode: 'lines',
+            line: { color: '#ffffff', width: 2 },
+            hoverinfo: 'skip',
+            showlegend: false
+        };
+        
+        var innerEdgeTrace = {
+            x: innerEdge.x,
+            y: innerEdge.y,
+            mode: 'lines',
+            line: { color: '#ffffff', width: 2 },
+            hoverinfo: 'skip',
+            showlegend: false
+        };
+        
+        allTraces.push(trackSurface, outerEdgeTrace, innerEdgeTrace);
 
         // Reference lap line
         var refTrace = { 
