@@ -1,4 +1,4 @@
-// Racing Telemetry Analysis App - Complete Version with Channel Mapping
+// Racing Telemetry Analysis App - Complete Version with Channel Mapping.
 // Generated app.js with all features
 
 class TelemetryAnalysisApp {
