@@ -1,4 +1,4 @@
-// Racing Telemetry Analysis App - Complete Version with Channel Mapping.
+// Racing Telemetry Analysis App - Complete Version with Channel Mapping
 // Generated app.js with all features
 
 class TelemetryAnalysisApp {
@@ -302,6 +302,11 @@ class TelemetryAnalysisApp {
             { category: 'G-Forces', channels: [{ key: 'gLat', name: 'Lateral G', icon: 'fa-arrows-alt-h' }, { key: 'gLong', name: 'Longitudinal G', icon: 'fa-arrows-alt-v' }, { key: 'gVert', name: 'Vertical G', icon: 'fa-arrows-alt-v' }]},
             { category: 'Wheel Speeds', channels: [{ key: 'wheelSpeedFL', name: 'FL', icon: 'fa-circle' }, { key: 'wheelSpeedFR', name: 'FR', icon: 'fa-circle' }, { key: 'wheelSpeedRL', name: 'RL', icon: 'fa-circle' }, { key: 'wheelSpeedRR', name: 'RR', icon: 'fa-circle' }]},
             { category: 'Suspension', channels: [{ key: 'suspFL', name: 'FL', icon: 'fa-arrows-alt-v' }, { key: 'suspFR', name: 'FR', icon: 'fa-arrows-alt-v' }, { key: 'suspRL', name: 'RL', icon: 'fa-arrows-alt-v' }, { key: 'suspRR', name: 'RR', icon: 'fa-arrows-alt-v' }]},
+            { category: 'Tire Temps - Front Left', channels: [{ key: 'tyreTempFLInner', name: 'FL Inner', icon: 'fa-thermometer-half' }, { key: 'tyreTempFLCenter', name: 'FL Center', icon: 'fa-thermometer-half' }, { key: 'tyreTempFLOuter', name: 'FL Outer', icon: 'fa-thermometer-half' }]},
+            { category: 'Tire Temps - Front Right', channels: [{ key: 'tyreTempFRInner', name: 'FR Inner', icon: 'fa-thermometer-half' }, { key: 'tyreTempFRCenter', name: 'FR Center', icon: 'fa-thermometer-half' }, { key: 'tyreTempFROuter', name: 'FR Outer', icon: 'fa-thermometer-half' }]},
+            { category: 'Tire Temps - Rear Left', channels: [{ key: 'tyreTempRLInner', name: 'RL Inner', icon: 'fa-thermometer-half' }, { key: 'tyreTempRLCenter', name: 'RL Center', icon: 'fa-thermometer-half' }, { key: 'tyreTempRLOuter', name: 'RL Outer', icon: 'fa-thermometer-half' }]},
+            { category: 'Tire Temps - Rear Right', channels: [{ key: 'tyreTempRRInner', name: 'RR Inner', icon: 'fa-thermometer-half' }, { key: 'tyreTempRRCenter', name: 'RR Center', icon: 'fa-thermometer-half' }, { key: 'tyreTempRROuter', name: 'RR Outer', icon: 'fa-thermometer-half' }]},
+            { category: 'Brake Temps', channels: [{ key: 'brakeTempFL', name: 'FL', icon: 'fa-fire' }, { key: 'brakeTempFR', name: 'FR', icon: 'fa-fire' }, { key: 'brakeTempRL', name: 'RL', icon: 'fa-fire' }, { key: 'brakeTempRR', name: 'RR', icon: 'fa-fire' }]},
             { category: 'Position', channels: [{ key: 'gpsLat', name: 'GPS Lat', icon: 'fa-map-marker-alt' }, { key: 'gpsLon', name: 'GPS Lon', icon: 'fa-map-marker-alt' }]}
         ];
         
