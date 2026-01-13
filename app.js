@@ -1,4 +1,4 @@
-// Racing Telemetry Analysis App - Complete Version with Channel Mapping.
+// Racing Telemetry Analysis App - Complete Version with Channel Mapping
 // Generated app.js with all features
 
 class TelemetryAnalysisApp {
@@ -694,56 +694,59 @@ class TelemetryAnalysisApp {
         var sampleRow = this.referenceData[0];
         var hasGPS = getValue(sampleRow, latNames, null) !== null && getValue(sampleRow, lonNames, null) !== null;
 
-        var buildTrack = function(data, useGPS) {
-            var positions = [];
+        // Build track centerline first, then offset based on steering for racing line
+        var buildTrackWithLateralOffset = function(data, useGPS) {
+            var centerline = [];
             
+            // First pass: build centerline (integrated path)
             if (useGPS) {
-                // Use actual GPS coordinates
                 for (var i = 0; i < data.length; i += sampleRate) {
                     var row = data[i];
                     var lat = getValue(row, latNames, null);
                     var lon = getValue(row, lonNames, null);
                     var speed = getValue(row, speedNames, 100);
+                    var steer = getValue(row, steerNames, 0);
                     if (lat !== null && lon !== null) {
-                        positions.push({ x: lon, y: lat, speed: speed, heading: 0 });
+                        centerline.push({ x: lon, y: lat, speed: speed, steer: steer, heading: 0 });
                     }
                 }
-                // Calculate headings from GPS positions
-                for (var i = 0; i < positions.length - 1; i++) {
-                    var dx = positions[i + 1].x - positions[i].x;
-                    var dy = positions[i + 1].y - positions[i].y;
-                    positions[i].heading = Math.atan2(dy, dx);
+                // Calculate headings from positions
+                for (var i = 0; i < centerline.length - 1; i++) {
+                    var dx = centerline[i + 1].x - centerline[i].x;
+                    var dy = centerline[i + 1].y - centerline[i].y;
+                    centerline[i].heading = Math.atan2(dy, dx);
                 }
-                if (positions.length > 0) {
-                    positions[positions.length - 1].heading = positions[positions.length - 2].heading;
+                if (centerline.length > 1) {
+                    centerline[centerline.length - 1].heading = centerline[centerline.length - 2].heading;
                 }
             } else {
-                // Reconstruct from telemetry
+                // Reconstruct from telemetry - this gives us the RACING LINE directly
                 var x = 0, y = 0, heading = 0, dt = 0.01;
                 for (var i = 0; i < data.length; i += sampleRate) {
                     var row = data[i];
                     var speed = getValue(row, speedNames, 100) / 3.6;
-                    var steer = getValue(row, steerNames, 0) * (Math.PI / 180);
+                    var steer = getValue(row, steerNames, 0);
                     var gLat = getValue(row, gLatNames, 0);
                     var yawRate = getValue(row, yawNames, 0) * (Math.PI / 180);
                     
                     var turnRate;
                     if (Math.abs(yawRate) > 0.001) turnRate = yawRate * dt * sampleRate;
                     else if (Math.abs(gLat) > 0.05) turnRate = (gLat * 9.81 / Math.max(speed, 10)) * dt * sampleRate;
-                    else turnRate = (speed * Math.tan(steer * 0.1) / 2.5) * dt * sampleRate;
+                    else turnRate = (speed * Math.tan(steer * 0.1 * Math.PI / 180) / 2.5) * dt * sampleRate;
                     
                     heading += turnRate;
                     var ds = speed * dt * sampleRate;
                     x += ds * Math.cos(heading);
                     y += ds * Math.sin(heading);
-                    positions.push({ x: x, y: y, speed: getValue(row, speedNames, 100), heading: heading });
+                    centerline.push({ x: x, y: y, speed: getValue(row, speedNames, 100), steer: steer, heading: heading, gLat: gLat });
                 }
             }
-            return positions;
+            
+            return centerline;
         };
 
-        var refTrack = buildTrack(this.referenceData, hasGPS);
-        var currTrack = buildTrack(this.currentData, hasGPS);
+        var refTrack = buildTrackWithLateralOffset(this.referenceData, hasGPS);
+        var currTrack = buildTrackWithLateralOffset(this.currentData, hasGPS);
         
         if (refTrack.length < 10) { 
             document.getElementById('track-map').innerHTML = '<p class="text-gray-400 text-center py-20">Insufficient data</p>'; 
@@ -764,7 +767,9 @@ class TelemetryAnalysisApp {
                     x: (p.x - centerX) / scale, 
                     y: (p.y - centerY) / scale, 
                     speed: p.speed, 
-                    heading: p.heading 
+                    heading: p.heading,
+                    steer: p.steer || 0,
+                    gLat: p.gLat || 0
                 }; 
             }); 
         };
@@ -777,21 +782,61 @@ class TelemetryAnalysisApp {
         // Get track name from selector or default
         var trackName = this.selectedTrack ? this.selectedTrack.name : 'Track';
         
-        // Always generate track boundary from racing line (most accurate)
-        var trackWidth = 0.03;
+        // Calculate track boundaries based on racing line
+        // The racing line IS the driven path - we create track edges around it
+        var trackHalfWidth = 0.025;
         var outerEdge = { x: [], y: [] };
         var innerEdge = { x: [], y: [] };
+        
+        // Find max steering to normalize
+        var maxSteer = Math.max.apply(null, refNorm.map(function(p) { return Math.abs(p.steer); })) || 10;
         
         for (var i = 0; i < refNorm.length; i++) {
             var p = refNorm[i];
             var perpX = Math.cos(p.heading + Math.PI / 2);
             var perpY = Math.sin(p.heading + Math.PI / 2);
             
-            outerEdge.x.push(p.x + perpX * trackWidth);
-            outerEdge.y.push(p.y + perpY * trackWidth);
-            innerEdge.x.push(p.x - perpX * trackWidth);
-            innerEdge.y.push(p.y - perpY * trackWidth);
+            // Use steering to determine which side has more space
+            // Positive steering = turning left = car is on right side of track = more space on left
+            // Negative steering = turning right = car is on left side of track = more space on right
+            var steerRatio = p.steer / maxSteer; // -1 to 1
+            
+            // Base width plus adjustment based on steering
+            // When turning left (positive steer), inner edge (left) is close, outer edge (right) is far
+            var innerWidth = trackHalfWidth * (1.2 - steerRatio * 0.7);
+            var outerWidth = trackHalfWidth * (1.2 + steerRatio * 0.7);
+            
+            // Clamp to reasonable values
+            innerWidth = Math.max(0.008, Math.min(0.05, innerWidth));
+            outerWidth = Math.max(0.008, Math.min(0.05, outerWidth));
+            
+            outerEdge.x.push(p.x + perpX * outerWidth);
+            outerEdge.y.push(p.y + perpY * outerWidth);
+            innerEdge.x.push(p.x - perpX * innerWidth);
+            innerEdge.y.push(p.y - perpY * innerWidth);
         }
+        
+        // Smooth the edges
+        var smoothEdge = function(edge, iterations) {
+            for (var iter = 0; iter < iterations; iter++) {
+                var newX = [], newY = [];
+                for (var i = 0; i < edge.x.length; i++) {
+                    if (i === 0 || i === edge.x.length - 1) {
+                        newX.push(edge.x[i]);
+                        newY.push(edge.y[i]);
+                    } else {
+                        newX.push((edge.x[i-1] + edge.x[i] + edge.x[i+1]) / 3);
+                        newY.push((edge.y[i-1] + edge.y[i] + edge.y[i+1]) / 3);
+                    }
+                }
+                edge.x = newX;
+                edge.y = newY;
+            }
+            return edge;
+        };
+        
+        outerEdge = smoothEdge(outerEdge, 5);
+        innerEdge = smoothEdge(innerEdge, 5);
 
         var trackSurfaceX = outerEdge.x.concat(innerEdge.x.slice().reverse());
         var trackSurfaceY = outerEdge.y.concat(innerEdge.y.slice().reverse());
