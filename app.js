@@ -280,7 +280,7 @@ class TelemetryAnalysisApp {
         
         html += '<div class="p-4 bg-blue-50 border-t" id="custom-mappings-section" style="display:none;"><h4 class="font-semibold text-gray-700 mb-2"><i class="fas fa-link text-blue-500 mr-2"></i>Custom Channel Mappings</h4>';
         html += '<div id="custom-mappings-list" class="space-y-1"></div>';
-        html += '<button id="reanalyze-btn" class="mt-3 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition"><i class="fas fa-sync-alt mr-2"></i>Apply Mappings and Analyze</button></div>';
+        html += '<button id="apply-mappings-btn" class="mt-3 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"><i class="fas fa-check mr-2"></i>Save Mappings</button></div>';
         
         html += '<div class="p-4 border-t bg-gradient-to-r from-purple-50 to-blue-50"><button id="start-analysis-btn" class="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-lg hover:from-purple-700 hover:to-blue-700 transition font-semibold text-lg shadow-lg"><i class="fas fa-play-circle mr-2"></i>Analyze Telemetry</button></div>';
         
@@ -395,8 +395,8 @@ class TelemetryAnalysisApp {
         var removeBtn = document.getElementById('remove-mapping-btn');
         if (removeBtn) removeBtn.addEventListener('click', function() { self.removeCustomMapping(document.getElementById('mapping-column-name').textContent); self.closeMappingModal(); });
         
-        var reanalyzeBtn = document.getElementById('reanalyze-btn');
-        if (reanalyzeBtn) reanalyzeBtn.addEventListener('click', function() { self.reanalyzeWithMappings(); });
+        var applyMappingsBtn = document.getElementById('apply-mappings-btn');
+        if (applyMappingsBtn) applyMappingsBtn.addEventListener('click', function() { self.applyMappings(); });
         
         var startAnalysisBtn = document.getElementById('start-analysis-btn');
         if (startAnalysisBtn) startAnalysisBtn.addEventListener('click', function() { self.analyzeTelemetry(); });
@@ -411,11 +411,53 @@ class TelemetryAnalysisApp {
             modal.classList.remove('hidden');
             modal.classList.add('flex');
             
+            // Build map of which channels are already mapped
+            var channelToColumn = {};
+            Object.keys(this.customMappings).forEach(function(col) {
+                channelToColumn[self.customMappings[col]] = col;
+            });
+            
+            // Also include auto-detected channels
+            if (this.detectedChannels) {
+                Object.keys(this.detectedChannels.required || {}).forEach(function(key) {
+                    var ch = self.detectedChannels.required[key];
+                    if (ch && ch.csvColumn && !channelToColumn[key]) channelToColumn[key] = ch.csvColumn + ' (auto)';
+                });
+                Object.keys(this.detectedChannels.optional || {}).forEach(function(key) {
+                    var ch = self.detectedChannels.optional[key];
+                    if (ch && ch.csvColumn && !channelToColumn[key]) channelToColumn[key] = ch.csvColumn + ' (auto)';
+                });
+            }
+            
             var existingMapping = this.customMappings[columnName];
             document.querySelectorAll('.channel-option-btn').forEach(function(btn) {
                 var channelKey = btn.getAttribute('data-channel');
-                btn.classList.remove('bg-green-100', 'border-green-500');
-                if (existingMapping && channelKey === existingMapping) btn.classList.add('bg-green-100', 'border-green-500');
+                var mappedColumn = channelToColumn[channelKey];
+                
+                // Reset styles
+                btn.classList.remove('bg-green-100', 'border-green-500', 'bg-yellow-50', 'border-yellow-400', 'opacity-60');
+                btn.style.position = 'relative';
+                
+                // Remove old badges
+                var oldBadge = btn.querySelector('.mapping-badge');
+                if (oldBadge) oldBadge.remove();
+                
+                if (existingMapping && channelKey === existingMapping) {
+                    // This is the current mapping for this column - highlight green
+                    btn.classList.add('bg-green-100', 'border-green-500');
+                    var badge = document.createElement('span');
+                    badge.className = 'mapping-badge absolute top-1 right-1 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded';
+                    badge.innerHTML = '<i class="fas fa-check"></i> Current';
+                    btn.appendChild(badge);
+                } else if (mappedColumn) {
+                    // This channel is already mapped to another column - show yellow with info
+                    btn.classList.add('bg-yellow-50', 'border-yellow-400', 'opacity-60');
+                    var badge = document.createElement('span');
+                    badge.className = 'mapping-badge absolute top-1 right-1 bg-yellow-500 text-white text-xs px-1.5 py-0.5 rounded max-w-24 truncate';
+                    badge.title = 'Mapped to: ' + mappedColumn;
+                    badge.innerHTML = '<i class="fas fa-link"></i> ' + (mappedColumn.length > 10 ? mappedColumn.substring(0, 10) + '...' : mappedColumn);
+                    btn.appendChild(badge);
+                }
             });
         }
     }
@@ -466,10 +508,16 @@ class TelemetryAnalysisApp {
         }
     }
 
-    reanalyzeWithMappings() {
+    applyMappings() {
         var self = this;
         if (Object.keys(this.customMappings).length > 0) {
-            var standardNames = { 'time': 'Time', 'distance': 'Distance', 'speed': 'Ground Speed', 'throttle': 'Throttle Pos', 'brake': 'Brake Pres Front', 'gear': 'Gear', 'steer': 'Steered Angle', 'rpm': 'Engine RPM', 'gLat': 'G Force Lat', 'gLong': 'G Force Long', 'gpsLat': 'GPS Latitude', 'gpsLon': 'GPS Longitude' };
+            var standardNames = { 'time': 'Time', 'distance': 'Distance', 'speed': 'Ground Speed', 'throttle': 'Throttle Pos', 'brake': 'Brake Pres Front', 'gear': 'Gear', 'steer': 'Steered Angle', 'rpm': 'Engine RPM', 'gLat': 'G Force Lat', 'gLong': 'G Force Long', 'gpsLat': 'GPS Latitude', 'gpsLon': 'GPS Longitude',
+                'tyreTempFLInner': 'Tyre Temp FL Inner', 'tyreTempFLCenter': 'Tyre Temp FL Centre', 'tyreTempFLOuter': 'Tyre Temp FL Outer',
+                'tyreTempFRInner': 'Tyre Temp FR Inner', 'tyreTempFRCenter': 'Tyre Temp FR Center', 'tyreTempFROuter': 'Tyre Temp FR Outer',
+                'tyreTempRLInner': 'Tyre Temp RL Inner', 'tyreTempRLCenter': 'Tyre Temp RL Centre', 'tyreTempRLOuter': 'Tyre Temp RL Outer',
+                'tyreTempRRInner': 'Tyre Temp RR Inner', 'tyreTempRRCenter': 'Tyre Temp RR Centre', 'tyreTempRROuter': 'Tyre Temp RR Outer',
+                'brakeTempFL': 'Brake Temp FL', 'brakeTempFR': 'Brake Temp FR', 'brakeTempRL': 'Brake Temp RL', 'brakeTempRR': 'Brake Temp RR'
+            };
             var renameMap = {};
             Object.keys(this.customMappings).forEach(function(originalCol) {
                 var targetChannel = self.customMappings[originalCol];
@@ -486,9 +534,10 @@ class TelemetryAnalysisApp {
                 Object.keys(renameMap).forEach(function(oldName) { if (newRow[oldName] !== undefined) newRow[renameMap[oldName]] = newRow[oldName]; });
                 return newRow;
             });
+            
+            this.showNotification('Mappings saved! Click "Analyze Telemetry" to process.', 'success');
         }
         this.detectChannels();
-        this.analyzeTelemetry();
     }
 
     async analyzeTelemetry() {
@@ -612,7 +661,7 @@ class TelemetryAnalysisApp {
                 var ds = speed * dt * sampleRate;
                 x += ds * Math.cos(heading);
                 y += ds * Math.sin(heading);
-                positions.push({ x: x, y: y, speed: getValue(row, speedNames, 100) });
+                positions.push({ x: x, y: y, speed: getValue(row, speedNames, 100), heading: heading });
             }
             return positions;
         };
@@ -628,10 +677,77 @@ class TelemetryAnalysisApp {
         var centerX = (minX + maxX) / 2, centerY = (minY + maxY) / 2;
         var scale = Math.max(maxX - minX, maxY - minY) || 1;
 
-        var normalize = function(track) { return track.map(function(p) { return { x: (p.x - centerX) / scale, y: (p.y - centerY) / scale, speed: p.speed }; }); };
+        var normalize = function(track) { return track.map(function(p) { return { x: (p.x - centerX) / scale, y: (p.y - centerY) / scale, speed: p.speed, heading: p.heading }; }); };
         var refNorm = normalize(refTrack);
         var currNorm = normalize(currTrack);
 
+        // Create track boundary by offsetting the reference line
+        var trackWidth = 0.025; // Track half-width in normalized units
+        var outerEdge = { x: [], y: [] };
+        var innerEdge = { x: [], y: [] };
+        
+        for (var i = 0; i < refNorm.length; i++) {
+            var p = refNorm[i];
+            // Calculate perpendicular direction (90 degrees from heading)
+            var perpX = Math.cos(p.heading + Math.PI / 2);
+            var perpY = Math.sin(p.heading + Math.PI / 2);
+            
+            // Outer edge (left side of track)
+            outerEdge.x.push(p.x + perpX * trackWidth);
+            outerEdge.y.push(p.y + perpY * trackWidth);
+            
+            // Inner edge (right side of track)
+            innerEdge.x.push(p.x - perpX * trackWidth);
+            innerEdge.y.push(p.y - perpY * trackWidth);
+        }
+
+        // Create filled track surface using a shape
+        var trackSurfaceX = outerEdge.x.concat(innerEdge.x.slice().reverse());
+        var trackSurfaceY = outerEdge.y.concat(innerEdge.y.slice().reverse());
+        
+        // Track surface (gray asphalt)
+        var trackSurface = {
+            x: trackSurfaceX,
+            y: trackSurfaceY,
+            fill: 'toself',
+            fillcolor: 'rgba(55, 65, 81, 0.8)',
+            line: { color: 'rgba(55, 65, 81, 0.8)', width: 0 },
+            mode: 'lines',
+            name: 'Track',
+            hoverinfo: 'skip',
+            showlegend: true
+        };
+        
+        // Track edges (white lines)
+        var outerEdgeTrace = {
+            x: outerEdge.x,
+            y: outerEdge.y,
+            mode: 'lines',
+            line: { color: '#ffffff', width: 2 },
+            hoverinfo: 'skip',
+            showlegend: false
+        };
+        
+        var innerEdgeTrace = {
+            x: innerEdge.x,
+            y: innerEdge.y,
+            mode: 'lines',
+            line: { color: '#ffffff', width: 2 },
+            hoverinfo: 'skip',
+            showlegend: false
+        };
+
+        // Reference lap - solid colored line
+        var refTrace = { 
+            x: refNorm.map(function(p) { return p.x; }), 
+            y: refNorm.map(function(p) { return p.y; }), 
+            mode: 'lines', 
+            name: 'Reference', 
+            line: { color: '#9ca3af', width: 4 }, 
+            hoverinfo: 'name' 
+        };
+
+        // Current lap - speed colored
         var allSpeeds = currNorm.map(function(p) { return p.speed; });
         var minSpeed = Math.min.apply(null, allSpeeds);
         var maxSpeed = Math.max.apply(null, allSpeeds);
@@ -642,14 +758,33 @@ class TelemetryAnalysisApp {
             return 'rgb(' + Math.round((1 - (ratio - 0.5) * 2) * 255) + ',255,0)';
         };
 
-        var refTrace = { x: refNorm.map(function(p) { return p.x; }), y: refNorm.map(function(p) { return p.y; }), mode: 'lines', name: 'Reference', line: { color: '#6b7280', width: 6 }, hoverinfo: 'name' };
         var currTraces = [];
         for (var i = 0; i < currNorm.length - 1; i++) {
-            currTraces.push({ x: [currNorm[i].x, currNorm[i + 1].x], y: [currNorm[i].y, currNorm[i + 1].y], mode: 'lines', showlegend: i === 0, name: i === 0 ? 'Your Lap (colored by speed)' : '', line: { color: getColor(currNorm[i].speed), width: 3 }, hoverinfo: 'skip' });
+            currTraces.push({ 
+                x: [currNorm[i].x, currNorm[i + 1].x], 
+                y: [currNorm[i].y, currNorm[i + 1].y], 
+                mode: 'lines', 
+                showlegend: i === 0, 
+                name: i === 0 ? 'Your Lap (colored by speed)' : '', 
+                line: { color: getColor(currNorm[i].speed), width: 3 }, 
+                hoverinfo: 'skip' 
+            });
         }
 
-        var layout = { showlegend: true, legend: { x: 0, y: 1, bgcolor: 'rgba(0,0,0,0.5)', font: { color: '#fff', size: 11 } }, xaxis: { visible: false, scaleanchor: 'y' }, yaxis: { visible: false }, margin: { t: 5, b: 5, l: 5, r: 5 }, paper_bgcolor: '#1f2937', plot_bgcolor: '#1f2937', autosize: true };
-        Plotly.newPlot('track-map', [refTrace].concat(currTraces), layout, { responsive: true, displayModeBar: false });
+        var layout = { 
+            showlegend: true, 
+            legend: { x: 0, y: 1, bgcolor: 'rgba(0,0,0,0.7)', font: { color: '#fff', size: 11 } }, 
+            xaxis: { visible: false, scaleanchor: 'y' }, 
+            yaxis: { visible: false }, 
+            margin: { t: 5, b: 5, l: 5, r: 5 }, 
+            paper_bgcolor: '#1f2937', 
+            plot_bgcolor: '#1f2937', 
+            autosize: true 
+        };
+
+        // Layer order: track surface -> edges -> reference line -> current lap
+        var allTraces = [trackSurface, outerEdgeTrace, innerEdgeTrace, refTrace].concat(currTraces);
+        Plotly.newPlot('track-map', allTraces, layout, { responsive: true, displayModeBar: false });
     }
 
     getOverlayChannels() {
