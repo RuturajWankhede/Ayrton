@@ -13,6 +13,7 @@ class TelemetryAnalysisApp {
         this.customOverlays = [];
         this.selectedTrack = null;
         this.webhookUrl = localStorage.getItem('n8n_webhook_url') || 'https://ruturajw.app.n8n.cloud';
+        this.useLLMMapping = true; // Enable LLM-based channel mapping
         this.init();
     }
 
@@ -21,6 +22,86 @@ class TelemetryAnalysisApp {
         this.setupTrackSelector();
         this.checkConfiguration();
         console.log('Telemetry Analysis App initialized');
+    }
+    
+    // LLM-based channel mapping - sends column names to Claude for intelligent mapping
+    async mapChannelsWithLLM(columns, sampleData) {
+        var self = this;
+        
+        // Build a sample of the data to help Claude understand the columns
+        var dataSample = {};
+        columns.forEach(function(col) {
+            var values = sampleData.slice(0, 5).map(function(row) { 
+                return row[col]; 
+            });
+            dataSample[col] = values;
+        });
+        
+        var prompt = 'You are a racing telemetry expert. I have CSV columns from a racing data logger that need to be mapped to standard channel names.\n\n' +
+            'CSV COLUMNS AND SAMPLE VALUES:\n' + JSON.stringify(dataSample, null, 2) + '\n\n' +
+            'MAP THESE TO OUR STANDARD CHANNELS:\n' +
+            'REQUIRED (must map if present):\n' +
+            '- time: Elapsed time or timestamp (seconds)\n' +
+            '- distance: Lap distance or position around track (meters)\n' +
+            '- speed: Vehicle speed (km/h or mph)\n\n' +
+            'OPTIONAL:\n' +
+            '- throttle: Throttle position (0-100%)\n' +
+            '- brake: Brake pressure or position\n' +
+            '- gear: Current gear number\n' +
+            '- steer: Steering angle (degrees)\n' +
+            '- rpm: Engine RPM\n' +
+            '- engineTemp: Engine/water temperature\n' +
+            '- oilTemp: Oil temperature\n' +
+            '- fuelLevel: Fuel amount\n' +
+            '- gLat: Lateral G-force (cornering)\n' +
+            '- gLong: Longitudinal G-force (accel/braking)\n' +
+            '- gVert: Vertical G-force\n' +
+            '- yaw: Yaw rate/angular velocity\n' +
+            '- wheelSpeedFL/FR/RL/RR: Individual wheel speeds\n' +
+            '- suspFL/FR/RL/RR: Suspension position\n' +
+            '- gpsLat/gpsLon: GPS coordinates\n' +
+            '- tireTempFL/FR/RL/RR: Tire temperatures\n' +
+            '- brakeTemp: Brake temperature\n' +
+            '- turboBoost: Turbo pressure\n' +
+            '- drs: DRS status\n' +
+            '- ers: ERS deployment\n\n' +
+            'RESPOND WITH ONLY A JSON OBJECT mapping standard names to CSV column names.\n' +
+            'Only include mappings you are confident about. Example:\n' +
+            '{"time": "Session Time", "distance": "Lap Dist", "speed": "Ground Speed", "throttle": "TPS"}\n\n' +
+            'If a column could be multiple things, make your best guess based on the sample values.\n' +
+            'RESPOND WITH ONLY THE JSON OBJECT, NO OTHER TEXT.';
+        
+        try {
+            console.log('Requesting LLM channel mapping...');
+            
+            var response = await fetch(this.webhookUrl + '/webhook/channel-mapping', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    columns: columns,
+                    sample_data: dataSample,
+                    prompt: prompt
+                })
+            });
+            
+            if (!response.ok) {
+                console.warn('LLM mapping failed, falling back to rule-based');
+                return null;
+            }
+            
+            var result = await response.json();
+            
+            if (result.success && result.mappings) {
+                console.log('LLM channel mappings:', result.mappings);
+                return result.mappings;
+            }
+            
+            return null;
+            
+        } catch (error) {
+            console.warn('LLM channel mapping error:', error);
+            return null;
+        }
     }
 
     setupTrackSelector() {
@@ -162,7 +243,9 @@ class TelemetryAnalysisApp {
                     if (type === 'ref') { self.referenceData = cleanedData; self.displayFileInfo('ref', file); }
                     else { self.currentData = cleanedData; self.displayFileInfo('curr', file); }
                     
-                    if (self.referenceData && self.currentData) self.detectChannels();
+                    if (self.referenceData && self.currentData) {
+                        self.detectChannels(); // async but we don't need to wait
+                    }
                 },
                 error: function(error) { self.showNotification('Error parsing CSV: ' + error.message, 'error'); }
             });
@@ -189,62 +272,131 @@ class TelemetryAnalysisApp {
         return div.innerHTML;
     }
 
-    detectChannels() {
+    async detectChannels() {
         if (!this.referenceData || this.referenceData.length === 0) return;
         var columns = Object.keys(this.referenceData[0]);
         var self = this;
         
+        // Channel definitions for fallback and UI display
         var channelDefinitions = {
             required: {
-                time: { variants: ['Time', 'Elapsed Time', 'Session Time', 'time'], description: 'Timestamp data', icon: 'fa-clock' },
-                distance: { variants: ['Distance', 'Dist', 'LapDist', 'Lap Distance', 'distance'], description: 'Position around lap', icon: 'fa-road' },
-                speed: { variants: ['Ground Speed', 'Speed', 'Drive Speed', 'Vehicle Speed', 'speed'], description: 'Vehicle speed', icon: 'fa-tachometer-alt' }
+                time: { description: 'Timestamp data', icon: 'fa-clock' },
+                distance: { description: 'Position around lap', icon: 'fa-road' },
+                speed: { description: 'Vehicle speed', icon: 'fa-tachometer-alt' }
             },
             optional: {
-                throttle: { variants: ['Throttle Pos', 'Throttle', 'TPS', 'throttle'], description: 'Throttle position', icon: 'fa-gas-pump', category: 'Driver Inputs' },
-                brake: { variants: ['Brake Pres Front', 'Brake Pressure', 'Brake', 'brake'], description: 'Brake pressure', icon: 'fa-hand-paper', category: 'Driver Inputs' },
-                gear: { variants: ['Gear', 'gear', 'Gear Position'], description: 'Current gear', icon: 'fa-cog', category: 'Driver Inputs' },
-                steer: { variants: ['Steered Angle', 'Steering Angle', 'Steer', 'steer'], description: 'Steering angle', icon: 'fa-dharmachakra', category: 'Driver Inputs' },
-                rpm: { variants: ['Engine RPM', 'RPM', 'rpm'], description: 'Engine RPM', icon: 'fa-tachometer-alt', category: 'Engine' },
-                engineTemp: { variants: ['Engine Temp', 'Water Temp', 'Coolant Temp'], description: 'Engine temperature', icon: 'fa-thermometer-full', category: 'Engine' },
-                oilTemp: { variants: ['Eng Oil Temp', 'Oil Temp'], description: 'Oil temperature', icon: 'fa-oil-can', category: 'Engine' },
-                fuelLevel: { variants: ['Fuel Level', 'Fuel'], description: 'Fuel level', icon: 'fa-gas-pump', category: 'Engine' },
-                gLat: { variants: ['G Force Lat', 'Lateral G', 'G_Lat', 'gLat'], description: 'Lateral G-force', icon: 'fa-arrows-alt-h', category: 'G-Forces' },
-                gLong: { variants: ['G Force Long', 'Longitudinal G', 'G_Long', 'gLong'], description: 'Longitudinal G-force', icon: 'fa-arrows-alt-v', category: 'G-Forces' },
-                gVert: { variants: ['G Force Vert', 'Vertical G'], description: 'Vertical G-force', icon: 'fa-arrows-alt-v', category: 'G-Forces' },
-                yaw: { variants: ['Gyro Yaw Velocity', 'Yaw Rate', 'Yaw'], description: 'Yaw rate', icon: 'fa-sync', category: 'Vehicle Dynamics' },
-                wheelSpeedFL: { variants: ['Wheel Speed FL', 'WheelSpeed FL'], description: 'Front left wheel', icon: 'fa-circle', category: 'Wheel Speeds' },
-                wheelSpeedFR: { variants: ['Wheel Speed FR', 'WheelSpeed FR'], description: 'Front right wheel', icon: 'fa-circle', category: 'Wheel Speeds' },
-                wheelSpeedRL: { variants: ['Wheel Speed RL', 'WheelSpeed RL'], description: 'Rear left wheel', icon: 'fa-circle', category: 'Wheel Speeds' },
-                wheelSpeedRR: { variants: ['Wheel Speed RR', 'WheelSpeed RR'], description: 'Rear right wheel', icon: 'fa-circle', category: 'Wheel Speeds' },
-                suspFL: { variants: ['Susp Pos FL', 'Suspension FL'], description: 'Front left susp', icon: 'fa-arrows-alt-v', category: 'Suspension' },
-                suspFR: { variants: ['Susp Pos FR', 'Suspension FR'], description: 'Front right susp', icon: 'fa-arrows-alt-v', category: 'Suspension' },
-                suspRL: { variants: ['Susp Pos RL', 'Suspension RL'], description: 'Rear left susp', icon: 'fa-arrows-alt-v', category: 'Suspension' },
-                suspRR: { variants: ['Susp Pos RR', 'Suspension RR'], description: 'Rear right susp', icon: 'fa-arrows-alt-v', category: 'Suspension' },
-                gpsLat: { variants: ['GPS Latitude', 'Latitude', 'Lat'], description: 'GPS Latitude', icon: 'fa-map-marker-alt', category: 'Position' },
-                gpsLon: { variants: ['GPS Longitude', 'Longitude', 'Lon'], description: 'GPS Longitude', icon: 'fa-map-marker-alt', category: 'Position' }
+                throttle: { description: 'Throttle position', icon: 'fa-gas-pump', category: 'Driver Inputs' },
+                brake: { description: 'Brake pressure', icon: 'fa-hand-paper', category: 'Driver Inputs' },
+                gear: { description: 'Current gear', icon: 'fa-cog', category: 'Driver Inputs' },
+                steer: { description: 'Steering angle', icon: 'fa-dharmachakra', category: 'Driver Inputs' },
+                rpm: { description: 'Engine RPM', icon: 'fa-tachometer-alt', category: 'Engine' },
+                engineTemp: { description: 'Engine temperature', icon: 'fa-thermometer-full', category: 'Engine' },
+                oilTemp: { description: 'Oil temperature', icon: 'fa-oil-can', category: 'Engine' },
+                fuelLevel: { description: 'Fuel level', icon: 'fa-gas-pump', category: 'Engine' },
+                gLat: { description: 'Lateral G-force', icon: 'fa-arrows-alt-h', category: 'G-Forces' },
+                gLong: { description: 'Longitudinal G-force', icon: 'fa-arrows-alt-v', category: 'G-Forces' },
+                gVert: { description: 'Vertical G-force', icon: 'fa-arrows-alt-v', category: 'G-Forces' },
+                yaw: { description: 'Yaw rate', icon: 'fa-sync', category: 'Vehicle Dynamics' },
+                wheelSpeedFL: { description: 'Front left wheel', icon: 'fa-circle', category: 'Wheel Speeds' },
+                wheelSpeedFR: { description: 'Front right wheel', icon: 'fa-circle', category: 'Wheel Speeds' },
+                wheelSpeedRL: { description: 'Rear left wheel', icon: 'fa-circle', category: 'Wheel Speeds' },
+                wheelSpeedRR: { description: 'Rear right wheel', icon: 'fa-circle', category: 'Wheel Speeds' },
+                suspFL: { description: 'Front left susp', icon: 'fa-arrows-alt-v', category: 'Suspension' },
+                suspFR: { description: 'Front right susp', icon: 'fa-arrows-alt-v', category: 'Suspension' },
+                suspRL: { description: 'Rear left susp', icon: 'fa-arrows-alt-v', category: 'Suspension' },
+                suspRR: { description: 'Rear right susp', icon: 'fa-arrows-alt-v', category: 'Suspension' },
+                gpsLat: { description: 'GPS Latitude', icon: 'fa-map-marker-alt', category: 'Position' },
+                gpsLon: { description: 'GPS Longitude', icon: 'fa-map-marker-alt', category: 'Position' }
             }
         };
         
-        var detected = { required: {}, optional: {}, missing: [], unrecognized: [], capabilities: [], totalColumns: columns.length };
+        var detected = { required: {}, optional: {}, missing: [], unrecognized: [], capabilities: [], totalColumns: columns.length, mappingMethod: 'rule-based' };
         var matchedColumns = new Set();
         
-        Object.keys(channelDefinitions.required).forEach(function(key) {
-            var def = channelDefinitions.required[key];
-            var found = columns.find(function(col) {
-                return def.variants.some(function(variant) { return col.toLowerCase() === variant.toLowerCase(); });
-            });
-            if (found) { detected.required[key] = { csvColumn: found, description: def.description, icon: def.icon }; matchedColumns.add(found); }
-            else { detected.missing.push({ channel: key, description: def.description }); }
-        });
+        // Try LLM mapping first if enabled
+        var llmMappings = null;
+        if (this.useLLMMapping) {
+            try {
+                this.showNotification('AI is analyzing your CSV columns...', 'info');
+                llmMappings = await this.mapChannelsWithLLM(columns, this.referenceData);
+                if (llmMappings) {
+                    detected.mappingMethod = 'AI-powered';
+                    console.log('Using LLM mappings:', llmMappings);
+                }
+            } catch (e) {
+                console.warn('LLM mapping failed:', e);
+            }
+        }
         
-        Object.keys(channelDefinitions.optional).forEach(function(key) {
-            var def = channelDefinitions.optional[key];
-            var found = columns.find(function(col) {
-                return def.variants.some(function(variant) { return col.toLowerCase() === variant.toLowerCase(); });
+        // Process mappings (LLM or fallback to rule-based)
+        if (llmMappings) {
+            // Use LLM mappings
+            Object.keys(channelDefinitions.required).forEach(function(key) {
+                var def = channelDefinitions.required[key];
+                if (llmMappings[key] && columns.includes(llmMappings[key])) {
+                    detected.required[key] = { csvColumn: llmMappings[key], description: def.description, icon: def.icon };
+                    matchedColumns.add(llmMappings[key]);
+                } else {
+                    detected.missing.push({ channel: key, description: def.description });
+                }
             });
-            if (found) { detected.optional[key] = { csvColumn: found, description: def.description, icon: def.icon, category: def.category }; matchedColumns.add(found); }
-        });
+            
+            Object.keys(channelDefinitions.optional).forEach(function(key) {
+                var def = channelDefinitions.optional[key];
+                if (llmMappings[key] && columns.includes(llmMappings[key])) {
+                    detected.optional[key] = { csvColumn: llmMappings[key], description: def.description, icon: def.icon, category: def.category };
+                    matchedColumns.add(llmMappings[key]);
+                }
+            });
+        } else {
+            // Fallback: rule-based matching with hardcoded variants
+            var ruleVariants = {
+                time: ['Time', 'Elapsed Time', 'Session Time', 'time', 'TIME', 'elapsed', 'Elapsed'],
+                distance: ['Distance', 'Dist', 'LapDist', 'Lap Distance', 'distance', 'DISTANCE', 'Lap Dist'],
+                speed: ['Ground Speed', 'Speed', 'Drive Speed', 'Vehicle Speed', 'speed', 'SPEED', 'Velocity'],
+                throttle: ['Throttle Pos', 'Throttle', 'TPS', 'throttle', 'THROTTLE', 'Throttle %', 'ThrottlePos'],
+                brake: ['Brake Pres Front', 'Brake Pressure', 'Brake', 'brake', 'BRAKE', 'BrakePressure', 'Brake Pres'],
+                gear: ['Gear', 'gear', 'GEAR', 'Gear Position', 'GearPos'],
+                steer: ['Steered Angle', 'Steering Angle', 'Steer', 'steer', 'STEER', 'SteerAngle', 'Steering'],
+                rpm: ['Engine RPM', 'RPM', 'rpm', 'EngineRPM', 'Engine Speed'],
+                engineTemp: ['Engine Temp', 'Water Temp', 'Coolant Temp', 'EngineTemp', 'WaterTemp'],
+                oilTemp: ['Eng Oil Temp', 'Oil Temp', 'OilTemp'],
+                fuelLevel: ['Fuel Level', 'Fuel', 'FuelLevel', 'Fuel Remaining'],
+                gLat: ['G Force Lat', 'Lateral G', 'G_Lat', 'gLat', 'GLat', 'LatG', 'LateralAccel'],
+                gLong: ['G Force Long', 'Longitudinal G', 'G_Long', 'gLong', 'GLong', 'LongG', 'LongAccel'],
+                gVert: ['G Force Vert', 'Vertical G', 'G_Vert', 'gVert', 'GVert'],
+                yaw: ['Gyro Yaw Velocity', 'Yaw Rate', 'Yaw', 'YawRate', 'yaw'],
+                wheelSpeedFL: ['Wheel Speed FL', 'WheelSpeed FL', 'WheelSpeedFL'],
+                wheelSpeedFR: ['Wheel Speed FR', 'WheelSpeed FR', 'WheelSpeedFR'],
+                wheelSpeedRL: ['Wheel Speed RL', 'WheelSpeed RL', 'WheelSpeedRL'],
+                wheelSpeedRR: ['Wheel Speed RR', 'WheelSpeed RR', 'WheelSpeedRR'],
+                suspFL: ['Susp Pos FL', 'Suspension FL', 'SuspFL'],
+                suspFR: ['Susp Pos FR', 'Suspension FR', 'SuspFR'],
+                suspRL: ['Susp Pos RL', 'Suspension RL', 'SuspRL'],
+                suspRR: ['Susp Pos RR', 'Suspension RR', 'SuspRR'],
+                gpsLat: ['GPS Latitude', 'Latitude', 'Lat', 'lat'],
+                gpsLon: ['GPS Longitude', 'Longitude', 'Lon', 'lon']
+            };
+            
+            Object.keys(channelDefinitions.required).forEach(function(key) {
+                var def = channelDefinitions.required[key];
+                var variants = ruleVariants[key] || [];
+                var found = columns.find(function(col) {
+                    return variants.some(function(variant) { return col.toLowerCase() === variant.toLowerCase(); });
+                });
+                if (found) { detected.required[key] = { csvColumn: found, description: def.description, icon: def.icon }; matchedColumns.add(found); }
+                else { detected.missing.push({ channel: key, description: def.description }); }
+            });
+            
+            Object.keys(channelDefinitions.optional).forEach(function(key) {
+                var def = channelDefinitions.optional[key];
+                var variants = ruleVariants[key] || [];
+                var found = columns.find(function(col) {
+                    return variants.some(function(variant) { return col.toLowerCase() === variant.toLowerCase(); });
+                });
+                if (found) { detected.optional[key] = { csvColumn: found, description: def.description, icon: def.icon, category: def.category }; matchedColumns.add(found); }
+            });
+        }
         
         columns.forEach(function(col) { if (!matchedColumns.has(col)) detected.unrecognized.push(col); });
         
@@ -268,14 +420,26 @@ class TelemetryAnalysisApp {
         var optionalCount = Object.keys(detected.optional).length;
         var totalMatched = requiredCount + optionalCount;
         var statusColor = requiredCount === 3 ? 'green' : 'yellow';
+        var mappingMethod = detected.mappingMethod || 'rule-based';
+        var isAIPowered = mappingMethod === 'AI-powered';
         
         var displayContainer = document.createElement('div');
         displayContainer.id = 'channel-detection-display';
         displayContainer.className = 'mt-6 border rounded-lg overflow-hidden';
         
         var html = '<div class="bg-' + statusColor + '-50 p-4 border-b"><div class="flex items-center justify-between"><div>';
-        html += '<h3 class="font-bold text-lg flex items-center"><i class="fas fa-search text-' + statusColor + '-500 mr-2"></i>Channel Detection Results</h3>';
-        html += '<p class="text-sm text-gray-600">' + detected.totalColumns + ' columns found - ' + totalMatched + ' channels mapped</p>';
+        html += '<h3 class="font-bold text-lg flex items-center">';
+        if (isAIPowered) {
+            html += '<i class="fas fa-robot text-purple-500 mr-2"></i>AI Channel Detection';
+        } else {
+            html += '<i class="fas fa-search text-' + statusColor + '-500 mr-2"></i>Channel Detection Results';
+        }
+        html += '</h3>';
+        html += '<p class="text-sm text-gray-600">' + detected.totalColumns + ' columns found - ' + totalMatched + ' channels mapped';
+        if (isAIPowered) {
+            html += ' <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800"><i class="fas fa-sparkles mr-1"></i>AI-Powered</span>';
+        }
+        html += '</p>';
         html += '</div><button id="toggle-channel-details" class="text-sm bg-white px-3 py-1 rounded border hover:bg-gray-50"><i class="fas fa-chevron-down mr-1"></i>Details</button></div></div>';
         
         if (detected.capabilities.length > 0) {
@@ -580,7 +744,7 @@ class TelemetryAnalysisApp {
             
             this.showNotification('Mappings saved! Click "Analyze Telemetry" to process.', 'success');
         }
-        this.detectChannels();
+        this.detectChannels(); // async but we don't need to wait
     }
 
     async analyzeTelemetry() {
