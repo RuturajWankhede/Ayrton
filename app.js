@@ -627,9 +627,9 @@ class TelemetryAnalysisApp {
             var refDataFiltered = filterColumns(refData);
             var currDataFiltered = filterColumns(currData);
             
-            // Smart downsample to ~3000 rows max (keeps more detail in corners)
-            // This allows ~2 min laps at reduced resolution while fitting in Claude's context
-            var maxRows = 3000;
+            // Smart downsample to ~2000 rows max to fit Claude's context window
+            // At 100Hz: 20 seconds full res, or every 3rd sample for 60 second laps
+            var maxRows = 2000;
             if (refDataFiltered.length > maxRows) {
                 var step = Math.ceil(refDataFiltered.length / maxRows);
                 refDataFiltered = refDataFiltered.filter(function(_, i) { return i % step === 0; });
@@ -678,18 +678,9 @@ class TelemetryAnalysisApp {
         var lapDelta = sessionData.timeDelta || analysis.timeDelta || 0;
         document.getElementById('lap-delta').textContent = (lapDelta > 0 ? '+' : '') + lapDelta.toFixed(3) + 's';
         
-        // Calculate grip usage from telemetry if available
-        var gripUsage = 75; // Default
-        if (sessionData.refTelemetry && sessionData.currTelemetry) {
-            var refGLat = sessionData.refTelemetry.map(function(r) { return Math.abs(r.gLat || 0); }).filter(function(g) { return g > 0; });
-            var currGLat = sessionData.currTelemetry.map(function(r) { return Math.abs(r.gLat || 0); }).filter(function(g) { return g > 0; });
-            if (refGLat.length > 0 && currGLat.length > 0) {
-                var maxRefG = Math.max.apply(null, refGLat);
-                var maxCurrG = Math.max.apply(null, currGLat);
-                if (maxRefG > 0) gripUsage = (maxCurrG / maxRefG) * 100;
-            }
-        }
-        document.getElementById('g-force-usage').textContent = Math.min(gripUsage, 100).toFixed(0) + '%';
+        // Calculate grip usage from raw telemetry stored in app
+        var gripUsage = this.calculateGripUsage();
+        document.getElementById('g-force-usage').textContent = gripUsage.toFixed(0) + '%';
         
         // Driving style based on lap delta
         var drivingStyle = lapDelta > 2 ? 'Learning' : lapDelta > 1 ? 'Building' : lapDelta > 0.5 ? 'Close' : lapDelta > 0 ? 'Competitive' : 'Faster!';
@@ -701,6 +692,76 @@ class TelemetryAnalysisApp {
         this.generateGraphs(analysis);
         this.displaySetupRecommendations(analysis);
         this.generateFullReport(analysis);
+    }
+    
+    calculateGripUsage() {
+        // Calculate grip usage by comparing lateral G utilization
+        // between current lap and reference lap
+        var self = this;
+        
+        if (!this.referenceData || !this.currentData || !this.detectedChannels) {
+            return 75; // Default fallback
+        }
+        
+        // Find the gLat channel
+        var gLatChannel = null;
+        var channels = this.detectedChannels.optional || {};
+        if (channels.gLat) {
+            gLatChannel = channels.gLat.csvColumn || channels.gLat;
+        }
+        
+        if (!gLatChannel) {
+            // Try common names
+            var possibleNames = ['G Force Lat', 'gLat', 'Lateral G', 'LateralAccel', 'G_Lat'];
+            var sampleRow = this.referenceData[0];
+            for (var i = 0; i < possibleNames.length; i++) {
+                if (sampleRow && sampleRow[possibleNames[i]] !== undefined) {
+                    gLatChannel = possibleNames[i];
+                    break;
+                }
+            }
+        }
+        
+        if (!gLatChannel) {
+            return 75; // No lateral G data available
+        }
+        
+        // Extract lateral G values
+        var refGLat = this.referenceData.map(function(row) {
+            var val = parseFloat(row[gLatChannel]);
+            return isNaN(val) ? 0 : Math.abs(val);
+        }).filter(function(g) { return g > 0.1; }); // Filter out near-zero values
+        
+        var currGLat = this.currentData.map(function(row) {
+            var val = parseFloat(row[gLatChannel]);
+            return isNaN(val) ? 0 : Math.abs(val);
+        }).filter(function(g) { return g > 0.1; });
+        
+        if (refGLat.length === 0 || currGLat.length === 0) {
+            return 75; // Not enough data
+        }
+        
+        // Calculate max lateral G for each lap
+        var maxRefG = Math.max.apply(null, refGLat);
+        var maxCurrG = Math.max.apply(null, currGLat);
+        
+        // Also calculate average of top 10% G values for more robust comparison
+        refGLat.sort(function(a, b) { return b - a; });
+        currGLat.sort(function(a, b) { return b - a; });
+        
+        var top10PercentRef = refGLat.slice(0, Math.ceil(refGLat.length * 0.1));
+        var top10PercentCurr = currGLat.slice(0, Math.ceil(currGLat.length * 0.1));
+        
+        var avgTopRefG = top10PercentRef.reduce(function(a, b) { return a + b; }, 0) / top10PercentRef.length;
+        var avgTopCurrG = top10PercentCurr.reduce(function(a, b) { return a + b; }, 0) / top10PercentCurr.length;
+        
+        // Use average of top 10% for more stable measurement
+        if (avgTopRefG > 0) {
+            var gripUsage = (avgTopCurrG / avgTopRefG) * 100;
+            return Math.min(Math.max(gripUsage, 0), 120); // Cap at 120% (driver could be exceeding reference)
+        }
+        
+        return 75; // Fallback
     }
 
     generateGraphs(analysis) {
