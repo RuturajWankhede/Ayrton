@@ -39,37 +39,74 @@ class TelemetryAnalysisApp {
         
         var prompt = 'You are a racing telemetry expert. I have CSV columns from a racing data logger that need to be mapped to standard channel names.\n\n' +
             'CSV COLUMNS AND SAMPLE VALUES:\n' + JSON.stringify(dataSample, null, 2) + '\n\n' +
-            'MAP THESE TO OUR STANDARD CHANNELS:\n' +
+            'MAP THESE TO OUR STANDARD CHANNELS:\n\n' +
             'REQUIRED (must map if present):\n' +
             '- time: Elapsed time or timestamp (seconds)\n' +
             '- distance: Lap distance or position around track (meters)\n' +
             '- speed: Vehicle speed (km/h or mph)\n\n' +
-            'OPTIONAL:\n' +
-            '- throttle: Throttle position (0-100%)\n' +
-            '- brake: Brake pressure or position\n' +
-            '- gear: Current gear number\n' +
-            '- steer: Steering angle (degrees)\n' +
+            'DRIVER INPUTS:\n' +
+            '- throttle: Throttle position\n' +
+            '- brake: Brake pressure/position (use front if multiple)\n' +
+            '- gear: Current gear\n' +
+            '- steer: Steering angle\n\n' +
+            'ENGINE & TEMPS:\n' +
             '- rpm: Engine RPM\n' +
-            '- engineTemp: Engine/water temperature\n' +
-            '- oilTemp: Oil temperature\n' +
-            '- fuelLevel: Fuel amount\n' +
-            '- gLat: Lateral G-force (cornering)\n' +
-            '- gLong: Longitudinal G-force (accel/braking)\n' +
-            '- gVert: Vertical G-force\n' +
-            '- yaw: Yaw rate/angular velocity\n' +
-            '- wheelSpeedFL/FR/RL/RR: Individual wheel speeds\n' +
-            '- suspFL/FR/RL/RR: Suspension position\n' +
-            '- gpsLat/gpsLon: GPS coordinates\n' +
-            '- tireTempFL/FR/RL/RR: Tire temperatures\n' +
-            '- brakeTemp: Brake temperature\n' +
-            '- turboBoost: Turbo pressure\n' +
-            '- drs: DRS status\n' +
-            '- ers: ERS deployment\n\n' +
-            'RESPOND WITH ONLY A JSON OBJECT mapping standard names to CSV column names.\n' +
-            'Only include mappings you are confident about. Example:\n' +
-            '{"time": "Session Time", "distance": "Lap Dist", "speed": "Ground Speed", "throttle": "TPS"}\n\n' +
-            'If a column could be multiple things, make your best guess based on the sample values.\n' +
-            'RESPOND WITH ONLY THE JSON OBJECT, NO OTHER TEXT.';
+            '- engineTemp: Engine/water/coolant temp\n' +
+            '- oilTemp: Engine oil temp\n' +
+            '- gboxOilTemp: Gearbox oil temp\n' +
+            '- diffOilTemp: Differential oil temp\n' +
+            '- oilPres: Oil pressure\n' +
+            '- fuelPres: Fuel pressure\n' +
+            '- manifoldPres: Manifold/boost pressure\n' +
+            '- baroPres: Barometric pressure\n' +
+            '- airTemp: Intake air temp\n' +
+            '- lambda1: Lambda/AFR sensor 1\n' +
+            '- lambda2: Lambda/AFR sensor 2\n' +
+            '- fuelUsed: Fuel used/remaining\n\n' +
+            'G-FORCES & DYNAMICS:\n' +
+            '- gLatF: Lateral G front (or main lateral G)\n' +
+            '- gLatM: Lateral G mid/center\n' +
+            '- gLatR: Lateral G rear\n' +
+            '- gLongF: Longitudinal G front\n' +
+            '- gLongM: Longitudinal G mid\n' +
+            '- yaw1: Yaw sensor 1\n' +
+            '- yaw2: Yaw sensor 2\n\n' +
+            'TIRE TEMPS (map each zone separately - I=Inner, C=Center/Centre, O=Outer):\n' +
+            '- tireTempFLI: Front Left Inner\n' +
+            '- tireTempFLC: Front Left Center (or single FL temp)\n' +
+            '- tireTempFLO: Front Left Outer\n' +
+            '- tireTempFRI: Front Right Inner\n' +
+            '- tireTempFRC: Front Right Center (or single FR temp)\n' +
+            '- tireTempFRO: Front Right Outer\n' +
+            '- tireTempRLI: Rear Left Inner\n' +
+            '- tireTempRLC: Rear Left Center (or single RL temp)\n' +
+            '- tireTempRLO: Rear Left Outer\n' +
+            '- tireTempRRI: Rear Right Inner\n' +
+            '- tireTempRRC: Rear Right Center (or single RR temp)\n' +
+            '- tireTempRRO: Rear Right Outer\n\n' +
+            'BRAKE TEMPS & PRESSURES:\n' +
+            '- brakeTempFL/FR/RL/RR: Individual brake temps\n' +
+            '- brakePresF: Front brake pressure\n' +
+            '- brakePresR: Rear brake pressure\n\n' +
+            'WHEEL SPEEDS:\n' +
+            '- wheelSpeedFL/FR/RL/RR: Individual wheel speeds\n\n' +
+            'SUSPENSION:\n' +
+            '- suspFL/FR/RL/RR: Suspension travel/position\n' +
+            '- rideHeightFL/FR/RL/RR: Ride heights\n\n' +
+            'ELECTRICAL:\n' +
+            '- batteryVolts: Battery voltage\n' +
+            '- batVoltsADL: ADL battery voltage\n\n' +
+            'OTHER:\n' +
+            '- lapNumber: Current lap\n' +
+            '- gpsLat/gpsLon: GPS coordinates\n\n' +
+            'RULES:\n' +
+            '1. Map as many columns as possible\n' +
+            '2. For tire temps with Inner/Centre/Outer, map each to the appropriate I/C/O channel\n' +
+            '3. If only one tire temp per corner exists, map it to the C (center) channel\n' +
+            '4. Use the sample values to verify your mappings make sense\n\n' +
+            'RESPOND WITH ONLY A JSON OBJECT. Example:\n' +
+            '{"time":"Time","distance":"Lap Distance","tireTempFLI":"Tyre Temp FL Inner","tireTempFLC":"Tyre Temp FL Centre","tireTempFLO":"Tyre Temp FL Outer"}\n\n' +
+            'JSON ONLY, NO OTHER TEXT:';
         
         try {
             console.log('Requesting LLM channel mapping...');
@@ -285,40 +322,88 @@ class TelemetryAnalysisApp {
                 speed: { description: 'Vehicle speed', icon: 'fa-tachometer-alt' }
             },
             optional: {
+                // Driver Inputs
                 throttle: { description: 'Throttle position', icon: 'fa-gas-pump', category: 'Driver Inputs' },
                 brake: { description: 'Brake pressure', icon: 'fa-hand-paper', category: 'Driver Inputs' },
                 gear: { description: 'Current gear', icon: 'fa-cog', category: 'Driver Inputs' },
                 steer: { description: 'Steering angle', icon: 'fa-dharmachakra', category: 'Driver Inputs' },
+                
+                // Engine
                 rpm: { description: 'Engine RPM', icon: 'fa-tachometer-alt', category: 'Engine' },
                 engineTemp: { description: 'Engine temperature', icon: 'fa-thermometer-full', category: 'Engine' },
                 oilTemp: { description: 'Oil temperature', icon: 'fa-oil-can', category: 'Engine' },
-                fuelLevel: { description: 'Fuel level', icon: 'fa-gas-pump', category: 'Engine' },
+                gboxOilTemp: { description: 'Gearbox oil temp', icon: 'fa-oil-can', category: 'Engine' },
+                diffOilTemp: { description: 'Diff oil temp', icon: 'fa-oil-can', category: 'Engine' },
+                oilPres: { description: 'Oil pressure', icon: 'fa-tint', category: 'Engine' },
+                fuelPres: { description: 'Fuel pressure', icon: 'fa-gas-pump', category: 'Engine' },
+                manifoldPres: { description: 'Manifold pressure', icon: 'fa-compress-arrows-alt', category: 'Engine' },
+                baroPres: { description: 'Barometric pressure', icon: 'fa-cloud', category: 'Engine' },
+                airTemp: { description: 'Air intake temp', icon: 'fa-wind', category: 'Engine' },
+                lambda1: { description: 'Lambda 1', icon: 'fa-burn', category: 'Engine' },
+                lambda2: { description: 'Lambda 2', icon: 'fa-burn', category: 'Engine' },
+                fuelUsed: { description: 'Fuel used', icon: 'fa-gas-pump', category: 'Engine' },
+                
+                // G-Forces
+                gLatF: { description: 'Lateral G (Front)', icon: 'fa-arrows-alt-h', category: 'G-Forces' },
+                gLatM: { description: 'Lateral G (Mid)', icon: 'fa-arrows-alt-h', category: 'G-Forces' },
+                gLatR: { description: 'Lateral G (Rear)', icon: 'fa-arrows-alt-h', category: 'G-Forces' },
+                gLongF: { description: 'Long G (Front)', icon: 'fa-arrows-alt-v', category: 'G-Forces' },
+                gLongM: { description: 'Long G (Mid)', icon: 'fa-arrows-alt-v', category: 'G-Forces' },
                 gLat: { description: 'Lateral G-force', icon: 'fa-arrows-alt-h', category: 'G-Forces' },
                 gLong: { description: 'Longitudinal G-force', icon: 'fa-arrows-alt-v', category: 'G-Forces' },
                 gVert: { description: 'Vertical G-force', icon: 'fa-arrows-alt-v', category: 'G-Forces' },
-                yaw: { description: 'Yaw rate', icon: 'fa-sync', category: 'Vehicle Dynamics' },
-                tireTempFL: { description: 'Front left tire temp', icon: 'fa-temperature-high', category: 'Tires' },
-                tireTempFR: { description: 'Front right tire temp', icon: 'fa-temperature-high', category: 'Tires' },
-                tireTempRL: { description: 'Rear left tire temp', icon: 'fa-temperature-high', category: 'Tires' },
-                tireTempRR: { description: 'Rear right tire temp', icon: 'fa-temperature-high', category: 'Tires' },
-                brakeTempFL: { description: 'Front left brake temp', icon: 'fa-fire', category: 'Brakes' },
-                brakeTempFR: { description: 'Front right brake temp', icon: 'fa-fire', category: 'Brakes' },
-                brakeTempRL: { description: 'Rear left brake temp', icon: 'fa-fire', category: 'Brakes' },
-                brakeTempRR: { description: 'Rear right brake temp', icon: 'fa-fire', category: 'Brakes' },
-                wheelSpeedFL: { description: 'Front left wheel', icon: 'fa-circle', category: 'Wheel Speeds' },
-                wheelSpeedFR: { description: 'Front right wheel', icon: 'fa-circle', category: 'Wheel Speeds' },
-                wheelSpeedRL: { description: 'Rear left wheel', icon: 'fa-circle', category: 'Wheel Speeds' },
-                wheelSpeedRR: { description: 'Rear right wheel', icon: 'fa-circle', category: 'Wheel Speeds' },
-                suspFL: { description: 'Front left susp', icon: 'fa-arrows-alt-v', category: 'Suspension' },
-                suspFR: { description: 'Front right susp', icon: 'fa-arrows-alt-v', category: 'Suspension' },
-                suspRL: { description: 'Rear left susp', icon: 'fa-arrows-alt-v', category: 'Suspension' },
-                suspRR: { description: 'Rear right susp', icon: 'fa-arrows-alt-v', category: 'Suspension' },
+                yaw1: { description: 'Yaw sensor 1', icon: 'fa-sync', category: 'G-Forces' },
+                yaw2: { description: 'Yaw sensor 2', icon: 'fa-sync', category: 'G-Forces' },
+                
+                // Tire Temps - Front Left
+                tireTempFLI: { description: 'FL Tire Inner', icon: 'fa-temperature-high', category: 'Tire Temps' },
+                tireTempFLC: { description: 'FL Tire Center', icon: 'fa-temperature-high', category: 'Tire Temps' },
+                tireTempFLO: { description: 'FL Tire Outer', icon: 'fa-temperature-high', category: 'Tire Temps' },
+                // Tire Temps - Front Right
+                tireTempFRI: { description: 'FR Tire Inner', icon: 'fa-temperature-high', category: 'Tire Temps' },
+                tireTempFRC: { description: 'FR Tire Center', icon: 'fa-temperature-high', category: 'Tire Temps' },
+                tireTempFRO: { description: 'FR Tire Outer', icon: 'fa-temperature-high', category: 'Tire Temps' },
+                // Tire Temps - Rear Left
+                tireTempRLI: { description: 'RL Tire Inner', icon: 'fa-temperature-high', category: 'Tire Temps' },
+                tireTempRLC: { description: 'RL Tire Center', icon: 'fa-temperature-high', category: 'Tire Temps' },
+                tireTempRLO: { description: 'RL Tire Outer', icon: 'fa-temperature-high', category: 'Tire Temps' },
+                // Tire Temps - Rear Right
+                tireTempRRI: { description: 'RR Tire Inner', icon: 'fa-temperature-high', category: 'Tire Temps' },
+                tireTempRRC: { description: 'RR Tire Center', icon: 'fa-temperature-high', category: 'Tire Temps' },
+                tireTempRRO: { description: 'RR Tire Outer', icon: 'fa-temperature-high', category: 'Tire Temps' },
+                
+                // Brake Temps
+                brakeTempFL: { description: 'FL Brake temp', icon: 'fa-fire', category: 'Brakes' },
+                brakeTempFR: { description: 'FR Brake temp', icon: 'fa-fire', category: 'Brakes' },
+                brakeTempRL: { description: 'RL Brake temp', icon: 'fa-fire', category: 'Brakes' },
+                brakeTempRR: { description: 'RR Brake temp', icon: 'fa-fire', category: 'Brakes' },
+                brakePresF: { description: 'Front brake pressure', icon: 'fa-compress', category: 'Brakes' },
+                brakePresR: { description: 'Rear brake pressure', icon: 'fa-compress', category: 'Brakes' },
+                
+                // Wheel Speeds
+                wheelSpeedFL: { description: 'FL wheel speed', icon: 'fa-circle', category: 'Wheel Speeds' },
+                wheelSpeedFR: { description: 'FR wheel speed', icon: 'fa-circle', category: 'Wheel Speeds' },
+                wheelSpeedRL: { description: 'RL wheel speed', icon: 'fa-circle', category: 'Wheel Speeds' },
+                wheelSpeedRR: { description: 'RR wheel speed', icon: 'fa-circle', category: 'Wheel Speeds' },
+                
+                // Suspension
+                suspFL: { description: 'FL suspension', icon: 'fa-arrows-alt-v', category: 'Suspension' },
+                suspFR: { description: 'FR suspension', icon: 'fa-arrows-alt-v', category: 'Suspension' },
+                suspRL: { description: 'RL suspension', icon: 'fa-arrows-alt-v', category: 'Suspension' },
+                suspRR: { description: 'RR suspension', icon: 'fa-arrows-alt-v', category: 'Suspension' },
+                rideHeightFL: { description: 'FL ride height', icon: 'fa-ruler-vertical', category: 'Suspension' },
+                rideHeightFR: { description: 'FR ride height', icon: 'fa-ruler-vertical', category: 'Suspension' },
+                rideHeightRL: { description: 'RL ride height', icon: 'fa-ruler-vertical', category: 'Suspension' },
+                rideHeightRR: { description: 'RR ride height', icon: 'fa-ruler-vertical', category: 'Suspension' },
+                
+                // Electrical
+                batteryVolts: { description: 'Battery voltage', icon: 'fa-battery-full', category: 'Electrical' },
+                batVoltsADL: { description: 'ADL battery', icon: 'fa-battery-full', category: 'Electrical' },
+                
+                // Position
                 gpsLat: { description: 'GPS Latitude', icon: 'fa-map-marker-alt', category: 'Position' },
                 gpsLon: { description: 'GPS Longitude', icon: 'fa-map-marker-alt', category: 'Position' },
-                lambda: { description: 'Air/fuel ratio', icon: 'fa-burn', category: 'Engine' },
-                boost: { description: 'Boost pressure', icon: 'fa-compress-arrows-alt', category: 'Engine' },
-                batteryVolts: { description: 'Battery voltage', icon: 'fa-battery-full', category: 'Electrical' },
-                airTemp: { description: 'Air intake temp', icon: 'fa-wind', category: 'Engine' }
+                lapNumber: { description: 'Lap number', icon: 'fa-flag-checkered', category: 'Position' }
             }
         };
         
