@@ -601,10 +601,21 @@ class TelemetryAnalysisApp {
                 currData = currData.filter(function(_, i) { return i % step === 0; });
             }
             
+            // Build channel mappings from detected + custom overrides
+            var channelMappings = {};
+            if (this.detectedChannels) {
+                // Merge required and optional detected channels
+                Object.assign(channelMappings, this.detectedChannels.required || {});
+                Object.assign(channelMappings, this.detectedChannels.optional || {});
+            }
+            // Apply any custom mappings the user made
+            Object.assign(channelMappings, this.customMappings || {});
+            
             var payload = {
                 reference_lap: refData, current_lap: currData,
                 driver_name: document.getElementById('driver-name').value || 'Driver',
                 track_name: document.getElementById('track-name').value || 'Track',
+                channel_mappings: channelMappings,
                 session_id: sessionId, timestamp: new Date().toISOString()
             };
 
