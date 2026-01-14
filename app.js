@@ -613,7 +613,7 @@ class TelemetryAnalysisApp {
                 if (colName) columnsToKeep.push(colName);
             }
             
-            // Filter data to only include mapped columns (keeps all rows, reduces columns)
+            // Filter data to only include mapped columns
             var filterColumns = function(data) {
                 return data.map(function(row) {
                     var filtered = {};
@@ -626,6 +626,15 @@ class TelemetryAnalysisApp {
             
             var refDataFiltered = filterColumns(refData);
             var currDataFiltered = filterColumns(currData);
+            
+            // Smart downsample to ~3000 rows max (keeps more detail in corners)
+            // This allows ~2 min laps at reduced resolution while fitting in Claude's context
+            var maxRows = 3000;
+            if (refDataFiltered.length > maxRows) {
+                var step = Math.ceil(refDataFiltered.length / maxRows);
+                refDataFiltered = refDataFiltered.filter(function(_, i) { return i % step === 0; });
+                currDataFiltered = currDataFiltered.filter(function(_, i) { return i % step === 0; });
+            }
             
             console.log('Sending ' + refDataFiltered.length + ' rows with ' + columnsToKeep.length + ' channels');
             
