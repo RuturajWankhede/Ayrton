@@ -595,6 +595,15 @@ class TelemetryAnalysisApp {
             var refData = this.referenceData;
             var currData = this.currentData;
             
+            // Limit to 5000 rows max to prevent request size issues
+            // At 100Hz, 5000 rows = 50 seconds of data (enough for most laps)
+            // All channels are preserved, only row count is limited
+            if (refData.length > 5000) {
+                var step = Math.ceil(refData.length / 5000);
+                refData = refData.filter(function(_, i) { return i % step === 0; });
+                currData = currData.filter(function(_, i) { return i % step === 0; });
+            }
+            
             // Build channel mappings from detected + custom overrides
             var channelMappings = {};
             if (this.detectedChannels) {
