@@ -62,7 +62,9 @@ class TelemetryAnalysisApp {
             '- airTemp: Intake air temp\n' +
             '- lambda1: Lambda/AFR sensor 1\n' +
             '- lambda2: Lambda/AFR sensor 2\n' +
-            '- fuelUsed: Fuel used/remaining\n\n' +
+            '- fuelLevel: Current fuel level (liters or kg)\n' +
+            '- fuelUsed: Fuel used/consumed (liters or kg)\n' +
+            '- fuelPressure: Fuel system pressure\n\n' +
             'G-FORCES & DYNAMICS:\n' +
             '- gLatF: Lateral G front (or main lateral G)\n' +
             '- gLatM: Lateral G mid/center\n' +
@@ -342,7 +344,8 @@ class TelemetryAnalysisApp {
                 airTemp: { description: 'Air intake temp', icon: 'fa-wind', category: 'Engine' },
                 lambda1: { description: 'Lambda 1', icon: 'fa-burn', category: 'Engine' },
                 lambda2: { description: 'Lambda 2', icon: 'fa-burn', category: 'Engine' },
-                fuelUsed: { description: 'Fuel used', icon: 'fa-gas-pump', category: 'Engine' },
+                fuelLevel: { description: 'Fuel level', icon: 'fa-gas-pump', category: 'Fuel' },
+                fuelUsed: { description: 'Fuel used', icon: 'fa-gas-pump', category: 'Fuel' },
                 
                 // G-Forces
                 gLatF: { description: 'Lateral G (Front)', icon: 'fa-arrows-alt-h', category: 'G-Forces' },
