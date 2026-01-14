@@ -595,12 +595,6 @@ class TelemetryAnalysisApp {
             var refData = this.referenceData;
             var currData = this.currentData;
             
-            if (refData.length > 1000) {
-                var step = Math.ceil(refData.length / 500);
-                refData = refData.filter(function(_, i) { return i % step === 0; });
-                currData = currData.filter(function(_, i) { return i % step === 0; });
-            }
-            
             // Build channel mappings from detected + custom overrides
             var channelMappings = {};
             if (this.detectedChannels) {
@@ -645,15 +639,31 @@ class TelemetryAnalysisApp {
 
     displayAnalysisResults(results) {
         var analysis = results.analysis || {};
-        var lapDelta = analysis.timeDelta || 0;
-        document.getElementById('lap-delta').textContent = lapDelta > 0 ? '+' + lapDelta.toFixed(3) + 's' : lapDelta.toFixed(3) + 's';
+        var sessionData = results.session_data || this.sessionData || {};
         
-        var gForceUsage = (analysis.avgSpeedCurr && analysis.avgSpeedRef) ? (analysis.avgSpeedCurr / analysis.avgSpeedRef * 100) : 75;
-        document.getElementById('g-force-usage').textContent = Math.min(gForceUsage, 100).toFixed(0) + '%';
+        // Get lap delta from session_data (where the N8N code puts it)
+        var lapDelta = sessionData.timeDelta || analysis.timeDelta || 0;
+        document.getElementById('lap-delta').textContent = (lapDelta > 0 ? '+' : '') + lapDelta.toFixed(3) + 's';
         
-        var drivingStyle = analysis.timeDelta > 2 ? 'Conservative' : analysis.timeDelta > 1 ? 'Cautious' : analysis.timeDelta > 0 ? 'Close' : 'Competitive';
+        // Calculate grip usage from telemetry if available
+        var gripUsage = 75; // Default
+        if (sessionData.refTelemetry && sessionData.currTelemetry) {
+            var refGLat = sessionData.refTelemetry.map(function(r) { return Math.abs(r.gLat || 0); }).filter(function(g) { return g > 0; });
+            var currGLat = sessionData.currTelemetry.map(function(r) { return Math.abs(r.gLat || 0); }).filter(function(g) { return g > 0; });
+            if (refGLat.length > 0 && currGLat.length > 0) {
+                var maxRefG = Math.max.apply(null, refGLat);
+                var maxCurrG = Math.max.apply(null, currGLat);
+                if (maxRefG > 0) gripUsage = (maxCurrG / maxRefG) * 100;
+            }
+        }
+        document.getElementById('g-force-usage').textContent = Math.min(gripUsage, 100).toFixed(0) + '%';
+        
+        // Driving style based on lap delta
+        var drivingStyle = lapDelta > 2 ? 'Learning' : lapDelta > 1 ? 'Building' : lapDelta > 0.5 ? 'Close' : lapDelta > 0 ? 'Competitive' : 'Faster!';
         document.getElementById('tire-status').textContent = drivingStyle;
-        document.getElementById('setup-issue').textContent = ((analysis.problems && analysis.problems.length) || 0) + ' Issues';
+        
+        // Count issues (placeholder - could parse from Ayrton's response)
+        document.getElementById('setup-issue').textContent = lapDelta > 1 ? 'Focus Areas' : 'Fine Tuning';
 
         this.generateGraphs(analysis);
         this.displaySetupRecommendations(analysis);
@@ -956,7 +966,15 @@ class TelemetryAnalysisApp {
         this.generateSingleOverlay('steering-overlay', refData, currData, refDist, currDist, channels.steering);
         this.generateSingleOverlay('glat-overlay', refData, currData, refDist, currDist, channels.gLat);
         this.generateSingleOverlay('glong-overlay', refData, currData, refDist, currDist, channels.gLong);
-        this.generateSingleOverlay('gear-overlay', refData, currData, refDist, currDist, channels.gear);
+        
+        // Only show gear overlay if gear channel exists in data
+        var hasGear = refData.some(function(row) { return self.getValue(row, channels.gear.names, null) !== null; });
+        var gearContainer = document.getElementById('gear-overlay');
+        if (hasGear) {
+            this.generateSingleOverlay('gear-overlay', refData, currData, refDist, currDist, channels.gear);
+        } else if (gearContainer) {
+            gearContainer.parentElement.style.display = 'none';
+        }
     }
 
     generateSingleOverlay(containerId, refData, currData, refDist, currDist, channelConfig) {
