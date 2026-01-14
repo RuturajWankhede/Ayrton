@@ -297,6 +297,14 @@ class TelemetryAnalysisApp {
                 gLong: { description: 'Longitudinal G-force', icon: 'fa-arrows-alt-v', category: 'G-Forces' },
                 gVert: { description: 'Vertical G-force', icon: 'fa-arrows-alt-v', category: 'G-Forces' },
                 yaw: { description: 'Yaw rate', icon: 'fa-sync', category: 'Vehicle Dynamics' },
+                tireTempFL: { description: 'Front left tire temp', icon: 'fa-temperature-high', category: 'Tires' },
+                tireTempFR: { description: 'Front right tire temp', icon: 'fa-temperature-high', category: 'Tires' },
+                tireTempRL: { description: 'Rear left tire temp', icon: 'fa-temperature-high', category: 'Tires' },
+                tireTempRR: { description: 'Rear right tire temp', icon: 'fa-temperature-high', category: 'Tires' },
+                brakeTempFL: { description: 'Front left brake temp', icon: 'fa-fire', category: 'Brakes' },
+                brakeTempFR: { description: 'Front right brake temp', icon: 'fa-fire', category: 'Brakes' },
+                brakeTempRL: { description: 'Rear left brake temp', icon: 'fa-fire', category: 'Brakes' },
+                brakeTempRR: { description: 'Rear right brake temp', icon: 'fa-fire', category: 'Brakes' },
                 wheelSpeedFL: { description: 'Front left wheel', icon: 'fa-circle', category: 'Wheel Speeds' },
                 wheelSpeedFR: { description: 'Front right wheel', icon: 'fa-circle', category: 'Wheel Speeds' },
                 wheelSpeedRL: { description: 'Rear left wheel', icon: 'fa-circle', category: 'Wheel Speeds' },
@@ -306,7 +314,11 @@ class TelemetryAnalysisApp {
                 suspRL: { description: 'Rear left susp', icon: 'fa-arrows-alt-v', category: 'Suspension' },
                 suspRR: { description: 'Rear right susp', icon: 'fa-arrows-alt-v', category: 'Suspension' },
                 gpsLat: { description: 'GPS Latitude', icon: 'fa-map-marker-alt', category: 'Position' },
-                gpsLon: { description: 'GPS Longitude', icon: 'fa-map-marker-alt', category: 'Position' }
+                gpsLon: { description: 'GPS Longitude', icon: 'fa-map-marker-alt', category: 'Position' },
+                lambda: { description: 'Air/fuel ratio', icon: 'fa-burn', category: 'Engine' },
+                boost: { description: 'Boost pressure', icon: 'fa-compress-arrows-alt', category: 'Engine' },
+                batteryVolts: { description: 'Battery voltage', icon: 'fa-battery-full', category: 'Electrical' },
+                airTemp: { description: 'Air intake temp', icon: 'fa-wind', category: 'Engine' }
             }
         };
         
@@ -349,40 +361,78 @@ class TelemetryAnalysisApp {
                 }
             });
         } else {
-            // Fallback: rule-based matching with hardcoded variants
+            // Fallback: rule-based matching with fuzzy matching
             var ruleVariants = {
-                time: ['Time', 'Elapsed Time', 'Session Time', 'time', 'TIME', 'elapsed', 'Elapsed'],
+                time: ['Time', 'Elapsed Time', 'Session Time', 'time', 'TIME', 'elapsed', 'Elapsed', 'Lap Time', 'Running Lap Time'],
                 distance: ['Distance', 'Dist', 'LapDist', 'Lap Distance', 'distance', 'DISTANCE', 'Lap Dist'],
-                speed: ['Ground Speed', 'Speed', 'Drive Speed', 'Vehicle Speed', 'speed', 'SPEED', 'Velocity'],
-                throttle: ['Throttle Pos', 'Throttle', 'TPS', 'throttle', 'THROTTLE', 'Throttle %', 'ThrottlePos'],
-                brake: ['Brake Pres Front', 'Brake Pressure', 'Brake', 'brake', 'BRAKE', 'BrakePressure', 'Brake Pres'],
-                gear: ['Gear', 'gear', 'GEAR', 'Gear Position', 'GearPos'],
-                steer: ['Steered Angle', 'Steering Angle', 'Steer', 'steer', 'STEER', 'SteerAngle', 'Steering'],
-                rpm: ['Engine RPM', 'RPM', 'rpm', 'EngineRPM', 'Engine Speed'],
-                engineTemp: ['Engine Temp', 'Water Temp', 'Coolant Temp', 'EngineTemp', 'WaterTemp'],
-                oilTemp: ['Eng Oil Temp', 'Oil Temp', 'OilTemp'],
-                fuelLevel: ['Fuel Level', 'Fuel', 'FuelLevel', 'Fuel Remaining'],
-                gLat: ['G Force Lat', 'Lateral G', 'G_Lat', 'gLat', 'GLat', 'LatG', 'LateralAccel'],
-                gLong: ['G Force Long', 'Longitudinal G', 'G_Long', 'gLong', 'GLong', 'LongG', 'LongAccel'],
+                speed: ['Ground Speed', 'Speed', 'Drive Speed', 'Vehicle Speed', 'speed', 'SPEED', 'Velocity', 'Max Straight Speed'],
+                throttle: ['Throttle Pos', 'Throttle', 'TPS', 'throttle', 'THROTTLE', 'Throttle %', 'ThrottlePos', 'Error Throttle Pos'],
+                brake: ['Brake Pres Front', 'Brake Pressure', 'Brake', 'brake', 'BRAKE', 'BrakePressure', 'Brake Pres', 'Brake Pres Rear'],
+                gear: ['Gear', 'gear', 'GEAR', 'Gear Position', 'GearPos', 'Gear Pos Volts'],
+                steer: ['Steered Angle', 'Steering Angle', 'Steer', 'steer', 'STEER', 'SteerAngle', 'Steering', 'Wheel Slip'],
+                rpm: ['Engine RPM', 'RPM', 'rpm', 'EngineRPM', 'Engine Speed', 'Error Over RPM'],
+                engineTemp: ['Engine Temp', 'Water Temp', 'Coolant Temp', 'EngineTemp', 'WaterTemp', 'Error Engine Temp'],
+                oilTemp: ['Eng Oil Temp', 'Oil Temp', 'OilTemp', 'Error Oil Temp', 'Gbox Oil Temp', 'Diff Oil Temp'],
+                fuelLevel: ['Fuel Level', 'Fuel', 'FuelLevel', 'Fuel Remaining', 'Fuel Used (Raw)', 'Fuel Pres'],
+                gLat: ['G Force Lat', 'Lateral G', 'G_Lat', 'gLat', 'GLat', 'LatG', 'LateralAccel', 'G Force Lat - Front', 'G Force Lat - Mid', 'Error Lateral G'],
+                gLong: ['G Force Long', 'Longitudinal G', 'G_Long', 'gLong', 'GLong', 'LongG', 'LongAccel', 'G Force Long Front', 'G Force Long Mid', 'Error Long G'],
                 gVert: ['G Force Vert', 'Vertical G', 'G_Vert', 'gVert', 'GVert'],
-                yaw: ['Gyro Yaw Velocity', 'Yaw Rate', 'Yaw', 'YawRate', 'yaw'],
-                wheelSpeedFL: ['Wheel Speed FL', 'WheelSpeed FL', 'WheelSpeedFL'],
-                wheelSpeedFR: ['Wheel Speed FR', 'WheelSpeed FR', 'WheelSpeedFR'],
+                yaw: ['Gyro Yaw Velocity', 'Yaw Rate', 'Yaw', 'YawRate', 'yaw', 'G Lat Yaw 1 - velcro mount', 'G Lat Yaw 2 - rubber mount'],
+                tireTempFL: ['Tyre Temp FL Centre', 'Tyre Temp FL Inner', 'Tyre Temp FL Outer', 'Tire Temp FL', 'TireTempFL'],
+                tireTempFR: ['Tyre Temp FR Centre', 'Tyre Temp FR Center', 'Tyre Temp FR Inner', 'Tyre Temp FR Outer', 'Tire Temp FR'],
+                tireTempRL: ['Tyre Temp RL', 'Tire Temp RL'],
+                tireTempRR: ['Tyre Temp RR', 'Tire Temp RR'],
+                brakeTempFL: ['Brake Temp FL', 'BrakeTempFL'],
+                brakeTempFR: ['Brake Temp FR', 'BrakeTempFR'],
+                brakeTempRL: ['Brake Temp RL', 'BrakeTempRL'],
+                brakeTempRR: ['Brake Temp RR', 'BrakeTempRR'],
+                wheelSpeedFL: ['Wheel Speed FL', 'WheelSpeed FL', 'WheelSpeedFL', 'Dig In 1 Speed'],
+                wheelSpeedFR: ['Wheel Speed FR', 'WheelSpeed FR', 'WheelSpeedFR', 'Dig In 2 Speed'],
                 wheelSpeedRL: ['Wheel Speed RL', 'WheelSpeed RL', 'WheelSpeedRL'],
                 wheelSpeedRR: ['Wheel Speed RR', 'WheelSpeed RR', 'WheelSpeedRR'],
-                suspFL: ['Susp Pos FL', 'Suspension FL', 'SuspFL'],
-                suspFR: ['Susp Pos FR', 'Suspension FR', 'SuspFR'],
-                suspRL: ['Susp Pos RL', 'Suspension RL', 'SuspRL'],
-                suspRR: ['Susp Pos RR', 'Suspension RR', 'SuspRR'],
+                suspFL: ['Susp Pos FL', 'Suspension FL', 'SuspFL', 'Ride Height FL'],
+                suspFR: ['Susp Pos FR', 'Suspension FR', 'SuspFR', 'Ride Height FR'],
+                suspRL: ['Susp Pos RL', 'Suspension RL', 'SuspRL', 'Ride Height RL'],
+                suspRR: ['Susp Pos RR', 'Suspension RR', 'SuspRR', 'Ride Height RR'],
                 gpsLat: ['GPS Latitude', 'Latitude', 'Lat', 'lat'],
-                gpsLon: ['GPS Longitude', 'Longitude', 'Lon', 'lon']
+                gpsLon: ['GPS Longitude', 'Longitude', 'Lon', 'lon'],
+                lambda: ['Lambda 1', 'Lambda 2', 'La1 Closed Loop', 'La2 Closed Loop'],
+                boost: ['Manifold Pres', 'Error Over Boost', 'Baro Pres'],
+                batteryVolts: ['Battery Volts', 'Bat Volts ADL', 'Error Low Bat Volts'],
+                airTemp: ['Air Temp Inlet', 'Error Inlet Air Temp']
+            };
+            
+            // Helper function for fuzzy matching
+            var fuzzyMatch = function(col, variants) {
+                var colLower = col.toLowerCase().replace(/[^a-z0-9]/g, '');
+                
+                // Exact match first
+                for (var i = 0; i < variants.length; i++) {
+                    if (col.toLowerCase() === variants[i].toLowerCase()) {
+                        return true;
+                    }
+                }
+                
+                // Partial match - column contains variant or vice versa
+                for (var i = 0; i < variants.length; i++) {
+                    var varLower = variants[i].toLowerCase().replace(/[^a-z0-9]/g, '');
+                    if (colLower.indexOf(varLower) !== -1 || varLower.indexOf(colLower) !== -1) {
+                        // Make sure it's a significant match (at least 60% of characters)
+                        var matchRatio = Math.min(colLower.length, varLower.length) / Math.max(colLower.length, varLower.length);
+                        if (matchRatio > 0.6) {
+                            return true;
+                        }
+                    }
+                }
+                
+                return false;
             };
             
             Object.keys(channelDefinitions.required).forEach(function(key) {
                 var def = channelDefinitions.required[key];
                 var variants = ruleVariants[key] || [];
                 var found = columns.find(function(col) {
-                    return variants.some(function(variant) { return col.toLowerCase() === variant.toLowerCase(); });
+                    return fuzzyMatch(col, variants);
                 });
                 if (found) { detected.required[key] = { csvColumn: found, description: def.description, icon: def.icon }; matchedColumns.add(found); }
                 else { detected.missing.push({ channel: key, description: def.description }); }
@@ -392,7 +442,7 @@ class TelemetryAnalysisApp {
                 var def = channelDefinitions.optional[key];
                 var variants = ruleVariants[key] || [];
                 var found = columns.find(function(col) {
-                    return variants.some(function(variant) { return col.toLowerCase() === variant.toLowerCase(); });
+                    return fuzzyMatch(col, variants);
                 });
                 if (found) { detected.optional[key] = { csvColumn: found, description: def.description, icon: def.icon, category: def.category }; matchedColumns.add(found); }
             });
