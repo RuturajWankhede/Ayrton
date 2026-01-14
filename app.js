@@ -87,7 +87,8 @@ class TelemetryAnalysisApp {
             'BRAKE TEMPS & PRESSURES:\n' +
             '- brakeTempFL/FR/RL/RR: Individual brake temps\n' +
             '- brakePresF: Front brake pressure\n' +
-            '- brakePresR: Rear brake pressure\n\n' +
+            '- brakePresR: Rear brake pressure\n' +
+            '- brakeBias: Brake bias setting (front percentage)\n\n' +
             'WHEEL SPEEDS:\n' +
             '- wheelSpeedFL/FR/RL/RR: Individual wheel speeds\n\n' +
             'SUSPENSION:\n' +
@@ -379,6 +380,7 @@ class TelemetryAnalysisApp {
                 brakeTempRR: { description: 'RR Brake temp', icon: 'fa-fire', category: 'Brakes' },
                 brakePresF: { description: 'Front brake pressure', icon: 'fa-compress', category: 'Brakes' },
                 brakePresR: { description: 'Rear brake pressure', icon: 'fa-compress', category: 'Brakes' },
+                brakeBias: { description: 'Brake bias setting', icon: 'fa-sliders-h', category: 'Brakes' },
                 
                 // Wheel Speeds
                 wheelSpeedFL: { description: 'FL wheel speed', icon: 'fa-circle', category: 'Wheel Speeds' },
