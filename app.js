@@ -1053,7 +1053,7 @@ class TelemetryAnalysisApp {
     }
     
     // ============================================
-    // CORNER CARD - Fixed data access
+    // CORNER CARD - Shows current + reference speeds
     // ============================================
     renderCornerCard(segment, idx) {
         var hasIssues = segment.issues && segment.issues.length > 0;
@@ -1061,6 +1061,7 @@ class TelemetryAnalysisApp {
         
         var curr = segment.curr || {};
         var delta = segment.delta || {};
+        var ref = segment.ref || {};
         
         var entrySpeed = curr.entrySpeed !== undefined ? curr.entrySpeed : '--';
         var apexSpeed = curr.apexSpeed !== undefined ? curr.apexSpeed : '--';
@@ -1073,6 +1074,11 @@ class TelemetryAnalysisApp {
         var deltaEntry = delta.entrySpeed !== undefined ? delta.entrySpeed : 0;
         var deltaApex = delta.apexSpeed !== undefined ? delta.apexSpeed : 0;
         var deltaExit = delta.exitSpeed !== undefined ? delta.exitSpeed : 0;
+        
+        // Calculate reference speeds (ref = curr - delta)
+        var refEntry = ref.entrySpeed !== undefined ? ref.entrySpeed : (typeof entrySpeed === 'number' ? entrySpeed - deltaEntry : '--');
+        var refApex = ref.apexSpeed !== undefined ? ref.apexSpeed : (typeof apexSpeed === 'number' ? apexSpeed - deltaApex : '--');
+        var refExit = ref.exitSpeed !== undefined ? ref.exitSpeed : (typeof exitSpeed === 'number' ? exitSpeed - deltaExit : '--');
         
         var html = '<div class="' + bgColor + ' border rounded-xl p-5 mb-4">';
         
@@ -1089,26 +1095,35 @@ class TelemetryAnalysisApp {
         }
         html += '</div>';
         
-        // Speed grid
+        // Speed comparison grid - shows Your speed, Ref speed, and Delta
         html += '<div class="grid grid-cols-3 gap-4 mb-4">';
         
-        html += '<div class="bg-white rounded-lg p-3 text-center shadow-sm">';
-        html += '<div class="text-gray-500 text-sm">Entry Speed</div>';
-        html += '<div class="text-gray-800 font-bold text-lg">' + entrySpeed + ' <span class="text-xs font-normal">km/h</span></div>';
-        if (deltaEntry !== 0) html += '<div class="text-' + (deltaEntry >= 0 ? 'green' : 'red') + '-600 text-sm font-medium">' + (deltaEntry >= 0 ? '+' : '') + deltaEntry + '</div>';
-        html += '</div>';
+        // Entry Speed
+        html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
+        html += '<div class="text-gray-500 text-sm text-center mb-2">Entry Speed</div>';
+        html += '<div class="flex justify-between items-center">';
+        html += '<div class="text-center flex-1"><div class="text-purple-600 font-bold text-lg">' + entrySpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
+        html += '<div class="text-center px-2"><div class="text-' + (deltaEntry >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaEntry >= 0 ? '+' : '') + deltaEntry + '</div><div class="text-xs text-gray-400">km/h</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-gray-600 font-bold text-lg">' + refEntry + '</div><div class="text-xs text-gray-400">Ref</div></div>';
+        html += '</div></div>';
         
-        html += '<div class="bg-white rounded-lg p-3 text-center shadow-sm">';
-        html += '<div class="text-gray-500 text-sm">Apex Speed</div>';
-        html += '<div class="text-gray-800 font-bold text-lg">' + apexSpeed + ' <span class="text-xs font-normal">km/h</span></div>';
-        if (deltaApex !== 0) html += '<div class="text-' + (deltaApex >= 0 ? 'green' : 'red') + '-600 text-sm font-medium">' + (deltaApex >= 0 ? '+' : '') + deltaApex + '</div>';
-        html += '</div>';
+        // Apex Speed
+        html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
+        html += '<div class="text-gray-500 text-sm text-center mb-2">Apex Speed</div>';
+        html += '<div class="flex justify-between items-center">';
+        html += '<div class="text-center flex-1"><div class="text-purple-600 font-bold text-lg">' + apexSpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
+        html += '<div class="text-center px-2"><div class="text-' + (deltaApex >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaApex >= 0 ? '+' : '') + deltaApex + '</div><div class="text-xs text-gray-400">km/h</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-gray-600 font-bold text-lg">' + refApex + '</div><div class="text-xs text-gray-400">Ref</div></div>';
+        html += '</div></div>';
         
-        html += '<div class="bg-white rounded-lg p-3 text-center shadow-sm">';
-        html += '<div class="text-gray-500 text-sm">Exit Speed</div>';
-        html += '<div class="text-gray-800 font-bold text-lg">' + exitSpeed + ' <span class="text-xs font-normal">km/h</span></div>';
-        if (deltaExit !== 0) html += '<div class="text-' + (deltaExit >= 0 ? 'green' : 'red') + '-600 text-sm font-medium">' + (deltaExit >= 0 ? '+' : '') + deltaExit + '</div>';
-        html += '</div>';
+        // Exit Speed
+        html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
+        html += '<div class="text-gray-500 text-sm text-center mb-2">Exit Speed</div>';
+        html += '<div class="flex justify-between items-center">';
+        html += '<div class="text-center flex-1"><div class="text-purple-600 font-bold text-lg">' + exitSpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
+        html += '<div class="text-center px-2"><div class="text-' + (deltaExit >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaExit >= 0 ? '+' : '') + deltaExit + '</div><div class="text-xs text-gray-400">km/h</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-gray-600 font-bold text-lg">' + refExit + '</div><div class="text-xs text-gray-400">Ref</div></div>';
+        html += '</div></div>';
         
         html += '</div>';
         
