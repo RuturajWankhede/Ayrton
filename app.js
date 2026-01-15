@@ -911,7 +911,37 @@ class TelemetryAnalysisApp {
         var analysis = results.analysis || {};
         var sessionData = results.session_data || this.sessionData || {};
         
+        // Try to get lap delta from multiple sources
         var lapDelta = sessionData.timeDelta || sessionData.lapDelta || analysis.timeDelta || 0;
+        
+        // If lap delta is 0, calculate it from the telemetry data
+        if (lapDelta === 0 && this.referenceData && this.currentData) {
+            var timeNames = ['Time', 'Elapsed Time', 'Session Time', 'time'];
+            var getValue = function(row, names) {
+                for (var i = 0; i < names.length; i++) {
+                    if (row[names[i]] !== undefined && row[names[i]] !== null) {
+                        var val = parseFloat(row[names[i]]);
+                        if (!isNaN(val)) return val;
+                    }
+                }
+                return null;
+            };
+            
+            var refEndTime = getValue(this.referenceData[this.referenceData.length - 1], timeNames);
+            var currEndTime = getValue(this.currentData[this.currentData.length - 1], timeNames);
+            
+            if (refEndTime !== null && currEndTime !== null) {
+                lapDelta = currEndTime - refEndTime;
+                console.log('Calculated lap delta from telemetry:', lapDelta);
+            }
+        }
+        
+        // Store the lap delta for use in the analysis tab
+        this.sessionData.lapDelta = lapDelta;
+        this.sessionData.timeDelta = lapDelta;
+        this.sessionData.driver = sessionData.driver || document.getElementById('driver-name').value || 'Driver';
+        this.sessionData.track = sessionData.track || document.getElementById('track-name').value || 'Track';
+        
         document.getElementById('lap-delta').textContent = (lapDelta > 0 ? '+' : '') + lapDelta.toFixed(3) + 's';
         
         var gripUsage = this.calculateGripUsage();
@@ -926,7 +956,7 @@ class TelemetryAnalysisApp {
         this.generateFullReport(analysis);
         
         // Generate analysis tab content (NOT popup)
-        this.generateAnalysisTab(analysis, sessionData);
+        this.generateAnalysisTab(analysis, this.sessionData);
         
         // Auto-switch to analysis tab
         this.switchTab('analysis');
@@ -943,9 +973,13 @@ class TelemetryAnalysisApp {
         var fuelAnalysis = analysis.fuelAnalysis || {};
         var brakingTechnique = analysis.brakingTechnique || {};
         var summary = analysis.summary || {};
-        var lapDelta = sessionData.lapDelta || sessionData.timeDelta || analysis.timeDelta || 0;
-        var driverName = sessionData.driver || 'Driver';
-        var trackName = sessionData.track || 'Track';
+        
+        // Get lap delta - try multiple sources
+        var lapDelta = sessionData.lapDelta || sessionData.timeDelta || 
+                       this.sessionData.lapDelta || this.sessionData.timeDelta ||
+                       analysis.timeDelta || 0;
+        var driverName = sessionData.driver || this.sessionData.driver || 'Driver';
+        var trackName = sessionData.track || this.sessionData.track || 'Track';
         
         // Get or create the analysis tab
         var analysisTab = document.getElementById('analysis-tab');
