@@ -979,7 +979,6 @@ class TelemetryAnalysisApp {
         html += '</div>';
         html += '<div class="text-right">';
         html += '<div class="text-3xl font-bold">' + (lapDelta > 0 ? '+' : '') + lapDelta.toFixed(3) + 's</div>';
-        html += '<div class="text-red-200">' + (lapDelta > 0 ? 'Behind Reference' : 'Ahead of Reference') + '</div>';
         html += '</div>';
         html += '</div>';
         html += '</div>';
@@ -1009,19 +1008,9 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-gray-700 rounded-lg p-4 text-center"><div class="text-3xl font-bold text-red-400">~' + totalTimeLoss.toFixed(2) + 's</div><div class="text-gray-400">Time Loss</div></div>';
         html += '</div>';
         
-        // Braking technique - comparative
-        if (brakingTechnique.smoothnessVsRef || brakingTechnique.trailBrakingCount !== undefined) {
-            html += '<div class="grid grid-cols-3 gap-4">';
-            if (brakingTechnique.smoothnessVsRef) {
-                html += '<div class="bg-gray-700/50 rounded-lg p-3"><span class="text-gray-400">Braking:</span> <span class="text-white font-bold">' + brakingTechnique.smoothnessVsRef + '</span></div>';
-            }
-            if (brakingTechnique.trailBrakingCount !== undefined) {
-                html += '<div class="bg-gray-700/50 rounded-lg p-3"><span class="text-gray-400">Trail Braking:</span> <span class="text-white font-bold">' + brakingTechnique.trailBrakingCount + '/' + (brakingTechnique.totalCorners || cornerCount) + ' corners</span></div>';
-            }
-            if (brakingTechnique.trailBrakingRef !== undefined) {
-                html += '<div class="bg-gray-700/50 rounded-lg p-3"><span class="text-gray-400">Ref Trail:</span> <span class="text-white font-bold">' + brakingTechnique.trailBrakingRef + '/' + (brakingTechnique.totalCorners || cornerCount) + '</span></div>';
-            }
-            html += '</div>';
+        // Braking technique - just show smoothness comparison
+        if (brakingTechnique.smoothnessVsRef) {
+            html += '<div class="bg-gray-700/50 rounded-lg p-3 inline-block"><span class="text-gray-400">Braking:</span> <span class="text-white font-bold">' + brakingTechnique.smoothnessVsRef + '</span></div>';
         }
         html += '</div>';
         
