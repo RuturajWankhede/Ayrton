@@ -1127,20 +1127,33 @@ class TelemetryAnalysisApp {
         
         html += '</div>';
         
-        // Braking details
+        // Braking details - also showing You / Delta / Ref
+        var refPeakBrake = ref.peakBrake !== undefined ? ref.peakBrake : (ref.peakBrakeNorm !== undefined ? ref.peakBrakeNorm : '--');
+        var deltaPeakBrake = delta.peakBrake !== undefined ? delta.peakBrake : (typeof peakBrake === 'number' && typeof refPeakBrake === 'number' ? peakBrake - refPeakBrake : 0);
+        
+        var refTrailDist = ref.trailDist !== undefined ? ref.trailDist : (ref.trailBrakingDist !== undefined ? ref.trailBrakingDist : 0);
+        var refTrailBraking = ref.hasTrailBraking !== undefined ? ref.hasTrailBraking : (ref.trailBraking !== undefined ? ref.trailBraking : (refTrailDist > 0));
+        var deltaTrailDist = delta.trailDist !== undefined ? delta.trailDist : (trailDist - refTrailDist);
+        
         html += '<div class="grid grid-cols-3 gap-3 mb-4">';
         
-        html += '<div class="bg-gray-100 rounded p-2 text-center">';
-        html += '<div class="text-xs text-gray-500">Peak Brake</div>';
-        html += '<div class="text-gray-800 font-semibold">' + peakBrake + '%</div>';
-        html += '</div>';
+        // Peak Brake - You / Delta / Ref
+        html += '<div class="bg-gray-100 rounded p-2">';
+        html += '<div class="text-xs text-gray-500 text-center mb-1">Peak Brake</div>';
+        html += '<div class="flex justify-between items-center text-sm">';
+        html += '<div class="text-center flex-1"><div class="text-purple-600 font-bold">' + peakBrake + '%</div><div class="text-xs text-gray-400">You</div></div>';
+        if (typeof deltaPeakBrake === 'number' && deltaPeakBrake !== 0) {
+            html += '<div class="text-center px-1"><div class="text-' + (deltaPeakBrake >= 0 ? 'green' : 'red') + '-600 font-bold text-xs">' + (deltaPeakBrake >= 0 ? '+' : '') + deltaPeakBrake + '</div></div>';
+        }
+        html += '<div class="text-center flex-1"><div class="text-gray-600 font-bold">' + refPeakBrake + '%</div><div class="text-xs text-gray-400">Ref</div></div>';
+        html += '</div></div>';
         
-        // Smoothness - handle string or number
+        // Smoothness - handle string or number (comparative)
         html += '<div class="bg-gray-100 rounded p-2 text-center">';
         html += '<div class="text-xs text-gray-500">Smoothness</div>';
         if (segment.smoothness && typeof segment.smoothness === 'string') {
             var smoothColor = segment.smoothness.includes('rougher') ? 'text-red-600' : segment.smoothness.includes('smoother') ? 'text-green-600' : 'text-gray-800';
-            html += '<div class="' + smoothColor + ' font-semibold text-xs">' + segment.smoothness + '</div>';
+            html += '<div class="' + smoothColor + ' font-semibold text-xs mt-1">' + segment.smoothness + '</div>';
         } else if (curr.smoothness !== undefined && curr.smoothness !== null) {
             html += '<div class="text-gray-800 font-semibold">' + (typeof curr.smoothness === 'number' ? curr.smoothness + '/100' : curr.smoothness) + '</div>';
         } else {
@@ -1148,16 +1161,39 @@ class TelemetryAnalysisApp {
         }
         html += '</div>';
         
-        html += '<div class="bg-gray-100 rounded p-2 text-center">';
-        html += '<div class="text-xs text-gray-500">Trail Braking</div>';
+        // Trail Braking - You / Delta / Ref
+        html += '<div class="bg-gray-100 rounded p-2">';
+        html += '<div class="text-xs text-gray-500 text-center mb-1">Trail Braking</div>';
+        html += '<div class="flex justify-between items-center text-sm">';
+        
+        // Your trail braking
+        html += '<div class="text-center flex-1">';
         if (trailBraking === true) {
-            html += '<div class="text-green-600 font-semibold">' + (trailDist > 0 ? trailDist + 'm' : 'Yes') + '</div>';
+            html += '<div class="text-purple-600 font-bold">' + (trailDist > 0 ? trailDist + 'm' : 'Yes') + '</div>';
         } else if (trailBraking === false) {
-            html += '<div class="text-red-600 font-semibold">None</div>';
+            html += '<div class="text-red-600 font-bold">No</div>';
         } else {
-            html += '<div class="text-gray-400 font-semibold">-</div>';
+            html += '<div class="text-gray-400 font-bold">-</div>';
         }
-        html += '</div>';
+        html += '<div class="text-xs text-gray-400">You</div></div>';
+        
+        // Delta
+        if (typeof deltaTrailDist === 'number' && deltaTrailDist !== 0) {
+            html += '<div class="text-center px-1"><div class="text-' + (deltaTrailDist >= 0 ? 'green' : 'red') + '-600 font-bold text-xs">' + (deltaTrailDist >= 0 ? '+' : '') + deltaTrailDist + 'm</div></div>';
+        }
+        
+        // Ref trail braking
+        html += '<div class="text-center flex-1">';
+        if (refTrailBraking === true) {
+            html += '<div class="text-gray-600 font-bold">' + (refTrailDist > 0 ? refTrailDist + 'm' : 'Yes') + '</div>';
+        } else if (refTrailBraking === false) {
+            html += '<div class="text-gray-600 font-bold">No</div>';
+        } else {
+            html += '<div class="text-gray-400 font-bold">-</div>';
+        }
+        html += '<div class="text-xs text-gray-400">Ref</div></div>';
+        
+        html += '</div></div>';
         
         html += '</div>';
         
