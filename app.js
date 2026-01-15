@@ -1425,6 +1425,7 @@ class TelemetryAnalysisApp {
         var yawNames = ['Gyro Yaw Velocity', 'Yaw Rate'];
         var latNames = ['GPS Latitude', 'Latitude', 'Lat'];
         var lonNames = ['GPS Longitude', 'Longitude', 'Lon'];
+        var distNames = ['Distance', 'Dist', 'Lap Distance', 'LapDist'];
         var iRacingPosXNames = ['CarPosX', 'PosX', 'Car Pos X'];
         var iRacingPosZNames = ['CarPosZ', 'PosZ', 'Car Pos Z'];
         var sampleRate = Math.max(1, Math.floor(this.referenceData.length / 500));
@@ -1445,7 +1446,8 @@ class TelemetryAnalysisApp {
                     var lat = getValue(row, latNames, null);
                     var lon = getValue(row, lonNames, null);
                     var speed = getValue(row, speedNames, 100);
-                    if (lat !== null && lon !== null) positions.push({ x: lon, y: lat, speed: speed, heading: 0 });
+                    var dist = getValue(row, distNames, 0);
+                    if (lat !== null && lon !== null) positions.push({ x: lon, y: lat, speed: speed, heading: 0, distance: dist });
                 }
             } else if (source === 'iRacing') {
                 for (var i = 0; i < data.length; i += sampleRate) {
@@ -1453,7 +1455,8 @@ class TelemetryAnalysisApp {
                     var posX = getValue(row, iRacingPosXNames, null);
                     var posZ = getValue(row, iRacingPosZNames, null);
                     var speed = getValue(row, speedNames, 100);
-                    if (posX !== null && posZ !== null) positions.push({ x: posX, y: posZ, speed: speed, heading: 0 });
+                    var dist = getValue(row, distNames, 0);
+                    if (posX !== null && posZ !== null) positions.push({ x: posX, y: posZ, speed: speed, heading: 0, distance: dist });
                 }
             } else {
                 var x = 0, y = 0, heading = 0, dt = 0.01;
@@ -1463,6 +1466,7 @@ class TelemetryAnalysisApp {
                     var steer = getValue(row, steerNames, 0) * (Math.PI / 180);
                     var gLat = getValue(row, gLatNames, 0);
                     var yawRate = getValue(row, yawNames, 0) * (Math.PI / 180);
+                    var dist = getValue(row, distNames, 0);
                     var turnRate;
                     if (Math.abs(yawRate) > 0.001) turnRate = yawRate * dt * sampleRate;
                     else if (Math.abs(gLat) > 0.05) turnRate = (gLat * 9.81 / Math.max(speed, 10)) * dt * sampleRate;
@@ -1471,7 +1475,7 @@ class TelemetryAnalysisApp {
                     var ds = speed * dt * sampleRate;
                     x += ds * Math.cos(heading);
                     y += ds * Math.sin(heading);
-                    positions.push({ x: x, y: y, speed: getValue(row, speedNames, 100), heading: heading });
+                    positions.push({ x: x, y: y, speed: getValue(row, speedNames, 100), heading: heading, distance: dist });
                 }
                 return positions;
             }
@@ -1499,7 +1503,7 @@ class TelemetryAnalysisApp {
         var centerX = (minX + maxX) / 2, centerY = (minY + maxY) / 2;
         var scale = Math.max(maxX - minX, maxY - minY) || 1;
         var normalize = function(track) { 
-            return track.map(function(p) { return { x: (p.x - centerX) / scale, y: (p.y - centerY) / scale, speed: p.speed, heading: p.heading }; }); 
+            return track.map(function(p) { return { x: (p.x - centerX) / scale, y: (p.y - centerY) / scale, speed: p.speed, heading: p.heading, distance: p.distance }; }); 
         };
         
         var refNorm = normalize(refTrack);
@@ -1549,10 +1553,86 @@ class TelemetryAnalysisApp {
             });
         }
         
+        // Add segment markers (Turns and Straights) from analysis
+        var annotations = [];
+        var segmentMarkers = { x: [], y: [], text: [], colors: [] };
+        
+        if (this.analysisResults && this.analysisResults.trackSegments) {
+            var segments = this.analysisResults.trackSegments;
+            
+            // Helper function to find track position for a given distance
+            var findPositionAtDistance = function(targetDist) {
+                var bestIdx = 0;
+                var bestDiff = Infinity;
+                for (var i = 0; i < refNorm.length; i++) {
+                    var diff = Math.abs((refNorm[i].distance || 0) - targetDist);
+                    if (diff < bestDiff) {
+                        bestDiff = diff;
+                        bestIdx = i;
+                    }
+                }
+                return refNorm[bestIdx] || refNorm[0];
+            };
+            
+            var turnCount = 0;
+            var straightCount = 0;
+            
+            segments.forEach(function(segment) {
+                var dist = segment.distance || 0;
+                var pos = findPositionAtDistance(dist);
+                
+                if (segment.type === 'corner') {
+                    turnCount++;
+                    var label = 'T' + turnCount;
+                    var hasIssues = segment.issues && segment.issues.length > 0;
+                    
+                    segmentMarkers.x.push(pos.x);
+                    segmentMarkers.y.push(pos.y);
+                    segmentMarkers.text.push(label);
+                    segmentMarkers.colors.push(hasIssues ? '#ef4444' : '#22c55e');
+                    
+                    annotations.push({
+                        x: pos.x,
+                        y: pos.y,
+                        text: label,
+                        showarrow: false,
+                        font: { color: '#ffffff', size: 10, family: 'Arial Black' },
+                        bgcolor: hasIssues ? '#ef4444' : '#22c55e',
+                        bordercolor: '#ffffff',
+                        borderwidth: 1,
+                        borderpad: 3,
+                        opacity: 0.9
+                    });
+                } else if (segment.type === 'straight') {
+                    straightCount++;
+                    var label = 'S' + straightCount;
+                    
+                    segmentMarkers.x.push(pos.x);
+                    segmentMarkers.y.push(pos.y);
+                    segmentMarkers.text.push(label);
+                    segmentMarkers.colors.push('#3b82f6');
+                    
+                    annotations.push({
+                        x: pos.x,
+                        y: pos.y,
+                        text: label,
+                        showarrow: false,
+                        font: { color: '#ffffff', size: 10, family: 'Arial Black' },
+                        bgcolor: '#3b82f6',
+                        bordercolor: '#ffffff',
+                        borderwidth: 1,
+                        borderpad: 3,
+                        opacity: 0.9
+                    });
+                }
+            });
+        }
+        
         var layout = { 
             showlegend: true, legend: { x: 0, y: 1, bgcolor: 'rgba(0,0,0,0.7)', font: { color: '#fff', size: 11 } }, 
             xaxis: { visible: false, scaleanchor: 'y' }, yaxis: { visible: false }, 
-            margin: { t: 5, b: 5, l: 5, r: 5 }, paper_bgcolor: '#1f2937', plot_bgcolor: '#1f2937', autosize: true 
+            margin: { t: 5, b: 5, l: 5, r: 5 }, paper_bgcolor: '#1f2937', plot_bgcolor: '#1f2937', autosize: true,
+            annotations: annotations
         };
         Plotly.newPlot('track-map', allTraces, layout, { responsive: true, displayModeBar: false });
     }
@@ -1620,7 +1700,54 @@ class TelemetryAnalysisApp {
         var traces = [];
         if (refX.length > 0) traces.push({ x: refX, y: refY, mode: 'lines', name: 'Reference', line: { color: channelConfig.color.ref, width: 1.5 }, hovertemplate: 'Ref: %{y:.2f} ' + channelConfig.unit + '<extra></extra>' });
         if (currX.length > 0) traces.push({ x: currX, y: currY, mode: 'lines', name: 'Your Lap', line: { color: channelConfig.color.curr, width: 2 }, hovertemplate: 'You: %{y:.2f} ' + channelConfig.unit + '<extra></extra>' });
-        var layout = { xaxis: { title: 'Distance (m)', tickfont: { size: 10 } }, yaxis: { title: channelConfig.unit, tickfont: { size: 10 } }, margin: { t: 10, b: 40, l: 50, r: 10 }, legend: { orientation: 'h', y: 1.05, x: 0.5, xanchor: 'center', font: { size: 10 } }, hovermode: 'x unified', autosize: true };
+        
+        // Add turn markers as vertical lines and annotations
+        var shapes = [];
+        var annotations = [];
+        if (this.analysisResults && this.analysisResults.trackSegments) {
+            var turnCount = 0;
+            var allY = refY.concat(currY);
+            var yMin = Math.min.apply(null, allY);
+            var yMax = Math.max.apply(null, allY);
+            
+            this.analysisResults.trackSegments.forEach(function(segment) {
+                if (segment.type === 'corner') {
+                    turnCount++;
+                    var dist = segment.distance || 0;
+                    var hasIssues = segment.issues && segment.issues.length > 0;
+                    var color = hasIssues ? 'rgba(239, 68, 68, 0.6)' : 'rgba(34, 197, 94, 0.4)';
+                    
+                    // Vertical line at turn location
+                    shapes.push({
+                        type: 'line',
+                        x0: dist, x1: dist,
+                        y0: yMin, y1: yMax,
+                        line: { color: color, width: 2, dash: 'dot' }
+                    });
+                    
+                    // Label at top
+                    annotations.push({
+                        x: dist,
+                        y: yMax,
+                        text: 'T' + turnCount,
+                        showarrow: false,
+                        font: { color: hasIssues ? '#ef4444' : '#22c55e', size: 9, family: 'Arial' },
+                        yshift: 10
+                    });
+                }
+            });
+        }
+        
+        var layout = { 
+            xaxis: { title: 'Distance (m)', tickfont: { size: 10 } }, 
+            yaxis: { title: channelConfig.unit, tickfont: { size: 10 } }, 
+            margin: { t: 20, b: 40, l: 50, r: 10 }, 
+            legend: { orientation: 'h', y: 1.1, x: 0.5, xanchor: 'center', font: { size: 10 } }, 
+            hovermode: 'x unified', 
+            autosize: true,
+            shapes: shapes,
+            annotations: annotations
+        };
         Plotly.newPlot(containerId, traces, layout, { responsive: true, displayModeBar: false });
     }
     
