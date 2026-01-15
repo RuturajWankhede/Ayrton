@@ -996,6 +996,372 @@ class TelemetryAnalysisApp {
         this.generateGraphs(analysis);
         this.displaySetupRecommendations(analysis);
         this.generateFullReport(analysis);
+        
+        // Generate the dedicated analysis page
+        this.generateDedicatedAnalysisPage(analysis, sessionData);
+    }
+    
+    generateDedicatedAnalysisPage(analysis, sessionData) {
+        var self = this;
+        var trackSegments = analysis.trackSegments || [];
+        var tireAnalysis = analysis.tireAnalysis || {};
+        var brakeAnalysis = analysis.brakeAnalysis || {};
+        var fuelAnalysis = analysis.fuelAnalysis || {};
+        var brakingTechnique = analysis.brakingTechnique || {};
+        var lapDelta = sessionData.timeDelta || 0;
+        var driverName = sessionData.driver || 'Driver';
+        var trackName = sessionData.track || 'Track';
+        
+        // Remove existing analysis page if present
+        var existingPage = document.getElementById('dedicated-analysis-page');
+        if (existingPage) existingPage.remove();
+        
+        // Create the analysis page container
+        var pageContainer = document.createElement('div');
+        pageContainer.id = 'dedicated-analysis-page';
+        pageContainer.className = 'fixed inset-0 bg-gray-900 z-50 overflow-y-auto';
+        
+        var html = '';
+        
+        // Header
+        html += '<div class="bg-gradient-to-r from-red-600 to-red-800 text-white p-6 sticky top-0 z-10 shadow-lg">';
+        html += '<div class="max-w-6xl mx-auto flex justify-between items-center">';
+        html += '<div>';
+        html += '<h1 class="text-3xl font-bold"><i class="fas fa-flag-checkered mr-3"></i>Lap Analysis Report</h1>';
+        html += '<p class="text-red-200 mt-1">' + driverName + ' at ' + trackName + '</p>';
+        html += '</div>';
+        html += '<div class="text-right">';
+        html += '<div class="text-4xl font-bold">' + (lapDelta > 0 ? '+' : '') + lapDelta.toFixed(3) + 's</div>';
+        html += '<div class="text-red-200">' + (lapDelta > 0 ? 'Behind Reference' : 'Ahead of Reference') + '</div>';
+        html += '</div>';
+        html += '<button onclick="document.getElementById(\'dedicated-analysis-page\').remove()" class="ml-6 bg-white/20 hover:bg-white/30 rounded-full p-3">';
+        html += '<i class="fas fa-times text-2xl"></i>';
+        html += '</button>';
+        html += '</div>';
+        html += '</div>';
+        
+        // Main content
+        html += '<div class="max-w-6xl mx-auto p-6">';
+        
+        // Tab navigation
+        html += '<div class="flex space-x-4 mb-6 border-b border-gray-700 pb-4">';
+        html += '<button onclick="document.getElementById(\'driving-section\').classList.remove(\'hidden\');document.getElementById(\'setup-section\').classList.add(\'hidden\');this.classList.add(\'bg-red-600\');this.nextElementSibling.classList.remove(\'bg-red-600\')" class="px-6 py-3 rounded-lg font-semibold bg-red-600 text-white"><i class="fas fa-steering-wheel mr-2"></i>Driving Analysis</button>';
+        html += '<button onclick="document.getElementById(\'setup-section\').classList.remove(\'hidden\');document.getElementById(\'driving-section\').classList.add(\'hidden\');this.classList.add(\'bg-red-600\');this.previousElementSibling.classList.remove(\'bg-red-600\')" class="px-6 py-3 rounded-lg font-semibold bg-gray-700 text-white hover:bg-gray-600"><i class="fas fa-wrench mr-2"></i>Setup Recommendations</button>';
+        html += '</div>';
+        
+        // ============================================
+        // DRIVING ANALYSIS SECTION
+        // ============================================
+        html += '<div id="driving-section">';
+        
+        // Overall Summary
+        html += '<div class="bg-gray-800 rounded-xl p-6 mb-6">';
+        html += '<h2 class="text-2xl font-bold text-white mb-4"><i class="fas fa-chart-line mr-2 text-yellow-400"></i>Overall Lap Summary</h2>';
+        html += '<div class="grid grid-cols-4 gap-4 mb-4">';
+        
+        // Summary stats
+        var corners = trackSegments.filter(function(s) { return s.type === 'corner'; });
+        var straights = trackSegments.filter(function(s) { return s.type === 'straight'; });
+        var totalTimeLoss = trackSegments.reduce(function(sum, s) { return sum + (s.timeLoss || 0); }, 0);
+        var issueCount = trackSegments.reduce(function(sum, s) { return sum + (s.issues ? s.issues.length : 0); }, 0);
+        
+        html += '<div class="bg-gray-700 rounded-lg p-4 text-center"><div class="text-3xl font-bold text-white">' + corners.length + '</div><div class="text-gray-400">Corners</div></div>';
+        html += '<div class="bg-gray-700 rounded-lg p-4 text-center"><div class="text-3xl font-bold text-white">' + straights.length + '</div><div class="text-gray-400">Straights</div></div>';
+        html += '<div class="bg-gray-700 rounded-lg p-4 text-center"><div class="text-3xl font-bold text-' + (issueCount > 5 ? 'red' : 'yellow') + '-400">' + issueCount + '</div><div class="text-gray-400">Issues Found</div></div>';
+        html += '<div class="bg-gray-700 rounded-lg p-4 text-center"><div class="text-3xl font-bold text-red-400">~' + totalTimeLoss.toFixed(2) + 's</div><div class="text-gray-400">Est. Time Loss</div></div>';
+        html += '</div>';
+        
+        // Braking technique summary
+        if (brakingTechnique.avgSmoothness) {
+            html += '<div class="grid grid-cols-3 gap-4">';
+            html += '<div class="bg-gray-700/50 rounded-lg p-3"><span class="text-gray-400">Brake Smoothness:</span> <span class="text-white font-bold">' + brakingTechnique.avgSmoothness + '/100</span></div>';
+            html += '<div class="bg-gray-700/50 rounded-lg p-3"><span class="text-gray-400">Avg Peak Brake:</span> <span class="text-white font-bold">' + brakingTechnique.avgPeakPressure + '%</span></div>';
+            html += '<div class="bg-gray-700/50 rounded-lg p-3"><span class="text-gray-400">Trail Braking:</span> <span class="text-white font-bold">' + brakingTechnique.trailBrakingCount + '/' + brakingTechnique.totalCorners + ' corners</span></div>';
+            html += '</div>';
+        }
+        html += '</div>';
+        
+        // Sequential track analysis
+        html += '<h2 class="text-2xl font-bold text-white mb-4"><i class="fas fa-road mr-2 text-blue-400"></i>Lap Walkthrough</h2>';
+        
+        trackSegments.forEach(function(segment, idx) {
+            if (segment.type === 'corner') {
+                html += self.renderCornerSegment(segment, idx);
+            } else if (segment.type === 'straight') {
+                html += self.renderStraightSegment(segment, idx);
+            }
+        });
+        
+        html += '</div>'; // End driving section
+        
+        // ============================================
+        // SETUP RECOMMENDATIONS SECTION
+        // ============================================
+        html += '<div id="setup-section" class="hidden">';
+        
+        html += '<div class="bg-gray-800 rounded-xl p-6 mb-6">';
+        html += '<h2 class="text-2xl font-bold text-white mb-4"><i class="fas fa-cogs mr-2 text-green-400"></i>Setup Recommendations</h2>';
+        html += '<p class="text-gray-400 mb-6">Based on tire temperatures, brake data, and driving patterns, here are suggested setup changes:</p>';
+        
+        // Tire-based recommendations
+        if (tireAnalysis.available) {
+            html += '<div class="mb-6">';
+            html += '<h3 class="text-xl font-semibold text-white mb-3"><i class="fas fa-circle text-yellow-500 mr-2"></i>Tire Setup</h3>';
+            html += '<div class="grid grid-cols-2 gap-4 mb-4">';
+            
+            // Show tire temps
+            ['fl', 'fr', 'rl', 'rr'].forEach(function(corner) {
+                var data = tireAnalysis[corner];
+                if (data && data.avg) {
+                    var bgColor = data.avg > 100 ? 'bg-red-900/50' : data.avg < 70 ? 'bg-blue-900/50' : 'bg-green-900/50';
+                    html += '<div class="' + bgColor + ' rounded-lg p-4">';
+                    html += '<div class="font-bold text-white">' + corner.toUpperCase() + ' Tire</div>';
+                    if (data.inner !== null) html += '<div class="text-sm text-gray-300">Inner: ' + Math.round(data.inner) + '°C</div>';
+                    if (data.center !== null) html += '<div class="text-sm text-gray-300">Center: ' + Math.round(data.center) + '°C</div>';
+                    if (data.outer !== null) html += '<div class="text-sm text-gray-300">Outer: ' + Math.round(data.outer) + '°C</div>';
+                    if (data.spread) html += '<div class="text-sm ' + (data.spread > 15 ? 'text-red-400' : 'text-gray-400') + '">Spread: ' + Math.round(data.spread) + '°C</div>';
+                    html += '</div>';
+                }
+            });
+            html += '</div>';
+            
+            // Tire recommendations
+            if (tireAnalysis.issues && tireAnalysis.issues.length > 0) {
+                html += '<div class="bg-yellow-900/30 border border-yellow-600/50 rounded-lg p-4">';
+                html += '<h4 class="font-semibold text-yellow-400 mb-2">Recommended Changes:</h4>';
+                html += '<ul class="space-y-2">';
+                tireAnalysis.issues.forEach(function(issue) {
+                    html += '<li class="text-gray-300"><i class="fas fa-wrench text-yellow-500 mr-2"></i>';
+                    html += (issue.corner ? '<strong>' + issue.corner + ':</strong> ' : '') + issue.issue;
+                    if (issue.recommendation) html += ' <span class="text-green-400">→ ' + issue.recommendation + '</span>';
+                    html += '</li>';
+                });
+                html += '</ul>';
+                html += '</div>';
+            } else {
+                html += '<div class="bg-green-900/30 border border-green-600/50 rounded-lg p-4">';
+                html += '<p class="text-green-400"><i class="fas fa-check-circle mr-2"></i>Tire temperatures look balanced - no major changes needed</p>';
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+        
+        // Brake-based recommendations
+        if (brakeAnalysis.available) {
+            html += '<div class="mb-6">';
+            html += '<h3 class="text-xl font-semibold text-white mb-3"><i class="fas fa-compact-disc text-red-500 mr-2"></i>Brake Setup</h3>';
+            
+            html += '<div class="grid grid-cols-4 gap-4 mb-4">';
+            if (brakeAnalysis.fl !== null) html += '<div class="bg-gray-700 rounded-lg p-3 text-center"><div class="text-2xl font-bold text-white">' + Math.round(brakeAnalysis.fl) + '°C</div><div class="text-gray-400">FL Brake</div></div>';
+            if (brakeAnalysis.fr !== null) html += '<div class="bg-gray-700 rounded-lg p-3 text-center"><div class="text-2xl font-bold text-white">' + Math.round(brakeAnalysis.fr) + '°C</div><div class="text-gray-400">FR Brake</div></div>';
+            if (brakeAnalysis.rl !== null) html += '<div class="bg-gray-700 rounded-lg p-3 text-center"><div class="text-2xl font-bold text-white">' + Math.round(brakeAnalysis.rl) + '°C</div><div class="text-gray-400">RL Brake</div></div>';
+            if (brakeAnalysis.rr !== null) html += '<div class="bg-gray-700 rounded-lg p-3 text-center"><div class="text-2xl font-bold text-white">' + Math.round(brakeAnalysis.rr) + '°C</div><div class="text-gray-400">RR Brake</div></div>';
+            html += '</div>';
+            
+            if (brakeAnalysis.brakeBiasSetting !== null) {
+                html += '<div class="bg-gray-700 rounded-lg p-4 mb-4">';
+                html += '<div class="flex justify-between items-center">';
+                html += '<span class="text-gray-400">Current Brake Bias:</span>';
+                html += '<span class="text-2xl font-bold text-white">' + brakeAnalysis.brakeBiasSetting + '% Front</span>';
+                html += '</div>';
+                html += '</div>';
+            }
+            
+            if (brakeAnalysis.issues && brakeAnalysis.issues.length > 0) {
+                html += '<div class="bg-red-900/30 border border-red-600/50 rounded-lg p-4">';
+                html += '<h4 class="font-semibold text-red-400 mb-2">Recommended Changes:</h4>';
+                html += '<ul class="space-y-2">';
+                brakeAnalysis.issues.forEach(function(issue) {
+                    html += '<li class="text-gray-300"><i class="fas fa-wrench text-red-500 mr-2"></i>' + issue.issue;
+                    if (issue.recommendation) html += ' <span class="text-green-400">→ ' + issue.recommendation + '</span>';
+                    html += '</li>';
+                });
+                html += '</ul>';
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+        
+        // Fuel information
+        if (fuelAnalysis.available && fuelAnalysis.fuelPerLap) {
+            html += '<div class="mb-6">';
+            html += '<h3 class="text-xl font-semibold text-white mb-3"><i class="fas fa-gas-pump text-blue-500 mr-2"></i>Fuel Strategy</h3>';
+            html += '<div class="bg-gray-700 rounded-lg p-4">';
+            html += '<div class="grid grid-cols-3 gap-4 mb-4">';
+            html += '<div class="text-center"><div class="text-2xl font-bold text-white">' + fuelAnalysis.fuelPerLap.toFixed(2) + ' L</div><div class="text-gray-400">Per Lap</div></div>';
+            if (fuelAnalysis.estimatedRange) html += '<div class="text-center"><div class="text-2xl font-bold text-white">' + fuelAnalysis.estimatedRange + '</div><div class="text-gray-400">Laps Remaining</div></div>';
+            if (fuelAnalysis.endFuel) html += '<div class="text-center"><div class="text-2xl font-bold text-white">' + fuelAnalysis.endFuel.toFixed(1) + ' L</div><div class="text-gray-400">Current Fuel</div></div>';
+            html += '</div>';
+            html += '<div class="border-t border-gray-600 pt-4">';
+            html += '<h4 class="font-semibold text-white mb-2">Race Fuel Requirements (5% margin):</h4>';
+            html += '<div class="grid grid-cols-5 gap-2 text-center">';
+            html += '<div class="bg-gray-800 rounded p-2"><div class="font-bold text-white">' + fuelAnalysis.fuelFor5Laps + 'L</div><div class="text-xs text-gray-400">5 laps</div></div>';
+            html += '<div class="bg-gray-800 rounded p-2"><div class="font-bold text-white">' + fuelAnalysis.fuelFor10Laps + 'L</div><div class="text-xs text-gray-400">10 laps</div></div>';
+            html += '<div class="bg-gray-800 rounded p-2"><div class="font-bold text-white">' + fuelAnalysis.fuelFor15Laps + 'L</div><div class="text-xs text-gray-400">15 laps</div></div>';
+            html += '<div class="bg-gray-800 rounded p-2"><div class="font-bold text-white">' + fuelAnalysis.fuelFor20Laps + 'L</div><div class="text-xs text-gray-400">20 laps</div></div>';
+            html += '<div class="bg-gray-800 rounded p-2"><div class="font-bold text-white">' + fuelAnalysis.fuelFor30Laps + 'L</div><div class="text-xs text-gray-400">30 laps</div></div>';
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
+        }
+        
+        html += '</div>'; // End setup section
+        
+        html += '</div>'; // End main content
+        
+        pageContainer.innerHTML = html;
+        document.body.appendChild(pageContainer);
+    }
+    
+    renderCornerSegment(segment, idx) {
+        var hasIssues = segment.issues && segment.issues.length > 0;
+        var bgColor = hasIssues ? 'bg-red-900/20 border-red-600/30' : 'bg-green-900/20 border-green-600/30';
+        
+        var html = '<div class="' + bgColor + ' border rounded-xl p-5 mb-4">';
+        
+        // Header
+        html += '<div class="flex justify-between items-start mb-4">';
+        html += '<div>';
+        html += '<h3 class="text-xl font-bold text-white"><i class="fas fa-undo text-red-400 mr-2"></i>' + segment.name + '</h3>';
+        html += '<span class="text-gray-400">' + segment.cornerType + ' corner at ' + segment.distance + 'm</span>';
+        html += '</div>';
+        if (segment.timeLoss > 0) {
+            html += '<div class="bg-red-600/30 text-red-300 px-3 py-1 rounded-full text-sm">~' + segment.timeLoss.toFixed(2) + 's lost</div>';
+        } else {
+            html += '<div class="bg-green-600/30 text-green-300 px-3 py-1 rounded-full text-sm"><i class="fas fa-check mr-1"></i>Good</div>';
+        }
+        html += '</div>';
+        
+        // Speed comparison
+        if (segment.curr) {
+            html += '<div class="grid grid-cols-3 gap-4 mb-4">';
+            html += '<div class="bg-gray-800/50 rounded-lg p-3 text-center">';
+            html += '<div class="text-gray-400 text-sm">Entry Speed</div>';
+            html += '<div class="text-white font-bold">' + segment.curr.entrySpeed + ' <span class="text-xs">km/h</span></div>';
+            html += '<div class="text-' + (segment.delta.entrySpeed >= 0 ? 'green' : 'red') + '-400 text-sm">' + (segment.delta.entrySpeed >= 0 ? '+' : '') + segment.delta.entrySpeed + '</div>';
+            html += '</div>';
+            html += '<div class="bg-gray-800/50 rounded-lg p-3 text-center">';
+            html += '<div class="text-gray-400 text-sm">Apex Speed</div>';
+            html += '<div class="text-white font-bold">' + segment.curr.apexSpeed + ' <span class="text-xs">km/h</span></div>';
+            html += '<div class="text-' + (segment.delta.apexSpeed >= 0 ? 'green' : 'red') + '-400 text-sm">' + (segment.delta.apexSpeed >= 0 ? '+' : '') + segment.delta.apexSpeed + '</div>';
+            html += '</div>';
+            html += '<div class="bg-gray-800/50 rounded-lg p-3 text-center">';
+            html += '<div class="text-gray-400 text-sm">Exit Speed</div>';
+            html += '<div class="text-white font-bold">' + segment.curr.exitSpeed + ' <span class="text-xs">km/h</span></div>';
+            html += '<div class="text-' + (segment.delta.exitSpeed >= 0 ? 'green' : 'red') + '-400 text-sm">' + (segment.delta.exitSpeed >= 0 ? '+' : '') + segment.delta.exitSpeed + '</div>';
+            html += '</div>';
+            html += '</div>';
+            
+            // Braking details
+            html += '<div class="grid grid-cols-4 gap-3 mb-4">';
+            html += '<div class="bg-gray-800/30 rounded p-2 text-center">';
+            html += '<div class="text-xs text-gray-500">Peak Brake</div>';
+            html += '<div class="text-white font-semibold">' + segment.curr.peakBrake + '%</div>';
+            html += '</div>';
+            html += '<div class="bg-gray-800/30 rounded p-2 text-center">';
+            html += '<div class="text-xs text-gray-500">Smoothness</div>';
+            html += '<div class="text-' + (segment.curr.smoothness >= 70 ? 'green' : segment.curr.smoothness >= 50 ? 'yellow' : 'red') + '-400 font-semibold">' + segment.curr.smoothness + '/100</div>';
+            html += '</div>';
+            html += '<div class="bg-gray-800/30 rounded p-2 text-center">';
+            html += '<div class="text-xs text-gray-500">Trail Braking</div>';
+            html += '<div class="text-' + (segment.curr.trailBraking ? 'green' : 'red') + '-400 font-semibold">' + (segment.curr.trailBraking ? segment.curr.trailBrakingDist + 'm' : 'None') + '</div>';
+            html += '</div>';
+            if (segment.curr.gLat) {
+                html += '<div class="bg-gray-800/30 rounded p-2 text-center">';
+                html += '<div class="text-xs text-gray-500">Lateral G</div>';
+                html += '<div class="text-white font-semibold">' + segment.curr.gLat + 'G</div>';
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+        
+        // Issues and recommendations
+        if (hasIssues) {
+            html += '<div class="border-t border-gray-700 pt-4">';
+            html += '<h4 class="font-semibold text-red-400 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Issues</h4>';
+            html += '<ul class="space-y-1 mb-3">';
+            segment.issues.forEach(function(issue) {
+                html += '<li class="text-gray-300 text-sm"><i class="fas fa-times text-red-500 mr-2"></i>' + issue + '</li>';
+            });
+            html += '</ul>';
+            
+            if (segment.recommendations && segment.recommendations.length > 0) {
+                html += '<h4 class="font-semibold text-green-400 mb-2"><i class="fas fa-lightbulb mr-2"></i>Recommendations</h4>';
+                html += '<ul class="space-y-1">';
+                segment.recommendations.forEach(function(rec) {
+                    html += '<li class="text-gray-300 text-sm"><i class="fas fa-arrow-right text-green-500 mr-2"></i>' + rec + '</li>';
+                });
+                html += '</ul>';
+            }
+            html += '</div>';
+        }
+        
+        html += '</div>';
+        return html;
+    }
+    
+    renderStraightSegment(segment, idx) {
+        var hasIssues = segment.issues && segment.issues.length > 0;
+        var bgColor = hasIssues ? 'bg-yellow-900/20 border-yellow-600/30' : 'bg-blue-900/20 border-blue-600/30';
+        
+        var html = '<div class="' + bgColor + ' border rounded-xl p-5 mb-4">';
+        
+        // Header
+        html += '<div class="flex justify-between items-start mb-4">';
+        html += '<div>';
+        html += '<h3 class="text-xl font-bold text-white"><i class="fas fa-road text-blue-400 mr-2"></i>' + segment.name + '</h3>';
+        html += '<span class="text-gray-400">' + segment.length + 'm long</span>';
+        html += '</div>';
+        if (segment.timeLoss > 0) {
+            html += '<div class="bg-yellow-600/30 text-yellow-300 px-3 py-1 rounded-full text-sm">~' + segment.timeLoss.toFixed(2) + 's lost</div>';
+        } else {
+            html += '<div class="bg-green-600/30 text-green-300 px-3 py-1 rounded-full text-sm"><i class="fas fa-check mr-1"></i>Good</div>';
+        }
+        html += '</div>';
+        
+        // Speed comparison
+        html += '<div class="grid grid-cols-3 gap-4 mb-4">';
+        html += '<div class="bg-gray-800/50 rounded-lg p-3 text-center">';
+        html += '<div class="text-gray-400 text-sm">Entry Speed</div>';
+        html += '<div class="text-white font-bold">' + segment.curr.entrySpeed + ' <span class="text-xs">km/h</span></div>';
+        html += '<div class="text-' + (segment.delta.entrySpeed >= 0 ? 'green' : 'red') + '-400 text-sm">' + (segment.delta.entrySpeed >= 0 ? '+' : '') + segment.delta.entrySpeed + '</div>';
+        html += '</div>';
+        html += '<div class="bg-gray-800/50 rounded-lg p-3 text-center">';
+        html += '<div class="text-gray-400 text-sm">Top Speed</div>';
+        html += '<div class="text-white font-bold">' + segment.curr.maxSpeed + ' <span class="text-xs">km/h</span></div>';
+        html += '<div class="text-' + (segment.delta.maxSpeed >= 0 ? 'green' : 'red') + '-400 text-sm">' + (segment.delta.maxSpeed >= 0 ? '+' : '') + segment.delta.maxSpeed + '</div>';
+        html += '</div>';
+        html += '<div class="bg-gray-800/50 rounded-lg p-3 text-center">';
+        html += '<div class="text-gray-400 text-sm">Full Throttle</div>';
+        html += '<div class="text-white font-bold">' + segment.curr.fullThrottlePct + '%</div>';
+        html += '<div class="text-gray-400 text-sm">of straight</div>';
+        html += '</div>';
+        html += '</div>';
+        
+        // Issues and recommendations
+        if (hasIssues) {
+            html += '<div class="border-t border-gray-700 pt-4">';
+            html += '<h4 class="font-semibold text-yellow-400 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Issues</h4>';
+            html += '<ul class="space-y-1 mb-3">';
+            segment.issues.forEach(function(issue) {
+                html += '<li class="text-gray-300 text-sm"><i class="fas fa-times text-yellow-500 mr-2"></i>' + issue + '</li>';
+            });
+            html += '</ul>';
+            
+            if (segment.recommendations && segment.recommendations.length > 0) {
+                html += '<h4 class="font-semibold text-green-400 mb-2"><i class="fas fa-lightbulb mr-2"></i>Why & How to Fix</h4>';
+                html += '<ul class="space-y-1">';
+                segment.recommendations.forEach(function(rec) {
+                    html += '<li class="text-gray-300 text-sm"><i class="fas fa-arrow-right text-green-500 mr-2"></i>' + rec + '</li>';
+                });
+                html += '</ul>';
+            }
+            html += '</div>';
+        }
+        
+        html += '</div>';
+        return html;
     }
     
     calculateGripUsage() {
