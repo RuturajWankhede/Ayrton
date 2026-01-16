@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LapLogic | Telemetry Analysis</title>
+    <link rel="icon" type="image/png" href="laplogic-logo.png">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -311,6 +312,14 @@
             background-size: 40px 40px;
             background-position: -1px -1px;
         }
+        /* Logo styling */
+        .logo-img {
+            filter: drop-shadow(0 0 10px rgba(0, 212, 170, 0.3));
+            transition: filter 0.2s ease;
+        }
+        .logo-img:hover {
+            filter: drop-shadow(0 0 20px rgba(0, 212, 170, 0.5));
+        }
     </style>
 </head>
 <body>
@@ -320,15 +329,7 @@
             <div class="flex items-center justify-between h-16">
                 <!-- Logo -->
                 <div class="flex items-center gap-4">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 bg-gradient-to-br from-[var(--accent-cyan)] to-[#00b894] flex items-center justify-center corner-cut">
-                            <i class="fas fa-bolt text-[var(--bg-primary)] text-lg"></i>
-                        </div>
-                        <div>
-                            <h1 class="font-display text-xl font-bold tracking-wide text-white">LAPLOGIC</h1>
-                            <p class="text-[10px] tracking-[0.2em] text-[var(--text-muted)] uppercase">Telemetry Analysis System</p>
-                        </div>
-                    </div>
+                    <img src="laplogic-logo.png" alt="LapLogic" class="h-12 w-auto logo-img">
                 </div>
                 
                 <!-- Status -->
@@ -598,6 +599,7 @@
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="fixed inset-0 bg-[var(--bg-primary)]/95 backdrop-blur-sm hidden items-center justify-center z-50">
         <div class="text-center">
+            <img src="laplogic-logo.png" alt="LapLogic" class="h-20 w-auto mx-auto mb-6 animate-pulse">
             <div class="w-16 h-16 border-3 border-[var(--accent-cyan)] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
             <p class="metric-label text-[var(--accent-cyan)] tracking-widest">ANALYZING TELEMETRY</p>
             <p class="text-sm text-[var(--text-muted)] mt-2">Processing data channels...</p>
