@@ -6,136 +6,410 @@
     <title>LapLogic | Telemetry Analysis</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * { font-family: 'Inter', sans-serif; }
-        .mono { font-family: 'JetBrains Mono', monospace; }
-        .dragover { background-color: rgba(59, 130, 246, 0.1); border-color: #3b82f6; }
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --bg-elevated: #1c2128;
+            --border-primary: #30363d;
+            --border-accent: #00d4aa;
+            --text-primary: #f0f6fc;
+            --text-secondary: #8b949e;
+            --text-muted: #484f58;
+            --accent-cyan: #00d4aa;
+            --accent-cyan-dim: rgba(0, 212, 170, 0.15);
+            --accent-magenta: #ff6b9d;
+            --accent-magenta-dim: rgba(255, 107, 157, 0.15);
+            --accent-amber: #ffb800;
+            --accent-amber-dim: rgba(255, 184, 0, 0.15);
+            --positive: #3fb950;
+            --negative: #f85149;
+            --warning: #d29922;
+        }
+        
+        * { 
+            font-family: 'Rajdhani', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        .font-data { font-family: 'JetBrains Mono', monospace; }
+        .font-display { font-family: 'Oxanium', sans-serif; }
+        
+        body { 
+            background: var(--bg-primary); 
+            color: var(--text-primary);
+            font-size: 15px;
+            line-height: 1.5;
+        }
+        
+        /* High contrast for pit lane visibility */
+        .metric-value {
+            font-family: 'Oxanium', sans-serif;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            text-shadow: 0 0 20px currentColor;
+        }
+        
+        .metric-label {
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            font-size: 11px;
+        }
+        
+        /* Panel styling - racing dashboard inspired */
+        .panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            position: relative;
+        }
+        
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-cyan) 0%, transparent 100%);
+        }
+        
+        .panel-accent-magenta::before {
+            background: linear-gradient(90deg, var(--accent-magenta) 0%, transparent 100%);
+        }
+        
+        .panel-accent-amber::before {
+            background: linear-gradient(90deg, var(--accent-amber) 0%, transparent 100%);
+        }
+        
+        /* Data cells with racing stripe accent */
+        .data-cell {
+            background: var(--bg-tertiary);
+            border-left: 3px solid var(--accent-cyan);
+            padding: 12px 16px;
+        }
+        
+        .data-cell-magenta { border-left-color: var(--accent-magenta); }
+        .data-cell-amber { border-left-color: var(--accent-amber); }
+        .data-cell-positive { border-left-color: var(--positive); }
+        .data-cell-negative { border-left-color: var(--negative); }
+        
+        /* Status indicator - highly visible */
+        .status-live {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            background: var(--accent-cyan-dim);
+            border: 1px solid var(--accent-cyan);
+            color: var(--accent-cyan);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+        
+        .status-live::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: var(--accent-cyan);
+            border-radius: 50%;
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(0, 212, 170, 0.7); }
+            50% { box-shadow: 0 0 0 8px rgba(0, 212, 170, 0); }
+        }
+        
+        /* Upload zones */
+        .upload-zone {
+            background: var(--bg-tertiary);
+            border: 2px dashed var(--border-primary);
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .upload-zone::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, transparent 40%, rgba(0,212,170,0.03) 100%);
+            pointer-events: none;
+        }
+        
+        .upload-zone:hover {
+            border-color: var(--accent-cyan);
+            background: var(--bg-elevated);
+        }
+        
+        .upload-zone.ref-zone:hover { border-color: var(--accent-cyan); }
+        .upload-zone.comp-zone:hover { border-color: var(--accent-magenta); }
+        
+        .dragover { 
+            border-color: var(--accent-cyan) !important; 
+            background: var(--accent-cyan-dim) !important;
+        }
+        
+        /* Tabs - racing style */
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         
-        body { background: #09090b; color: #e4e4e7; }
-        
-        .glass {
-            background: rgba(24, 24, 27, 0.8);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(63, 63, 70, 0.4);
+        .tab-btn {
+            position: relative;
+            padding: 16px 24px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 600;
+            font-size: 13px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            background: transparent;
+            border: none;
+            transition: all 0.2s ease;
         }
         
-        .glass-dark {
-            background: rgba(9, 9, 11, 0.95);
-            border: 1px solid rgba(39, 39, 42, 0.6);
+        .tab-btn:hover { 
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
         }
         
+        .tab-btn.active {
+            color: var(--accent-cyan);
+            background: var(--bg-tertiary);
+        }
+        
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--accent-cyan);
+        }
+        
+        /* Buttons */
         .btn-primary {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            background: linear-gradient(135deg, var(--accent-cyan) 0%, #00b894 100%);
+            color: var(--bg-primary);
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 14px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            padding: 14px 28px;
+            border: none;
             transition: all 0.2s ease;
         }
+        
         .btn-primary:hover {
-            box-shadow: 0 0 30px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 0 30px rgba(0, 212, 170, 0.5);
+            transform: translateY(-1px);
         }
         
-        .stat-card {
-            background: linear-gradient(180deg, rgba(24, 24, 27, 0.9) 0%, rgba(9, 9, 11, 0.95) 100%);
-            border: 1px solid rgba(63, 63, 70, 0.3);
-        }
-        
-        .upload-zone {
-            background: rgba(24, 24, 27, 0.4);
-            border: 2px dashed rgba(63, 63, 70, 0.5);
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-primary);
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 600;
+            font-size: 13px;
+            letter-spacing: 0.03em;
+            padding: 10px 20px;
             transition: all 0.2s ease;
         }
-        .upload-zone:hover { border-color: #3b82f6; background: rgba(59, 130, 246, 0.05); }
         
-        .tab-btn { color: #71717a; border-bottom: 2px solid transparent; transition: all 0.2s ease; }
-        .tab-btn:hover { color: #a1a1aa; }
-        .tab-btn.active { color: #3b82f6; border-bottom-color: #3b82f6; }
-        
-        input, select {
-            background: rgba(24, 24, 27, 0.8);
-            border: 1px solid rgba(63, 63, 70, 0.4);
-            color: #e4e4e7;
+        .btn-secondary:hover {
+            border-color: var(--accent-cyan);
+            background: var(--bg-elevated);
         }
-        input:focus, select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15); }
-        input::placeholder { color: #52525b; }
         
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #18181b; }
-        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+        /* Inputs */
+        input, select {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            padding: 12px 16px;
+            transition: all 0.2s ease;
+        }
         
-        .chat-ai {
-            background: linear-gradient(135deg, rgba(249, 115, 22, 0.08) 0%, rgba(234, 88, 12, 0.03) 100%);
-            border: 1px solid rgba(249, 115, 22, 0.15);
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 3px var(--accent-cyan-dim);
+        }
+        
+        input::placeholder { 
+            color: var(--text-muted);
+            font-family: 'Rajdhani', sans-serif;
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-primary); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+        
+        /* Chat styling */
+        .chat-message-ai {
+            background: linear-gradient(135deg, var(--accent-magenta-dim) 0%, rgba(255,107,157,0.05) 100%);
+            border: 1px solid rgba(255, 107, 157, 0.3);
+            border-left: 3px solid var(--accent-magenta);
+        }
+        
+        .chat-message-user {
+            background: var(--accent-cyan-dim);
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            border-right: 3px solid var(--accent-cyan);
+        }
+        
+        /* Quick action buttons */
+        .quick-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            color: var(--text-secondary);
+            font-size: 12px;
+            padding: 8px 14px;
+            transition: all 0.15s ease;
+        }
+        
+        .quick-btn:hover {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+            background: var(--accent-cyan-dim);
+        }
+        
+        /* Delta indicators */
+        .delta-positive { color: var(--positive); }
+        .delta-negative { color: var(--negative); }
+        .delta-neutral { color: var(--text-secondary); }
+        
+        /* Segment dividers */
+        .segment-divider {
+            height: 1px;
+            background: linear-gradient(90deg, var(--border-primary) 0%, transparent 100%);
+        }
+        
+        /* Corner markers */
+        .corner-cut {
+            clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+        }
+        
+        /* Grid lines background */
+        .grid-bg {
+            background-image: 
+                linear-gradient(var(--border-primary) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border-primary) 1px, transparent 1px);
+            background-size: 40px 40px;
+            background-position: -1px -1px;
         }
     </style>
 </head>
-<body class="min-h-screen">
-    <!-- Header -->
-    <header class="glass-dark border-b border-zinc-800/50">
-        <div class="container mx-auto px-6 py-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                    <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-                        <i class="fas fa-bolt text-white text-sm"></i>
-                    </div>
-                    <div>
-                        <h1 class="text-lg font-semibold text-white tracking-tight">LapLogic</h1>
-                        <p class="text-[10px] text-zinc-500 uppercase tracking-widest">Telemetry Analysis</p>
+<body>
+    <!-- Header Bar -->
+    <header class="bg-[var(--bg-secondary)] border-b border-[var(--border-primary)]">
+        <div class="max-w-screen-2xl mx-auto px-6">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo -->
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-[var(--accent-cyan)] to-[#00b894] flex items-center justify-center corner-cut">
+                            <i class="fas fa-bolt text-[var(--bg-primary)] text-lg"></i>
+                        </div>
+                        <div>
+                            <h1 class="font-display text-xl font-bold tracking-wide text-white">LAPLOGIC</h1>
+                            <p class="text-[10px] tracking-[0.2em] text-[var(--text-muted)] uppercase">Telemetry Analysis System</p>
+                        </div>
                     </div>
                 </div>
-                <span class="px-2.5 py-1 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    <i class="fas fa-circle text-[6px] mr-1.5 animate-pulse"></i>Ready
-                </span>
+                
+                <!-- Status -->
+                <div class="flex items-center gap-4">
+                    <div class="status-live">READY</div>
+                </div>
             </div>
         </div>
     </header>
 
-    <div class="container mx-auto px-6 py-8">
+    <main class="max-w-screen-2xl mx-auto px-6 py-6">
         <!-- Upload Section -->
-        <div id="upload-section" class="mb-8">
-            <div class="glass rounded-2xl p-6">
+        <div id="upload-section" class="mb-6">
+            <div class="panel rounded-lg p-6">
+                <!-- Header Row -->
                 <div class="flex items-center justify-between mb-6">
-                    <h2 class="text-sm font-semibold text-white">Upload Telemetry</h2>
-                    <span class="text-[10px] text-zinc-600 mono">.csv</span>
-                </div>
-                
-                <div class="grid md:grid-cols-2 gap-3 mb-5">
-                    <input type="text" id="driver-name" placeholder="Driver" class="rounded-lg px-4 py-2.5 text-sm">
-                    <input type="text" id="track-name" placeholder="Track" class="rounded-lg px-4 py-2.5 text-sm">
-                </div>
-                
-                <div class="mb-5">
-                    <select id="track-select" class="w-full rounded-lg px-4 py-2.5 text-sm">
-                        <option value="">Select track (optional)</option>
-                    </select>
-                </div>
-                
-                <div class="grid md:grid-cols-2 gap-5">
                     <div>
-                        <label class="block text-[10px] text-zinc-500 mb-2 uppercase tracking-wider">
-                            <span class="inline-block w-1.5 h-1.5 rounded-full mr-1.5" style="background: #3b82f6;"></span>Reference
-                        </label>
-                        <div id="ref-upload" class="upload-zone rounded-xl p-6 text-center cursor-pointer">
-                            <i class="fas fa-arrow-up-from-bracket text-xl text-zinc-600 mb-2"></i>
-                            <p class="text-xs text-zinc-500">Drop CSV or click</p>
+                        <h2 class="font-display text-lg font-semibold text-white tracking-wide">DATA INPUT</h2>
+                        <p class="text-sm text-[var(--text-secondary)]">Upload CSV telemetry files for comparison analysis</p>
+                    </div>
+                    <span class="text-xs font-data text-[var(--text-muted)]">.CSV FORMAT</span>
+                </div>
+                
+                <!-- Session Info -->
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div>
+                        <label class="metric-label text-[var(--text-muted)] block mb-2">Driver</label>
+                        <input type="text" id="driver-name" placeholder="Enter driver name" class="w-full rounded">
+                    </div>
+                    <div>
+                        <label class="metric-label text-[var(--text-muted)] block mb-2">Circuit</label>
+                        <input type="text" id="track-name" placeholder="Enter track name" class="w-full rounded">
+                    </div>
+                    <div>
+                        <label class="metric-label text-[var(--text-muted)] block mb-2">Track Database</label>
+                        <select id="track-select" class="w-full rounded">
+                            <option value="">Select for accurate mapping...</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Upload Zones -->
+                <div class="grid md:grid-cols-2 gap-6">
+                    <!-- Reference Lap -->
+                    <div>
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-4 h-4 rounded-sm bg-[var(--accent-cyan)]"></div>
+                            <span class="metric-label text-[var(--accent-cyan)]">Reference Lap</span>
+                            <span class="text-xs text-[var(--text-muted)]">— Target / Best</span>
+                        </div>
+                        <div id="ref-upload" class="upload-zone ref-zone rounded-lg p-8 text-center cursor-pointer">
+                            <div class="w-16 h-16 mx-auto mb-4 rounded-lg bg-[var(--bg-elevated)] flex items-center justify-center border border-[var(--border-primary)]">
+                                <i class="fas fa-file-arrow-up text-2xl text-[var(--accent-cyan)]"></i>
+                            </div>
+                            <p class="text-sm text-[var(--text-secondary)] mb-1">Drop CSV file or click to browse</p>
+                            <p class="text-xs text-[var(--text-muted)] font-data">Supports MoTeC, AiM, RaceBox exports</p>
                             <input type="file" id="ref-file" accept=".csv" class="hidden">
                         </div>
-                        <div id="ref-file-info" class="hidden mt-2 text-[10px] text-zinc-500 mono">
+                        <div id="ref-file-info" class="hidden mt-3 px-4 py-2 bg-[var(--accent-cyan-dim)] border border-[var(--accent-cyan)] rounded text-sm font-data text-[var(--accent-cyan)]">
+                            <i class="fas fa-check-circle mr-2"></i>
                             <span id="ref-file-name"></span> (<span id="ref-file-size"></span>)
                         </div>
                     </div>
                     
+                    <!-- Comparison Lap -->
                     <div>
-                        <label class="block text-[10px] text-zinc-500 mb-2 uppercase tracking-wider">
-                            <span class="inline-block w-1.5 h-1.5 rounded-full mr-1.5" style="background: #f97316;"></span>Comparison
-                        </label>
-                        <div id="curr-upload" class="upload-zone rounded-xl p-6 text-center cursor-pointer">
-                            <i class="fas fa-arrow-up-from-bracket text-xl text-zinc-600 mb-2"></i>
-                            <p class="text-xs text-zinc-500">Drop CSV or click</p>
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-4 h-4 rounded-sm bg-[var(--accent-magenta)]"></div>
+                            <span class="metric-label text-[var(--accent-magenta)]">Comparison Lap</span>
+                            <span class="text-xs text-[var(--text-muted)]">— Analysis Target</span>
+                        </div>
+                        <div id="curr-upload" class="upload-zone comp-zone rounded-lg p-8 text-center cursor-pointer">
+                            <div class="w-16 h-16 mx-auto mb-4 rounded-lg bg-[var(--bg-elevated)] flex items-center justify-center border border-[var(--border-primary)]">
+                                <i class="fas fa-file-arrow-up text-2xl text-[var(--accent-magenta)]"></i>
+                            </div>
+                            <p class="text-sm text-[var(--text-secondary)] mb-1">Drop CSV file or click to browse</p>
+                            <p class="text-xs text-[var(--text-muted)] font-data">Supports MoTeC, AiM, RaceBox exports</p>
                             <input type="file" id="curr-file" accept=".csv" class="hidden">
                         </div>
-                        <div id="curr-file-info" class="hidden mt-2 text-[10px] text-zinc-500 mono">
+                        <div id="curr-file-info" class="hidden mt-3 px-4 py-2 bg-[var(--accent-magenta-dim)] border border-[var(--accent-magenta)] rounded text-sm font-data text-[var(--accent-magenta)]">
+                            <i class="fas fa-check-circle mr-2"></i>
                             <span id="curr-file-name"></span> (<span id="curr-file-size"></span>)
                         </div>
                     </div>
@@ -145,135 +419,164 @@
 
         <!-- Results Section -->
         <div id="results-section" class="hidden">
-            <!-- Stats -->
-            <div class="grid grid-cols-4 gap-3 mb-6">
-                <div class="stat-card rounded-xl p-4">
-                    <p class="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Delta</p>
-                    <p id="lap-delta" class="text-xl font-semibold mono text-white">+0.000s</p>
+            <!-- Metrics Bar -->
+            <div class="grid grid-cols-4 gap-4 mb-6">
+                <div class="data-cell rounded">
+                    <p class="metric-label text-[var(--text-muted)] mb-1">Lap Delta</p>
+                    <p id="lap-delta" class="metric-value text-3xl text-[var(--accent-cyan)]">+0.000s</p>
                 </div>
-                <div class="stat-card rounded-xl p-4">
-                    <p class="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Grip</p>
-                    <p id="g-force-usage" class="text-xl font-semibold text-white">—%</p>
+                <div class="data-cell data-cell-magenta rounded">
+                    <p class="metric-label text-[var(--text-muted)] mb-1">Grip Usage</p>
+                    <p id="g-force-usage" class="metric-value text-3xl text-[var(--accent-magenta)]">—%</p>
                 </div>
-                <div class="stat-card rounded-xl p-4">
-                    <p class="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Style</p>
-                    <p id="tire-status" class="text-xl font-semibold text-white">—</p>
+                <div class="data-cell data-cell-amber rounded">
+                    <p class="metric-label text-[var(--text-muted)] mb-1">Driving Style</p>
+                    <p id="tire-status" class="metric-value text-2xl text-[var(--accent-amber)]">—</p>
                 </div>
-                <div class="stat-card rounded-xl p-4">
-                    <p class="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Issues</p>
-                    <p id="setup-issue" class="text-xl font-semibold text-white">0</p>
+                <div class="data-cell rounded">
+                    <p class="metric-label text-[var(--text-muted)] mb-1">Focus Areas</p>
+                    <p id="setup-issue" class="metric-value text-3xl text-white">0</p>
                 </div>
             </div>
 
-            <!-- Main Content -->
-            <div class="glass rounded-2xl overflow-hidden">
-                <!-- Tabs -->
-                <div class="border-b border-zinc-800/50 px-6">
-                    <nav class="flex space-x-6">
-                        <button data-tab="chat" class="tab-btn active py-3.5 text-xs font-medium">
-                            <i class="fas fa-message mr-1.5"></i>AIrton
-                        </button>
-                        <button data-tab="graphs" class="tab-btn py-3.5 text-xs font-medium">
-                            <i class="fas fa-chart-line mr-1.5"></i>Telemetry
-                        </button>
-                        <button data-tab="setup" class="tab-btn py-3.5 text-xs font-medium">
-                            <i class="fas fa-sliders mr-1.5"></i>Setup
-                        </button>
-                        <button data-tab="analysis" class="tab-btn py-3.5 text-xs font-medium">
-                            <i class="fas fa-list-check mr-1.5"></i>Analysis
-                        </button>
-                    </nav>
+            <!-- Main Panel -->
+            <div class="panel rounded-lg overflow-hidden">
+                <!-- Tab Navigation -->
+                <div class="flex border-b border-[var(--border-primary)] bg-[var(--bg-primary)]">
+                    <button data-tab="chat" class="tab-btn active">
+                        <i class="fas fa-terminal mr-2"></i>AIrton
+                    </button>
+                    <button data-tab="graphs" class="tab-btn">
+                        <i class="fas fa-chart-line mr-2"></i>Telemetry
+                    </button>
+                    <button data-tab="setup" class="tab-btn">
+                        <i class="fas fa-sliders mr-2"></i>Setup
+                    </button>
+                    <button data-tab="analysis" class="tab-btn">
+                        <i class="fas fa-clipboard-list mr-2"></i>Analysis
+                    </button>
                 </div>
 
                 <div class="p-6">
                     <!-- Chat Tab -->
                     <div id="chat-tab" class="tab-content active">
-                        <div id="chat-messages" class="h-80 overflow-y-auto mb-4 space-y-3 pr-2"></div>
+                        <div id="chat-messages" class="h-96 overflow-y-auto mb-4 space-y-3 pr-2"></div>
                         
-                        <div class="flex flex-wrap gap-1.5 mb-4">
-                            <button class="quick-question px-2.5 py-1 rounded text-[10px] bg-zinc-800/50 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition">Where am I losing time?</button>
-                            <button class="quick-question px-2.5 py-1 rounded text-[10px] bg-zinc-800/50 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition">Braking comparison</button>
-                            <button class="quick-question px-2.5 py-1 rounded text-[10px] bg-zinc-800/50 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition">Corner analysis</button>
-                            <button class="quick-question px-2.5 py-1 rounded text-[10px] bg-zinc-800/50 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition">Throttle trace</button>
+                        <!-- Quick Actions -->
+                        <div class="flex flex-wrap gap-2 mb-4">
+                            <button class="quick-question quick-btn rounded">Where am I losing time?</button>
+                            <button class="quick-question quick-btn rounded">Braking comparison</button>
+                            <button class="quick-question quick-btn rounded">Corner speed analysis</button>
+                            <button class="quick-question quick-btn rounded">Throttle application</button>
+                            <button class="quick-question quick-btn rounded">Biggest delta</button>
                         </div>
                         
-                        <div class="flex gap-2">
-                            <input type="text" id="chat-input" placeholder="Ask AIrton..." class="flex-1 rounded-lg px-4 py-2.5 text-sm">
-                            <button id="send-btn" class="btn-primary text-white px-4 py-2.5 rounded-lg">
-                                <i class="fas fa-arrow-up text-sm"></i>
+                        <!-- Input -->
+                        <div class="flex gap-3">
+                            <input type="text" id="chat-input" placeholder="Ask AIrton about your telemetry data..." class="flex-1 rounded-lg">
+                            <button id="send-btn" class="btn-primary rounded-lg px-6">
+                                <i class="fas fa-arrow-right"></i>
                             </button>
                         </div>
                     </div>
 
                     <!-- Graphs Tab -->
                     <div id="graphs-tab" class="tab-content">
-                        <div class="mb-6">
-                            <div class="flex items-center justify-between mb-3">
-                                <h3 class="text-xs font-medium text-white">Track Map</h3>
-                                <div class="flex items-center space-x-3 text-[10px] text-zinc-500">
-                                    <span><span class="inline-block w-1.5 h-1.5 rounded-full mr-1" style="background: #3b82f6;"></span>Reference</span>
-                                    <span><span class="inline-block w-1.5 h-1.5 rounded-full mr-1" style="background: #f97316;"></span>Comparison</span>
+                        <!-- Track Map -->
+                        <div class="mb-8">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-display text-sm font-semibold text-white tracking-wide">TRACK MAP</h3>
+                                <div class="flex items-center gap-6 text-xs">
+                                    <span class="flex items-center gap-2">
+                                        <span class="w-3 h-3 rounded-sm bg-[var(--accent-cyan)]"></span>
+                                        <span class="text-[var(--text-secondary)]">Reference</span>
+                                    </span>
+                                    <span class="flex items-center gap-2">
+                                        <span class="w-3 h-3 rounded-sm bg-[var(--accent-magenta)]"></span>
+                                        <span class="text-[var(--text-secondary)]">Comparison</span>
+                                    </span>
                                 </div>
                             </div>
-                            <div id="track-map" class="rounded-xl overflow-hidden" style="height: 350px; background: #09090b;"></div>
+                            <div id="track-map" class="rounded-lg border border-[var(--border-primary)]" style="height: 400px; background: var(--bg-primary);"></div>
                         </div>
                         
-                        <div class="mb-6">
-                            <h3 class="text-xs font-medium text-white mb-3">Traces</h3>
-                            <div class="space-y-3">
+                        <div class="segment-divider mb-8"></div>
+                        
+                        <!-- Telemetry Traces -->
+                        <div class="mb-8">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-display text-sm font-semibold text-white tracking-wide">TELEMETRY TRACES</h3>
+                                <div class="flex items-center gap-6 text-xs">
+                                    <span class="flex items-center gap-2">
+                                        <span class="w-3 h-3 rounded-sm bg-[var(--accent-cyan)]"></span>
+                                        <span class="text-[var(--text-secondary)]">Reference</span>
+                                    </span>
+                                    <span class="flex items-center gap-2">
+                                        <span class="w-3 h-3 rounded-sm bg-[var(--accent-magenta)]"></span>
+                                        <span class="text-[var(--text-secondary)]">Comparison</span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="space-y-4">
                                 <div>
-                                    <p class="text-[10px] text-zinc-500 mb-1.5">Speed</p>
-                                    <div id="speed-overlay" class="rounded-lg overflow-hidden" style="height: 180px; background: #09090b;"></div>
+                                    <p class="metric-label text-[var(--text-muted)] mb-2">Speed (km/h)</p>
+                                    <div id="speed-overlay" class="rounded-lg border border-[var(--border-primary)]" style="height: 200px; background: var(--bg-primary);"></div>
                                 </div>
                                 <div>
-                                    <p class="text-[10px] text-zinc-500 mb-1.5">Throttle</p>
-                                    <div id="throttle-overlay" class="rounded-lg overflow-hidden" style="height: 180px; background: #09090b;"></div>
+                                    <p class="metric-label text-[var(--text-muted)] mb-2">Throttle (%)</p>
+                                    <div id="throttle-overlay" class="rounded-lg border border-[var(--border-primary)]" style="height: 200px; background: var(--bg-primary);"></div>
                                 </div>
                                 <div>
-                                    <p class="text-[10px] text-zinc-500 mb-1.5">Brake</p>
-                                    <div id="brake-overlay" class="rounded-lg overflow-hidden" style="height: 180px; background: #09090b;"></div>
+                                    <p class="metric-label text-[var(--text-muted)] mb-2">Brake Pressure</p>
+                                    <div id="brake-overlay" class="rounded-lg border border-[var(--border-primary)]" style="height: 200px; background: var(--bg-primary);"></div>
                                 </div>
                                 <div>
-                                    <p class="text-[10px] text-zinc-500 mb-1.5">Steering</p>
-                                    <div id="steering-overlay" class="rounded-lg overflow-hidden" style="height: 180px; background: #09090b;"></div>
+                                    <p class="metric-label text-[var(--text-muted)] mb-2">Steering Angle (deg)</p>
+                                    <div id="steering-overlay" class="rounded-lg border border-[var(--border-primary)]" style="height: 200px; background: var(--bg-primary);"></div>
                                 </div>
                                 <div>
-                                    <p class="text-[10px] text-zinc-500 mb-1.5">Lateral G</p>
-                                    <div id="glat-overlay" class="rounded-lg overflow-hidden" style="height: 180px; background: #09090b;"></div>
+                                    <p class="metric-label text-[var(--text-muted)] mb-2">Lateral G</p>
+                                    <div id="glat-overlay" class="rounded-lg border border-[var(--border-primary)]" style="height: 200px; background: var(--bg-primary);"></div>
                                 </div>
                                 <div>
-                                    <p class="text-[10px] text-zinc-500 mb-1.5">Longitudinal G</p>
-                                    <div id="glong-overlay" class="rounded-lg overflow-hidden" style="height: 180px; background: #09090b;"></div>
+                                    <p class="metric-label text-[var(--text-muted)] mb-2">Longitudinal G</p>
+                                    <div id="glong-overlay" class="rounded-lg border border-[var(--border-primary)]" style="height: 200px; background: var(--bg-primary);"></div>
                                 </div>
                                 <div>
-                                    <p class="text-[10px] text-zinc-500 mb-1.5">Gear</p>
-                                    <div id="gear-overlay" class="rounded-lg overflow-hidden" style="height: 180px; background: #09090b;"></div>
+                                    <p class="metric-label text-[var(--text-muted)] mb-2">Gear</p>
+                                    <div id="gear-overlay" class="rounded-lg border border-[var(--border-primary)]" style="height: 200px; background: var(--bg-primary);"></div>
                                 </div>
                             </div>
                         </div>
                         
-                        <div class="glass-dark rounded-xl p-4 mb-6">
-                            <p class="text-[10px] text-zinc-500 mb-2 uppercase tracking-wider">Custom Channel</p>
-                            <div class="flex flex-wrap gap-2 items-center">
-                                <select id="custom-channel-select" class="rounded-lg px-3 py-2 text-xs flex-1">
-                                    <option value="">Select channel...</option>
+                        <div class="segment-divider mb-8"></div>
+                        
+                        <!-- Custom Channel -->
+                        <div class="p-4 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-primary)] mb-8">
+                            <p class="metric-label text-[var(--text-muted)] mb-3">Add Custom Channel</p>
+                            <div class="flex flex-wrap gap-3 items-center">
+                                <select id="custom-channel-select" class="rounded flex-1">
+                                    <option value="">Select telemetry channel...</option>
                                 </select>
-                                <button id="add-custom-overlay-btn" class="btn-primary text-white px-3 py-2 rounded-lg text-xs">
-                                    <i class="fas fa-plus mr-1"></i>Add
+                                <button id="add-custom-overlay-btn" class="btn-primary rounded px-4 py-3 text-sm">
+                                    <i class="fas fa-plus mr-2"></i>Add
                                 </button>
-                                <button id="clear-custom-overlays-btn" class="px-3 py-2 rounded-lg text-xs bg-zinc-800 text-zinc-500 hover:bg-zinc-700">Clear</button>
+                                <button id="clear-custom-overlays-btn" class="btn-secondary rounded">
+                                    Clear All
+                                </button>
                             </div>
-                            <div id="custom-overlays-container" class="mt-3 space-y-3"></div>
+                            <div id="custom-overlays-container" class="mt-4 space-y-4"></div>
                         </div>
                         
-                        <div class="grid md:grid-cols-2 gap-4">
+                        <!-- Comparison Charts -->
+                        <div class="grid md:grid-cols-2 gap-6">
                             <div>
-                                <p class="text-[10px] text-zinc-500 mb-1.5">Sector Delta</p>
-                                <div id="sector-time-chart" class="rounded-lg overflow-hidden" style="height: 200px; background: #09090b;"></div>
+                                <p class="metric-label text-[var(--text-muted)] mb-2">Sector Delta</p>
+                                <div id="sector-time-chart" class="rounded-lg border border-[var(--border-primary)]" style="height: 220px; background: var(--bg-primary);"></div>
                             </div>
                             <div>
-                                <p class="text-[10px] text-zinc-500 mb-1.5">Speed Comparison</p>
-                                <div id="speed-comparison" class="rounded-lg overflow-hidden" style="height: 200px; background: #09090b;"></div>
+                                <p class="metric-label text-[var(--text-muted)] mb-2">Speed Comparison</p>
+                                <div id="speed-comparison" class="rounded-lg border border-[var(--border-primary)]" style="height: 220px; background: var(--bg-primary);"></div>
                             </div>
                         </div>
                     </div>
@@ -290,22 +593,24 @@
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
-    <!-- Loading -->
-    <div id="loading-overlay" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden items-center justify-center z-50">
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-[var(--bg-primary)]/95 backdrop-blur-sm hidden items-center justify-center z-50">
         <div class="text-center">
-            <div class="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-            <p class="text-xs text-zinc-500">Analyzing...</p>
+            <div class="w-16 h-16 border-3 border-[var(--accent-cyan)] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p class="metric-label text-[var(--accent-cyan)] tracking-widest">ANALYZING TELEMETRY</p>
+            <p class="text-sm text-[var(--text-muted)] mt-2">Processing data channels...</p>
         </div>
     </div>
 
     <!-- Config Modal -->
-    <div id="config-modal" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden items-center justify-center z-50">
-        <div class="glass rounded-2xl p-6 max-w-sm w-full mx-4">
-            <h3 class="text-sm font-semibold text-white mb-4">Config</h3>
-            <input type="text" id="webhook-url" placeholder="Webhook URL" value="https://ruturajw.app.n8n.cloud" class="w-full rounded-lg px-4 py-2.5 text-sm mb-4">
-            <button id="save-config" class="btn-primary text-white px-4 py-2.5 rounded-lg w-full text-sm font-medium">Save</button>
+    <div id="config-modal" class="fixed inset-0 bg-[var(--bg-primary)]/95 backdrop-blur-sm hidden items-center justify-center z-50">
+        <div class="panel rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="font-display text-lg font-semibold text-white mb-4">CONFIGURATION</h3>
+            <label class="metric-label text-[var(--text-muted)] block mb-2">Webhook URL</label>
+            <input type="text" id="webhook-url" placeholder="https://..." value="https://ruturajw.app.n8n.cloud" class="w-full rounded mb-4">
+            <button id="save-config" class="btn-primary rounded w-full">Save Configuration</button>
         </div>
     </div>
 
