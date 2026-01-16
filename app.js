@@ -1253,50 +1253,125 @@ class TelemetryAnalysisApp {
         var bgColor = hasIssues ? 'bg-yellow-50 border-yellow-200' : 'bg-blue-50 border-blue-200';
         
         var curr = segment.curr || {};
+        var ref = segment.ref || {};
         var delta = segment.delta || {};
+        var lifts = curr.lifts || [];
+        var refLifts = ref.lifts || [];
         
         var entrySpeed = curr.entrySpeed !== undefined ? curr.entrySpeed : '--';
         var maxSpeed = curr.maxSpeed !== undefined ? curr.maxSpeed : '--';
-        var fullThrottle = curr.fullThrottlePercent !== undefined ? curr.fullThrottlePercent : (curr.fullThrottlePct !== undefined ? curr.fullThrottlePct : '--');
+        var exitSpeed = curr.exitSpeed !== undefined ? curr.exitSpeed : '--';
+        var avgThrottle = curr.avgThrottle !== undefined ? curr.avgThrottle : '--';
+        var isFullThrottle = curr.isFullThrottle || false;
+        
+        // Reference values
+        var refEntrySpeed = ref.entrySpeed !== undefined ? ref.entrySpeed : '--';
+        var refMaxSpeed = ref.maxSpeed !== undefined ? ref.maxSpeed : '--';
+        var refExitSpeed = ref.exitSpeed !== undefined ? ref.exitSpeed : '--';
+        var refAvgThrottle = ref.avgThrottle !== undefined ? ref.avgThrottle : '--';
         
         var deltaEntry = delta.entrySpeed !== undefined ? delta.entrySpeed : 0;
         var deltaMax = delta.maxSpeed !== undefined ? delta.maxSpeed : 0;
+        var deltaExit = delta.exitSpeed !== undefined ? delta.exitSpeed : 0;
         
         var html = '<div class="' + bgColor + ' border rounded-xl p-5 mb-4">';
         
+        // Header
         html += '<div class="flex justify-between items-start mb-4">';
         html += '<div>';
         html += '<h3 class="text-xl font-bold text-gray-800"><i class="fas fa-road text-blue-500 mr-2"></i>' + (segment.name || 'Straight ' + (idx + 1)) + '</h3>';
-        html += '<span class="text-gray-500">' + (segment.length || 0) + 'm long</span>';
+        html += '<span class="text-gray-500">' + (segment.distance || 0) + 'm - ' + (segment.endDistance || 0) + 'm (' + (segment.length || 0) + 'm)</span>';
         html += '</div>';
         if (segment.timeLoss > 0) {
             html += '<div class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm font-medium">~' + segment.timeLoss.toFixed(2) + 's lost</div>';
-        } else {
-            html += '<div class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium"><i class="fas fa-check mr-1"></i>Good</div>';
+        } else if (lifts.length === 0 && isFullThrottle) {
+            html += '<div class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium"><i class="fas fa-check mr-1"></i>Clean</div>';
         }
         html += '</div>';
         
+        // Speed comparison grid - You | Delta | Ref format
         html += '<div class="grid grid-cols-3 gap-4 mb-4">';
         
-        html += '<div class="bg-white rounded-lg p-3 text-center shadow-sm">';
-        html += '<div class="text-gray-500 text-sm">Entry Speed</div>';
-        html += '<div class="text-gray-800 font-bold text-lg">' + entrySpeed + ' <span class="text-xs font-normal">km/h</span></div>';
-        if (deltaEntry !== 0) html += '<div class="text-' + (deltaEntry >= 0 ? 'green' : 'red') + '-600 text-sm font-medium">' + (deltaEntry >= 0 ? '+' : '') + deltaEntry + '</div>';
+        // Entry Speed
+        html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
+        html += '<div class="text-gray-500 text-sm mb-2 text-center">Entry Speed</div>';
+        html += '<div class="flex justify-between items-center text-sm">';
+        html += '<div class="text-center"><div class="text-purple-600 font-bold text-lg">' + entrySpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
+        html += '<div class="text-center"><div class="text-' + (deltaEntry >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaEntry >= 0 ? '+' : '') + deltaEntry + '</div></div>';
+        html += '<div class="text-center"><div class="text-gray-600 font-bold text-lg">' + refEntrySpeed + '</div><div class="text-gray-400 text-xs">Ref</div></div>';
+        html += '</div></div>';
+        
+        // Max Speed
+        html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
+        html += '<div class="text-gray-500 text-sm mb-2 text-center">Max Speed</div>';
+        html += '<div class="flex justify-between items-center text-sm">';
+        html += '<div class="text-center"><div class="text-purple-600 font-bold text-lg">' + maxSpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
+        html += '<div class="text-center"><div class="text-' + (deltaMax >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaMax >= 0 ? '+' : '') + deltaMax + '</div></div>';
+        html += '<div class="text-center"><div class="text-gray-600 font-bold text-lg">' + refMaxSpeed + '</div><div class="text-gray-400 text-xs">Ref</div></div>';
+        html += '</div></div>';
+        
+        // Exit Speed
+        html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
+        html += '<div class="text-gray-500 text-sm mb-2 text-center">Exit Speed</div>';
+        html += '<div class="flex justify-between items-center text-sm">';
+        html += '<div class="text-center"><div class="text-purple-600 font-bold text-lg">' + exitSpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
+        html += '<div class="text-center"><div class="text-' + (deltaExit >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaExit >= 0 ? '+' : '') + deltaExit + '</div></div>';
+        html += '<div class="text-center"><div class="text-gray-600 font-bold text-lg">' + refExitSpeed + '</div><div class="text-gray-400 text-xs">Ref</div></div>';
+        html += '</div></div>';
+        
         html += '</div>';
         
-        html += '<div class="bg-white rounded-lg p-3 text-center shadow-sm">';
-        html += '<div class="text-gray-500 text-sm">Top Speed</div>';
-        html += '<div class="text-gray-800 font-bold text-lg">' + maxSpeed + ' <span class="text-xs font-normal">km/h</span></div>';
-        if (deltaMax !== 0) html += '<div class="text-' + (deltaMax >= 0 ? 'green' : 'red') + '-600 text-sm font-medium">' + (deltaMax >= 0 ? '+' : '') + deltaMax + '</div>';
+        // Throttle info
+        html += '<div class="grid grid-cols-2 gap-4 mb-4">';
+        html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
+        html += '<div class="text-gray-500 text-sm">Avg Throttle</div>';
+        html += '<div class="flex justify-between items-center">';
+        html += '<span class="text-purple-600 font-bold">' + avgThrottle + '%</span>';
+        html += '<span class="text-gray-400">vs</span>';
+        html += '<span class="text-gray-600 font-bold">' + refAvgThrottle + '%</span>';
+        html += '</div></div>';
+        
+        html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
+        html += '<div class="text-gray-500 text-sm">Throttle Lifts</div>';
+        html += '<div class="flex justify-between items-center">';
+        if (lifts.length > refLifts.length) {
+            html += '<span class="text-red-600 font-bold">' + lifts.length + ' lifts</span>';
+            html += '<span class="text-gray-400">vs</span>';
+            html += '<span class="text-gray-600 font-bold">' + refLifts.length + ' lifts</span>';
+        } else if (lifts.length > 0) {
+            html += '<span class="text-yellow-600 font-bold">' + lifts.length + ' lifts</span>';
+            html += '<span class="text-gray-400">vs</span>';
+            html += '<span class="text-gray-600 font-bold">' + refLifts.length + ' lifts</span>';
+        } else {
+            html += '<span class="text-green-600 font-bold">None</span>';
+            html += '<span class="text-gray-400">vs</span>';
+            html += '<span class="text-gray-600 font-bold">' + (refLifts.length > 0 ? refLifts.length + ' lifts' : 'None') + '</span>';
+        }
+        html += '</div></div>';
         html += '</div>';
         
-        html += '<div class="bg-white rounded-lg p-3 text-center shadow-sm">';
-        html += '<div class="text-gray-500 text-sm">Full Throttle</div>';
-        html += '<div class="text-gray-800 font-bold text-lg">' + fullThrottle + '%</div>';
-        html += '</div>';
+        // Show lift details if there are lifts
+        if (lifts.length > 0) {
+            html += '<div class="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">';
+            html += '<h4 class="font-semibold text-orange-700 mb-2"><i class="fas fa-tachometer-alt-slow mr-2"></i>Throttle Lifts Detected</h4>';
+            html += '<div class="space-y-2">';
+            lifts.forEach(function(lift) {
+                html += '<div class="text-sm text-gray-700">';
+                html += '<i class="fas fa-exclamation-circle text-orange-500 mr-2"></i>';
+                html += 'Lift at <strong>' + lift.distance + 'm</strong>: throttle dropped to ' + lift.minThrottle + '%, lost ~<strong>' + lift.speedLost + 'km/h</strong>';
+                html += '</div>';
+            });
+            
+            // Check if reference also had lifts at similar positions
+            if (refLifts.length > 0) {
+                html += '<div class="text-sm text-blue-600 mt-2"><i class="fas fa-info-circle mr-2"></i>Note: Reference lap also had lifts - may indicate traffic or track feature</div>';
+            } else {
+                html += '<div class="text-sm text-red-600 mt-2"><i class="fas fa-flag mr-2"></i>Reference was flat out here - possible traffic, hesitation, or missed opportunity</div>';
+            }
+            html += '</div></div>';
+        }
         
-        html += '</div>';
-        
+        // Issues and recommendations
         if (hasIssues) {
             html += '<div class="border-t border-gray-200 pt-4">';
             html += '<h4 class="font-semibold text-yellow-600 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Issues</h4>';
