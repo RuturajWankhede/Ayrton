@@ -1056,11 +1056,31 @@ class TelemetryAnalysisApp {
             html += '<i class="fas fa-exclamation-triangle mr-2"></i>No segment data available. Make sure the AI analysis completed and max_tokens is set high enough (4096+).';
             html += '</div>';
         } else {
-            trackSegments.forEach(function(segment, idx) {
-                if (segment.type === 'corner') {
-                    html += self.renderCornerCard(segment, idx);
-                } else if (segment.type === 'straight') {
-                    html += self.renderStraightCard(segment, idx);
+            // Separate and sort corners and straights by distance
+            var corners = trackSegments.filter(function(s) { return s.type === 'corner'; })
+                .sort(function(a, b) { return (a.distance || 0) - (b.distance || 0); });
+            
+            var straights = trackSegments.filter(function(s) { return s.type === 'straight'; })
+                .map(function(s) {
+                    var startDist = s.distance || s.startDistance || 0;
+                    var endDist = s.endDistance || startDist + (s.length || 100);
+                    s._midpoint = (startDist + endDist) / 2;
+                    return s;
+                })
+                .sort(function(a, b) { return (a._midpoint || 0) - (b._midpoint || 0); });
+            
+            // Create combined sorted list for sequential display
+            var allSegments = [];
+            corners.forEach(function(c, i) { allSegments.push({ segment: c, sortDist: c.distance || 0, displayIdx: i + 1, type: 'corner' }); });
+            straights.forEach(function(s, i) { allSegments.push({ segment: s, sortDist: s._midpoint || 0, displayIdx: i + 1, type: 'straight' }); });
+            allSegments.sort(function(a, b) { return a.sortDist - b.sortDist; });
+            
+            // Render in track order
+            allSegments.forEach(function(item) {
+                if (item.type === 'corner') {
+                    html += self.renderCornerCard(item.segment, item.displayIdx - 1);
+                } else if (item.type === 'straight') {
+                    html += self.renderStraightCard(item.segment, item.displayIdx - 1);
                 }
             });
         }
@@ -1081,6 +1101,9 @@ class TelemetryAnalysisApp {
     renderCornerCard(segment, idx) {
         var hasIssues = segment.issues && segment.issues.length > 0;
         var bgColor = hasIssues ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200';
+        
+        // Force correct turn label based on sorted index
+        var turnLabel = 'Turn ' + (idx + 1);
         
         var curr = segment.curr || {};
         var delta = segment.delta || {};
@@ -1108,7 +1131,7 @@ class TelemetryAnalysisApp {
         // Header
         html += '<div class="flex justify-between items-start mb-4">';
         html += '<div>';
-        html += '<h3 class="text-xl font-bold text-gray-800"><i class="fas fa-undo text-red-500 mr-2"></i>' + (segment.name || 'Turn ' + (idx + 1)) + '</h3>';
+        html += '<h3 class="text-xl font-bold text-gray-800"><i class="fas fa-undo text-red-500 mr-2"></i>' + turnLabel + '</h3>';
         html += '<span class="text-gray-500">' + (segment.cornerType || 'corner') + ' corner at ' + (segment.distance || 0) + 'm</span>';
         html += '</div>';
         if (segment.timeLoss > 0) {
@@ -1252,6 +1275,9 @@ class TelemetryAnalysisApp {
         var hasIssues = segment.issues && segment.issues.length > 0;
         var bgColor = hasIssues ? 'bg-yellow-50 border-yellow-200' : 'bg-blue-50 border-blue-200';
         
+        // Force correct straight label based on sorted index
+        var straightLabel = 'Straight ' + (idx + 1);
+        
         var curr = segment.curr || {};
         var ref = segment.ref || {};
         var delta = segment.delta || {};
@@ -1279,7 +1305,7 @@ class TelemetryAnalysisApp {
         // Header
         html += '<div class="flex justify-between items-start mb-4">';
         html += '<div>';
-        html += '<h3 class="text-xl font-bold text-gray-800"><i class="fas fa-road text-blue-500 mr-2"></i>' + (segment.name || 'Straight ' + (idx + 1)) + '</h3>';
+        html += '<h3 class="text-xl font-bold text-gray-800"><i class="fas fa-road text-blue-500 mr-2"></i>' + straightLabel + '</h3>';
         html += '<span class="text-gray-500">' + (segment.distance || 0) + 'm - ' + (segment.endDistance || 0) + 'm (' + (segment.length || 0) + 'm)</span>';
         html += '</div>';
         if (segment.timeLoss > 0) {
@@ -1694,6 +1720,20 @@ class TelemetryAnalysisApp {
         if (this.analysisResults && this.analysisResults.trackSegments) {
             var segments = this.analysisResults.trackSegments;
             
+            // Separate and sort corners and straights by distance
+            var corners = segments.filter(function(s) { return s.type === 'corner'; })
+                .sort(function(a, b) { return (a.distance || 0) - (b.distance || 0); });
+            
+            var straights = segments.filter(function(s) { return s.type === 'straight'; })
+                .map(function(s) {
+                    // Calculate midpoint for sorting and positioning
+                    var startDist = s.distance || s.startDistance || 0;
+                    var endDist = s.endDistance || startDist + (s.length || 100);
+                    s._midpoint = (startDist + endDist) / 2;
+                    return s;
+                })
+                .sort(function(a, b) { return (a._midpoint || 0) - (b._midpoint || 0); });
+            
             // Helper function to find track position for a given distance
             var findPositionAtDistance = function(targetDist) {
                 var bestIdx = 0;
@@ -1708,57 +1748,56 @@ class TelemetryAnalysisApp {
                 return refNorm[bestIdx] || refNorm[0];
             };
             
-            var turnCount = 0;
-            var straightCount = 0;
-            
-            segments.forEach(function(segment) {
+            // Add corner markers (sorted by distance)
+            corners.forEach(function(segment, idx) {
                 var dist = segment.distance || 0;
+                var label = 'T' + (idx + 1);
+                var hasIssues = segment.issues && segment.issues.length > 0;
                 var pos = findPositionAtDistance(dist);
                 
-                if (segment.type === 'corner') {
-                    turnCount++;
-                    var label = 'T' + turnCount;
-                    var hasIssues = segment.issues && segment.issues.length > 0;
-                    
-                    segmentMarkers.x.push(pos.x);
-                    segmentMarkers.y.push(pos.y);
-                    segmentMarkers.text.push(label);
-                    segmentMarkers.colors.push(hasIssues ? '#ef4444' : '#22c55e');
-                    
-                    annotations.push({
-                        x: pos.x,
-                        y: pos.y,
-                        text: label,
-                        showarrow: false,
-                        font: { color: '#ffffff', size: 10, family: 'Arial Black' },
-                        bgcolor: hasIssues ? '#ef4444' : '#22c55e',
-                        bordercolor: '#ffffff',
-                        borderwidth: 1,
-                        borderpad: 3,
-                        opacity: 0.9
-                    });
-                } else if (segment.type === 'straight') {
-                    straightCount++;
-                    var label = 'S' + straightCount;
-                    
-                    segmentMarkers.x.push(pos.x);
-                    segmentMarkers.y.push(pos.y);
-                    segmentMarkers.text.push(label);
-                    segmentMarkers.colors.push('#3b82f6');
-                    
-                    annotations.push({
-                        x: pos.x,
-                        y: pos.y,
-                        text: label,
-                        showarrow: false,
-                        font: { color: '#ffffff', size: 10, family: 'Arial Black' },
-                        bgcolor: '#3b82f6',
-                        bordercolor: '#ffffff',
-                        borderwidth: 1,
-                        borderpad: 3,
-                        opacity: 0.9
-                    });
-                }
+                segmentMarkers.x.push(pos.x);
+                segmentMarkers.y.push(pos.y);
+                segmentMarkers.text.push(label);
+                segmentMarkers.colors.push(hasIssues ? '#ef4444' : '#22c55e');
+                
+                annotations.push({
+                    x: pos.x,
+                    y: pos.y,
+                    text: label,
+                    showarrow: false,
+                    font: { color: '#ffffff', size: 10, family: 'Arial Black' },
+                    bgcolor: hasIssues ? '#ef4444' : '#22c55e',
+                    bordercolor: '#ffffff',
+                    borderwidth: 1,
+                    borderpad: 3,
+                    opacity: 0.9
+                });
+            });
+            
+            // Add straight markers (sorted by midpoint)
+            straights.forEach(function(segment, idx) {
+                var dist = segment._midpoint || segment.distance || 0;
+                var label = 'S' + (idx + 1);
+                var hasIssues = segment.issues && segment.issues.length > 0;
+                var pos = findPositionAtDistance(dist);
+                
+                segmentMarkers.x.push(pos.x);
+                segmentMarkers.y.push(pos.y);
+                segmentMarkers.text.push(label);
+                segmentMarkers.colors.push(hasIssues ? '#f59e0b' : '#3b82f6');
+                
+                annotations.push({
+                    x: pos.x,
+                    y: pos.y,
+                    text: label,
+                    showarrow: false,
+                    font: { color: '#ffffff', size: 10, family: 'Arial Black' },
+                    bgcolor: hasIssues ? '#f59e0b' : '#3b82f6',
+                    bordercolor: '#ffffff',
+                    borderwidth: 1,
+                    borderpad: 3,
+                    opacity: 0.9
+                });
             });
         }
         
@@ -1839,36 +1878,37 @@ class TelemetryAnalysisApp {
         var shapes = [];
         var annotations = [];
         if (this.analysisResults && this.analysisResults.trackSegments) {
-            var turnCount = 0;
             var allY = refY.concat(currY);
             var yMin = Math.min.apply(null, allY);
             var yMax = Math.max.apply(null, allY);
             
-            this.analysisResults.trackSegments.forEach(function(segment) {
-                if (segment.type === 'corner') {
-                    turnCount++;
-                    var dist = segment.distance || 0;
-                    var hasIssues = segment.issues && segment.issues.length > 0;
-                    var color = hasIssues ? 'rgba(239, 68, 68, 0.6)' : 'rgba(34, 197, 94, 0.4)';
-                    
-                    // Vertical line at turn location
-                    shapes.push({
-                        type: 'line',
-                        x0: dist, x1: dist,
-                        y0: yMin, y1: yMax,
-                        line: { color: color, width: 2, dash: 'dot' }
-                    });
-                    
-                    // Label at top
-                    annotations.push({
-                        x: dist,
-                        y: yMax,
-                        text: 'T' + turnCount,
-                        showarrow: false,
-                        font: { color: hasIssues ? '#ef4444' : '#22c55e', size: 9, family: 'Arial' },
-                        yshift: 10
-                    });
-                }
+            // Sort corners by distance before numbering
+            var corners = this.analysisResults.trackSegments
+                .filter(function(s) { return s.type === 'corner'; })
+                .sort(function(a, b) { return (a.distance || 0) - (b.distance || 0); });
+            
+            corners.forEach(function(segment, idx) {
+                var dist = segment.distance || 0;
+                var hasIssues = segment.issues && segment.issues.length > 0;
+                var color = hasIssues ? 'rgba(239, 68, 68, 0.6)' : 'rgba(34, 197, 94, 0.4)';
+                
+                // Vertical line at turn location
+                shapes.push({
+                    type: 'line',
+                    x0: dist, x1: dist,
+                    y0: yMin, y1: yMax,
+                    line: { color: color, width: 2, dash: 'dot' }
+                });
+                
+                // Label at top
+                annotations.push({
+                    x: dist,
+                    y: yMax,
+                    text: 'T' + (idx + 1),
+                    showarrow: false,
+                    font: { color: hasIssues ? '#ef4444' : '#22c55e', size: 9, family: 'Arial' },
+                    yshift: 10
+                });
             });
         }
         
