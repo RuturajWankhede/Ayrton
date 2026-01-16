@@ -515,22 +515,22 @@ class TelemetryAnalysisApp {
         
         var displayContainer = document.createElement('div');
         displayContainer.id = 'channel-detection-display';
-        displayContainer.className = 'mt-6 rounded-xl overflow-hidden border border-zinc-700/50 bg-zinc-900/50';
+        displayContainer.className = 'mt-6 rounded-lg overflow-hidden border border-[#30363d] bg-[#161b22]';
         
-        var html = '<div class="p-4 border-b border-zinc-700/50"><div class="flex items-center justify-between"><div>';
-        html += '<h3 class="font-medium text-sm text-white flex items-center">';
+        var html = '<div class="p-4 border-b border-[#30363d] bg-[#0d1117]"><div class="flex items-center justify-between"><div>';
+        html += '<h3 class="font-semibold text-sm text-white flex items-center" style="font-family: Rajdhani, sans-serif; letter-spacing: 0.05em;">';
         if (isAIPowered) {
-            html += '<i class="fas fa-robot text-blue-500 mr-2"></i>Channel Detection';
+            html += '<i class="fas fa-robot text-[#00d4aa] mr-2"></i>CHANNEL DETECTION';
         } else {
-            html += '<i class="fas fa-search text-' + statusColor + '-500 mr-2"></i>Channel Detection';
+            html += '<i class="fas fa-search text-[#00d4aa] mr-2"></i>CHANNEL DETECTION';
         }
         html += '</h3>';
-        html += '<p class="text-xs text-zinc-500">' + detected.totalColumns + ' columns · ' + totalMatched + ' mapped';
+        html += '<p class="text-xs text-[#8b949e]" style="font-family: JetBrains Mono, monospace;">' + detected.totalColumns + ' columns · ' + totalMatched + ' mapped';
         if (isAIPowered) {
-            html += ' <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-500/20 text-blue-400">AI</span>';
+            html += ' <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-[rgba(0,212,170,0.15)] text-[#00d4aa] border border-[rgba(0,212,170,0.3)]">AI</span>';
         }
         html += '</p>';
-        html += '</div><button id="toggle-channel-details" class="text-xs bg-zinc-800 px-3 py-1 rounded-lg border border-zinc-700 hover:bg-zinc-700 text-zinc-400"><i class="fas fa-chevron-down mr-1"></i>Details</button></div></div>';
+        html += '</div><button id="toggle-channel-details" class="text-xs px-3 py-1.5 rounded border border-[#30363d] bg-[#21262d] text-[#8b949e] hover:bg-[#30363d] hover:text-white transition" style="font-family: Rajdhani, sans-serif;"><i class="fas fa-chevron-down mr-1"></i>Details</button></div></div>';
         
         if (detected.capabilities.length > 0) {
             html += '<div class="p-4 bg-white border-b"><h4 class="font-semibold text-gray-700 mb-2"><i class="fas fa-bolt text-yellow-500 mr-2"></i>Analysis Capabilities</h4><div class="flex flex-wrap gap-2">';
@@ -579,7 +579,7 @@ class TelemetryAnalysisApp {
         html += '<div id="custom-mappings-list" class="space-y-1"></div>';
         html += '<button id="apply-mappings-btn" class="mt-3 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"><i class="fas fa-check mr-2"></i>Save Mappings</button></div>';
         
-        html += '<div class="p-4 border-t border-zinc-700/50 bg-zinc-900/50"><button id="start-analysis-btn" class="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-3 rounded-xl hover:from-blue-500 hover:to-blue-400 transition font-medium text-sm"><i class="fas fa-play mr-2"></i>Analyze</button></div>';
+        html += '<div class="p-4 border-t border-[#30363d] bg-[#0d1117]"><button id="start-analysis-btn" class="w-full bg-gradient-to-r from-[#00d4aa] to-[#00b894] text-[#0d1117] px-6 py-4 rounded-lg hover:shadow-[0_0_30px_rgba(0,212,170,0.4)] transition font-semibold text-sm tracking-wider" style="font-family: Rajdhani, sans-serif;"><i class="fas fa-play mr-2"></i>ANALYZE TELEMETRY</button></div>';
         
         displayContainer.innerHTML = html;
         var uploadContainer = document.querySelector('#upload-section .glass') || document.querySelector('#upload-section > div');
@@ -995,7 +995,7 @@ class TelemetryAnalysisApp {
             var tabBtnContainer = document.querySelector('.flex.border-b') || document.querySelector('[class*="tab-btn"]').parentElement;
             if (tabBtnContainer && !document.querySelector('[data-tab="analysis"]')) {
                 var analysisBtn = document.createElement('button');
-                analysisBtn.className = 'tab-btn px-4 py-2 font-medium border-b-2 border-transparent text-gray-600 hover:text-purple-600';
+                analysisBtn.className = 'tab-btn';
                 analysisBtn.setAttribute('data-tab', 'analysis');
                 analysisBtn.innerHTML = '<i class="fas fa-clipboard-check mr-2"></i>Lap Analysis';
                 analysisBtn.addEventListener('click', function() { self.switchTab('analysis'); });
@@ -1144,7 +1144,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm text-center mb-2">Entry Speed</div>';
         html += '<div class="flex justify-between items-center">';
-        html += '<div class="text-center flex-1"><div class="text-orange-500 font-bold text-lg">' + entrySpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + entrySpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
         html += '<div class="text-center px-2"><div class="text-' + (deltaEntry >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaEntry >= 0 ? '+' : '') + deltaEntry + '</div><div class="text-xs text-gray-400">km/h</div></div>';
         html += '<div class="text-center flex-1"><div class="text-gray-600 font-bold text-lg">' + refEntry + '</div><div class="text-xs text-gray-400">Ref</div></div>';
         html += '</div></div>';
@@ -1153,7 +1153,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm text-center mb-2">Apex Speed</div>';
         html += '<div class="flex justify-between items-center">';
-        html += '<div class="text-center flex-1"><div class="text-orange-500 font-bold text-lg">' + apexSpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + apexSpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
         html += '<div class="text-center px-2"><div class="text-' + (deltaApex >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaApex >= 0 ? '+' : '') + deltaApex + '</div><div class="text-xs text-gray-400">km/h</div></div>';
         html += '<div class="text-center flex-1"><div class="text-gray-600 font-bold text-lg">' + refApex + '</div><div class="text-xs text-gray-400">Ref</div></div>';
         html += '</div></div>';
@@ -1162,7 +1162,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm text-center mb-2">Exit Speed</div>';
         html += '<div class="flex justify-between items-center">';
-        html += '<div class="text-center flex-1"><div class="text-orange-500 font-bold text-lg">' + exitSpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + exitSpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
         html += '<div class="text-center px-2"><div class="text-' + (deltaExit >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaExit >= 0 ? '+' : '') + deltaExit + '</div><div class="text-xs text-gray-400">km/h</div></div>';
         html += '<div class="text-center flex-1"><div class="text-gray-600 font-bold text-lg">' + refExit + '</div><div class="text-xs text-gray-400">Ref</div></div>';
         html += '</div></div>';
@@ -1183,7 +1183,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-gray-100 rounded p-2">';
         html += '<div class="text-xs text-gray-500 text-center mb-1">Peak Brake</div>';
         html += '<div class="flex justify-between items-center text-sm">';
-        html += '<div class="text-center flex-1"><div class="text-orange-500 font-bold">' + peakBrake + '%</div><div class="text-xs text-gray-400">You</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-[#ff6b9d] font-semibold font-data">' + peakBrake + '%</div><div class="text-xs text-gray-400">You</div></div>';
         if (typeof deltaPeakBrake === 'number' && deltaPeakBrake !== 0) {
             html += '<div class="text-center px-1"><div class="text-' + (deltaPeakBrake >= 0 ? 'green' : 'red') + '-600 font-bold text-xs">' + (deltaPeakBrake >= 0 ? '+' : '') + deltaPeakBrake + '</div></div>';
         }
@@ -1211,7 +1211,7 @@ class TelemetryAnalysisApp {
         // Your trail braking
         html += '<div class="text-center flex-1">';
         if (trailBraking === true) {
-            html += '<div class="text-orange-500 font-bold">' + (trailDist > 0 ? trailDist + 'm' : 'Yes') + '</div>';
+            html += '<div class="text-[#ff6b9d] font-semibold font-data">' + (trailDist > 0 ? trailDist + 'm' : 'Yes') + '</div>';
         } else if (trailBraking === false) {
             html += '<div class="text-red-600 font-bold">No</div>';
         } else {
@@ -1318,7 +1318,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm mb-2 text-center">Entry Speed</div>';
         html += '<div class="flex justify-between items-center text-sm">';
-        html += '<div class="text-center"><div class="text-orange-500 font-bold text-lg">' + entrySpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
+        html += '<div class="text-center"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + entrySpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
         html += '<div class="text-center"><div class="text-' + (deltaEntry >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaEntry >= 0 ? '+' : '') + deltaEntry + '</div></div>';
         html += '<div class="text-center"><div class="text-gray-600 font-bold text-lg">' + refEntrySpeed + '</div><div class="text-gray-400 text-xs">Ref</div></div>';
         html += '</div></div>';
@@ -1327,7 +1327,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm mb-2 text-center">Max Speed</div>';
         html += '<div class="flex justify-between items-center text-sm">';
-        html += '<div class="text-center"><div class="text-orange-500 font-bold text-lg">' + maxSpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
+        html += '<div class="text-center"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + maxSpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
         html += '<div class="text-center"><div class="text-' + (deltaMax >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaMax >= 0 ? '+' : '') + deltaMax + '</div></div>';
         html += '<div class="text-center"><div class="text-gray-600 font-bold text-lg">' + refMaxSpeed + '</div><div class="text-gray-400 text-xs">Ref</div></div>';
         html += '</div></div>';
@@ -1336,7 +1336,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm mb-2 text-center">Exit Speed</div>';
         html += '<div class="flex justify-between items-center text-sm">';
-        html += '<div class="text-center"><div class="text-orange-500 font-bold text-lg">' + exitSpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
+        html += '<div class="text-center"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + exitSpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
         html += '<div class="text-center"><div class="text-' + (deltaExit >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaExit >= 0 ? '+' : '') + deltaExit + '</div></div>';
         html += '<div class="text-center"><div class="text-gray-600 font-bold text-lg">' + refExitSpeed + '</div><div class="text-gray-400 text-xs">Ref</div></div>';
         html += '</div></div>';
@@ -1348,7 +1348,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm">Avg Throttle</div>';
         html += '<div class="flex justify-between items-center">';
-        html += '<span class="text-orange-500 font-bold">' + avgThrottle + '%</span>';
+        html += '<span class="text-[#ff6b9d] font-semibold font-data">' + avgThrottle + '%</span>';
         html += '<span class="text-gray-400">vs</span>';
         html += '<span class="text-gray-600 font-bold">' + refAvgThrottle + '%</span>';
         html += '</div></div>';
@@ -1690,15 +1690,15 @@ class TelemetryAnalysisApp {
         });
         allTraces.push({ x: outerEdge.x, y: outerEdge.y, mode: 'lines', line: { color: '#ffffff', width: 2 }, hoverinfo: 'skip', showlegend: false });
         allTraces.push({ x: innerEdge.x, y: innerEdge.y, mode: 'lines', line: { color: '#ffffff', width: 2 }, hoverinfo: 'skip', showlegend: false });
-        allTraces.push({ x: refNorm.map(function(p) { return p.x; }), y: refNorm.map(function(p) { return p.y; }), mode: 'lines', name: 'Reference', line: { color: '#3b82f6', width: 4 }, hoverinfo: 'name' });
+        allTraces.push({ x: refNorm.map(function(p) { return p.x; }), y: refNorm.map(function(p) { return p.y; }), mode: 'lines', name: 'Reference', line: { color: '#00d4aa', width: 4 }, hoverinfo: 'name' });
         
-        // Your lap - solid orange line (no speed coloring)
+        // Your lap - solid magenta line (no speed coloring)
         allTraces.push({ 
             x: currNorm.map(function(p) { return p.x; }), 
             y: currNorm.map(function(p) { return p.y; }), 
             mode: 'lines', 
-            name: 'Your Lap', 
-            line: { color: '#f97316', width: 3 }, 
+            name: 'Comparison', 
+            line: { color: '#ff6b9d', width: 3 }, 
             hoverinfo: 'name' 
         });
         
@@ -1795,7 +1795,7 @@ class TelemetryAnalysisApp {
     }
     
     getOverlayChannels() {
-        var refColor = '#3b82f6', yourColor = '#f97316';  // Blue for reference, Orange for your lap
+        var refColor = '#00d4aa', yourColor = '#ff6b9d';  // Cyan for reference, Magenta for comparison
         return {
             speed: { names: ['Ground Speed', 'Speed', 'Drive Speed'], label: 'Speed', unit: 'km/h', color: { ref: refColor, curr: yourColor } },
             throttle: { names: ['Throttle Pos', 'Throttle', 'TPS'], label: 'Throttle', unit: '%', color: { ref: refColor, curr: yourColor } },
@@ -1959,8 +1959,8 @@ class TelemetryAnalysisApp {
         refData.forEach(function(row) { var dist = self.getValue(row, distNames, null); var val = self.getValue(row, [colName], null); if (dist !== null && val !== null) { refX.push(dist); refY.push(val); } });
         currData.forEach(function(row) { var dist = self.getValue(row, distNames, null); var val = self.getValue(row, [colName], null); if (dist !== null && val !== null) { currX.push(dist); currY.push(val); } });
         var traces = [];
-        if (refX.length > 0) traces.push({ x: refX, y: refY, mode: 'lines', name: 'Reference', line: { color: '#3b82f6', width: 1.5 } });
-        if (currX.length > 0) traces.push({ x: currX, y: currY, mode: 'lines', name: 'Your Lap', line: { color: '#f97316', width: 2 } });
+        if (refX.length > 0) traces.push({ x: refX, y: refY, mode: 'lines', name: 'Reference', line: { color: '#00d4aa', width: 1.5 } });
+        if (currX.length > 0) traces.push({ x: currX, y: currY, mode: 'lines', name: 'Comparison', line: { color: '#ff6b9d', width: 2 } });
         var layout = { xaxis: { title: 'Distance (m)', tickfont: { size: 10 } }, yaxis: { tickfont: { size: 10 } }, margin: { t: 10, b: 40, l: 50, r: 10 }, legend: { orientation: 'h', y: 1.05, x: 0.5, xanchor: 'center', font: { size: 10 } }, hovermode: 'x unified', autosize: true };
         Plotly.newPlot(chartId, traces, layout, { responsive: true, displayModeBar: false });
     }
@@ -1981,8 +1981,8 @@ class TelemetryAnalysisApp {
         var container = document.getElementById('speed-comparison');
         if (!container) return;
         if (!analysis.avgSpeedCurr) { container.innerHTML = '<p class="text-gray-500 text-center py-10">No speed data</p>'; return; }
-        var yourTrace = { x: ['Average', 'Top', 'Min Corner'], y: [analysis.avgSpeedCurr || 0, analysis.maxSpeedCurr || 0, analysis.minSpeedCurr || 0], type: 'bar', name: 'Your Lap', marker: { color: '#f97316' } };
-        var refTrace = { x: ['Average', 'Top', 'Min Corner'], y: [analysis.avgSpeedRef || 0, analysis.maxSpeedRef || 0, analysis.minSpeedRef || 0], type: 'bar', name: 'Reference', marker: { color: '#3b82f6' } };
+        var yourTrace = { x: ['Average', 'Top', 'Min Corner'], y: [analysis.avgSpeedCurr || 0, analysis.maxSpeedCurr || 0, analysis.minSpeedCurr || 0], type: 'bar', name: 'Comparison', marker: { color: '#ff6b9d' } };
+        var refTrace = { x: ['Average', 'Top', 'Min Corner'], y: [analysis.avgSpeedRef || 0, analysis.maxSpeedRef || 0, analysis.minSpeedRef || 0], type: 'bar', name: 'Reference', marker: { color: '#00d4aa' } };
         var layout = { barmode: 'group', yaxis: { title: 'Speed (km/h)' }, margin: { t: 30, b: 40, l: 50, r: 20 }, legend: { orientation: 'h', y: -0.15 } };
         Plotly.newPlot('speed-comparison', [yourTrace, refTrace], layout, { responsive: true });
     }
@@ -2061,7 +2061,7 @@ class TelemetryAnalysisApp {
         var chatMessages = document.getElementById('chat-messages');
         var messageDiv = document.createElement('div');
         messageDiv.className = 'flex justify-end';
-        messageDiv.innerHTML = '<div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 max-w-md"><p class="text-sm text-zinc-300">' + message + '</p></div>';
+        messageDiv.innerHTML = '<div class="chat-message-user rounded-lg p-4 max-w-md"><p class="text-sm text-[#f0f6fc]">' + message + '</p></div>';
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
@@ -2071,7 +2071,7 @@ class TelemetryAnalysisApp {
         var messageDiv = document.createElement('div');
         messageDiv.className = 'flex items-start';
         var cleanMessage = message.replace(/<[^>]*>/g, '');
-        messageDiv.innerHTML = '<div class="chat-ai rounded-xl p-4 max-w-2xl"><div class="flex items-center mb-2"><div class="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center mr-3"><span class="text-white font-bold text-sm">A</span></div><div><p class="font-medium text-orange-400 text-sm">AIrton</p></div></div><div class="text-zinc-300 text-sm leading-relaxed">' + cleanMessage.replace(/\n/g, '<br>') + '</div></div>';
+        messageDiv.innerHTML = '<div class="chat-message-ai rounded-lg p-4 max-w-2xl"><div class="flex items-center gap-3 mb-3"><div class="w-8 h-8 bg-gradient-to-br from-[#ff6b9d] to-[#ff4777] rounded flex items-center justify-center"><span class="text-white font-bold text-sm font-display">A</span></div><span class="font-display font-semibold text-[#ff6b9d] text-sm tracking-wide">AIRTON</span></div><div class="text-[#f0f6fc] text-sm leading-relaxed">' + cleanMessage.replace(/\n/g, '<br>') + '</div></div>';
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
@@ -2081,7 +2081,7 @@ class TelemetryAnalysisApp {
         var typingDiv = document.createElement('div');
         typingDiv.id = 'typing-indicator';
         typingDiv.className = 'flex items-start';
-        typingDiv.innerHTML = '<div class="rounded-xl p-3 bg-zinc-800/50 border border-zinc-700/50"><p class="text-zinc-500 text-sm"><i class="fas fa-circle-notch fa-spin mr-2 text-orange-500"></i>Analyzing...</p></div>';
+        typingDiv.innerHTML = '<div class="rounded-lg p-4 bg-[#21262d] border border-[#30363d]"><p class="text-[#8b949e] text-sm font-data"><i class="fas fa-circle-notch fa-spin mr-2 text-[#ff6b9d]"></i>Analyzing data...</p></div>';
         chatMessages.appendChild(typingDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
@@ -2099,11 +2099,9 @@ class TelemetryAnalysisApp {
         
         document.querySelectorAll('.tab-btn').forEach(function(btn) {
             if (btn.dataset.tab === tabName) { 
-                btn.classList.add('border-purple-500', 'text-purple-600'); 
-                btn.classList.remove('border-transparent', 'text-gray-600'); 
+                btn.classList.add('active'); 
             } else { 
-                btn.classList.remove('border-purple-500', 'text-purple-600'); 
-                btn.classList.add('border-transparent', 'text-gray-600'); 
+                btn.classList.remove('active'); 
             }
         });
         
