@@ -1270,8 +1270,8 @@ class TelemetryAnalysisApp {
         var hasIssues = segment.issues && segment.issues.length > 0;
         var bgColor = hasIssues ? 'bg-yellow-50 border-yellow-200' : 'bg-blue-50 border-blue-200';
         
-        // Force correct straight label based on sorted index
-        var straightLabel = 'Straight ' + (idx + 1);
+        // Use the name from the segment (e.g., "Start/Finish Straight" or "Straight 2")
+        var straightLabel = segment.name || ('Straight ' + (idx + 1));
         
         var curr = segment.curr || {};
         var ref = segment.ref || {};
@@ -1763,9 +1763,10 @@ class TelemetryAnalysisApp {
                 });
             });
             
-            // Add straight markers (distance is already midpoint from AI)
+            // Add straight markers - S1 = Start/Finish, others numbered sequentially
             straights.forEach(function(segment, idx) {
-                var dist = segment.distance || 0;  // AI now outputs midpoint as distance
+                var dist = segment.distance || 0;
+                // Use S1 for all straights since they're already ordered correctly
                 var label = 'S' + (idx + 1);
                 var hasIssues = segment.issues && segment.issues.length > 0;
                 var pos = findPositionAtDistance(dist);
