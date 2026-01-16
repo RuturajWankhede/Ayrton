@@ -1061,18 +1061,12 @@ class TelemetryAnalysisApp {
                 .sort(function(a, b) { return (a.distance || 0) - (b.distance || 0); });
             
             var straights = trackSegments.filter(function(s) { return s.type === 'straight'; })
-                .map(function(s) {
-                    var startDist = s.distance || s.startDistance || 0;
-                    var endDist = s.endDistance || startDist + (s.length || 100);
-                    s._midpoint = (startDist + endDist) / 2;
-                    return s;
-                })
-                .sort(function(a, b) { return (a._midpoint || 0) - (b._midpoint || 0); });
+                .sort(function(a, b) { return (a.distance || 0) - (b.distance || 0); });
             
             // Create combined sorted list for sequential display
             var allSegments = [];
             corners.forEach(function(c, i) { allSegments.push({ segment: c, sortDist: c.distance || 0, displayIdx: i + 1, type: 'corner' }); });
-            straights.forEach(function(s, i) { allSegments.push({ segment: s, sortDist: s._midpoint || 0, displayIdx: i + 1, type: 'straight' }); });
+            straights.forEach(function(s, i) { allSegments.push({ segment: s, sortDist: s.distance || 0, displayIdx: i + 1, type: 'straight' }); });
             allSegments.sort(function(a, b) { return a.sortDist - b.sortDist; });
             
             // Render in track order
@@ -1306,7 +1300,7 @@ class TelemetryAnalysisApp {
         html += '<div class="flex justify-between items-start mb-4">';
         html += '<div>';
         html += '<h3 class="text-xl font-bold text-gray-800"><i class="fas fa-road text-blue-500 mr-2"></i>' + straightLabel + '</h3>';
-        html += '<span class="text-gray-500">' + (segment.distance || 0) + 'm - ' + (segment.endDistance || 0) + 'm (' + (segment.length || 0) + 'm)</span>';
+        html += '<span class="text-gray-500">' + (segment.startDistance || segment.distance || 0) + 'm - ' + (segment.endDistance || 0) + 'm (' + (segment.length || 0) + 'm)</span>';
         html += '</div>';
         if (segment.timeLoss > 0) {
             html += '<div class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm font-medium">~' + segment.timeLoss.toFixed(2) + 's lost</div>';
@@ -1725,14 +1719,7 @@ class TelemetryAnalysisApp {
                 .sort(function(a, b) { return (a.distance || 0) - (b.distance || 0); });
             
             var straights = segments.filter(function(s) { return s.type === 'straight'; })
-                .map(function(s) {
-                    // Calculate midpoint for sorting and positioning
-                    var startDist = s.distance || s.startDistance || 0;
-                    var endDist = s.endDistance || startDist + (s.length || 100);
-                    s._midpoint = (startDist + endDist) / 2;
-                    return s;
-                })
-                .sort(function(a, b) { return (a._midpoint || 0) - (b._midpoint || 0); });
+                .sort(function(a, b) { return (a.distance || 0) - (b.distance || 0); });
             
             // Helper function to find track position for a given distance
             var findPositionAtDistance = function(targetDist) {
@@ -1774,9 +1761,9 @@ class TelemetryAnalysisApp {
                 });
             });
             
-            // Add straight markers (sorted by midpoint)
+            // Add straight markers (distance is already midpoint from AI)
             straights.forEach(function(segment, idx) {
-                var dist = segment._midpoint || segment.distance || 0;
+                var dist = segment.distance || 0;  // AI now outputs midpoint as distance
                 var label = 'S' + (idx + 1);
                 var hasIssues = segment.issues && segment.issues.length > 0;
                 var pos = findPositionAtDistance(dist);
