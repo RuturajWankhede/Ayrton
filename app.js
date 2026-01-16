@@ -1060,13 +1060,14 @@ class TelemetryAnalysisApp {
             var corners = trackSegments.filter(function(s) { return s.type === 'corner'; })
                 .sort(function(a, b) { return (a.distance || 0) - (b.distance || 0); });
             
+            // Sort straights by startDistance so S1 = start/finish straight
             var straights = trackSegments.filter(function(s) { return s.type === 'straight'; })
-                .sort(function(a, b) { return (a.distance || 0) - (b.distance || 0); });
+                .sort(function(a, b) { return (a.startDistance || a.distance || 0) - (b.startDistance || b.distance || 0); });
             
             // Create combined sorted list for sequential display
             var allSegments = [];
             corners.forEach(function(c, i) { allSegments.push({ segment: c, sortDist: c.distance || 0, displayIdx: i + 1, type: 'corner' }); });
-            straights.forEach(function(s, i) { allSegments.push({ segment: s, sortDist: s.distance || 0, displayIdx: i + 1, type: 'straight' }); });
+            straights.forEach(function(s, i) { allSegments.push({ segment: s, sortDist: s.startDistance || s.distance || 0, displayIdx: i + 1, type: 'straight' }); });
             allSegments.sort(function(a, b) { return a.sortDist - b.sortDist; });
             
             // Render in track order
@@ -1718,8 +1719,9 @@ class TelemetryAnalysisApp {
             var corners = segments.filter(function(s) { return s.type === 'corner'; })
                 .sort(function(a, b) { return (a.distance || 0) - (b.distance || 0); });
             
+            // Sort straights by startDistance (not midpoint) so S1 = start/finish straight
             var straights = segments.filter(function(s) { return s.type === 'straight'; })
-                .sort(function(a, b) { return (a.distance || 0) - (b.distance || 0); });
+                .sort(function(a, b) { return (a.startDistance || a.distance || 0) - (b.startDistance || b.distance || 0); });
             
             // Helper function to find track position for a given distance
             var findPositionAtDistance = function(targetDist) {
