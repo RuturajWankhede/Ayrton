@@ -27,7 +27,6 @@
             </div>
         </div>
     </div>
-
     <div class="container mx-auto p-6">
         <div id="upload-section" class="mb-8">
             <div class="bg-white rounded-lg shadow-lg p-6">
@@ -78,7 +77,6 @@
                 <!-- Channel detection results and analyze button will appear here -->
             </div>
         </div>
-
         <div id="results-section" class="hidden">
             <div class="grid md:grid-cols-4 gap-4 mb-6">
                 <div class="bg-white rounded-lg p-4 shadow">
@@ -102,7 +100,6 @@
                     <i class="fas fa-exclamation-triangle text-orange-500"></i>
                 </div>
             </div>
-
             <div class="bg-white rounded-lg shadow-lg">
                 <div class="border-b border-gray-200">
                     <nav class="flex">
@@ -115,12 +112,11 @@
                         <button data-tab="setup" class="tab-btn px-6 py-3 border-b-2 border-transparent text-gray-600 hover:text-gray-800">
                             <i class="fas fa-cogs mr-2"></i>Setup Recommendations
                         </button>
-                        <button data-tab="report" class="tab-btn px-6 py-3 border-b-2 border-transparent text-gray-600 hover:text-gray-800">
-                            <i class="fas fa-file-alt mr-2"></i>Full Report
+                        <button data-tab="analysis" class="tab-btn px-6 py-3 border-b-2 border-transparent text-gray-600 hover:text-gray-800">
+                            <i class="fas fa-clipboard-list mr-2"></i>Lap Analysis
                         </button>
                     </nav>
                 </div>
-
                 <div class="p-6">
                     <div id="chat-tab" class="tab-content active">
                         <div id="chat-messages" class="h-96 overflow-y-auto mb-4 space-y-4 border rounded-lg p-4 bg-gray-50"></div>
@@ -139,17 +135,16 @@
                             </button>
                         </div>
                     </div>
-
                     <div id="graphs-tab" class="tab-content">
                         <div class="mb-6">
                             <h3 class="text-lg font-bold mb-3"><i class="fas fa-route mr-2"></i>Track Map - Racing Line Comparison</h3>
                             <div id="track-map" class="bg-gray-900" style="height: 400px; width: 100%;"></div>
-                            <p class="text-xs text-gray-500 mt-2">Gray = Reference Line | Colored = Your Line (red=slow, green=fast)</p>
+                            <p class="text-xs text-gray-500 mt-2"><span class="inline-block w-3 h-3 rounded mr-1" style="background-color: #3b82f6;"></span>Reference | <span class="inline-block w-3 h-3 rounded mr-1" style="background-color: #f97316;"></span>Your Lap</p>
                         </div>
                         
                         <div class="mb-6">
                             <h3 class="text-lg font-bold mb-3"><i class="fas fa-chart-area mr-2"></i>Telemetry Overlays</h3>
-                            <p class="text-xs text-gray-500 mb-4"><span class="inline-block w-3 h-3 bg-gray-400 rounded mr-1"></span> Reference Lap | <span class="inline-block w-3 h-3 bg-purple-500 rounded mr-1"></span> Your Lap</p>
+                            <p class="text-xs text-gray-500 mb-4"><span class="inline-block w-3 h-3 rounded mr-1" style="background-color: #3b82f6;"></span>Reference Lap | <span class="inline-block w-3 h-3 rounded mr-1" style="background-color: #f97316;"></span>Your Lap</p>
                             <div class="space-y-6">
                                 <div>
                                     <h4 class="font-semibold mb-2 text-sm">Speed Overlay</h4>
@@ -209,19 +204,16 @@
                             </div>
                         </div>
                     </div>
-
                     <div id="setup-tab" class="tab-content">
                         <div id="setup-recommendations" class="space-y-4"></div>
                     </div>
-
-                    <div id="report-tab" class="tab-content">
-                        <div id="full-report" class="prose max-w-none"></div>
+                    <div id="analysis-tab" class="tab-content">
+                        <div id="lap-analysis" class="space-y-4"></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
     <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
         <div class="bg-white rounded-lg p-8 text-center">
             <i class="fas fa-spinner fa-spin text-4xl text-purple-600 mb-4"></i>
@@ -229,7 +221,6 @@
             <p class="text-gray-600">Ayrton is studying your data</p>
         </div>
     </div>
-
     <div id="config-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
         <div class="bg-white rounded-lg p-6 max-w-md w-full">
             <h3 class="text-lg font-bold mb-4">Configure Webhook</h3>
@@ -237,7 +228,6 @@
             <button id="save-config" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 w-full">Save</button>
         </div>
     </div>
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="tracks-database.js"></script>
