@@ -515,22 +515,22 @@ class TelemetryAnalysisApp {
         
         var displayContainer = document.createElement('div');
         displayContainer.id = 'channel-detection-display';
-        displayContainer.className = 'mt-6 border rounded-lg overflow-hidden';
+        displayContainer.className = 'mt-6 rounded-xl overflow-hidden border border-zinc-700/50 bg-zinc-900/50';
         
-        var html = '<div class="bg-' + statusColor + '-50 p-4 border-b"><div class="flex items-center justify-between"><div>';
-        html += '<h3 class="font-bold text-lg flex items-center">';
+        var html = '<div class="p-4 border-b border-zinc-700/50"><div class="flex items-center justify-between"><div>';
+        html += '<h3 class="font-medium text-sm text-white flex items-center">';
         if (isAIPowered) {
-            html += '<i class="fas fa-robot text-purple-500 mr-2"></i>AI Channel Detection';
+            html += '<i class="fas fa-robot text-blue-500 mr-2"></i>Channel Detection';
         } else {
-            html += '<i class="fas fa-search text-' + statusColor + '-500 mr-2"></i>Channel Detection Results';
+            html += '<i class="fas fa-search text-' + statusColor + '-500 mr-2"></i>Channel Detection';
         }
         html += '</h3>';
-        html += '<p class="text-sm text-gray-600">' + detected.totalColumns + ' columns found - ' + totalMatched + ' channels mapped';
+        html += '<p class="text-xs text-zinc-500">' + detected.totalColumns + ' columns · ' + totalMatched + ' mapped';
         if (isAIPowered) {
-            html += ' <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800"><i class="fas fa-sparkles mr-1"></i>AI-Powered</span>';
+            html += ' <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-500/20 text-blue-400">AI</span>';
         }
         html += '</p>';
-        html += '</div><button id="toggle-channel-details" class="text-sm bg-white px-3 py-1 rounded border hover:bg-gray-50"><i class="fas fa-chevron-down mr-1"></i>Details</button></div></div>';
+        html += '</div><button id="toggle-channel-details" class="text-xs bg-zinc-800 px-3 py-1 rounded-lg border border-zinc-700 hover:bg-zinc-700 text-zinc-400"><i class="fas fa-chevron-down mr-1"></i>Details</button></div></div>';
         
         if (detected.capabilities.length > 0) {
             html += '<div class="p-4 bg-white border-b"><h4 class="font-semibold text-gray-700 mb-2"><i class="fas fa-bolt text-yellow-500 mr-2"></i>Analysis Capabilities</h4><div class="flex flex-wrap gap-2">';
@@ -579,10 +579,11 @@ class TelemetryAnalysisApp {
         html += '<div id="custom-mappings-list" class="space-y-1"></div>';
         html += '<button id="apply-mappings-btn" class="mt-3 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"><i class="fas fa-check mr-2"></i>Save Mappings</button></div>';
         
-        html += '<div class="p-4 border-t bg-gradient-to-r from-purple-50 to-blue-50"><button id="start-analysis-btn" class="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-lg hover:from-purple-700 hover:to-blue-700 transition font-semibold text-lg shadow-lg"><i class="fas fa-play-circle mr-2"></i>Analyze Telemetry</button></div>';
+        html += '<div class="p-4 border-t border-zinc-700/50 bg-zinc-900/50"><button id="start-analysis-btn" class="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-3 rounded-xl hover:from-blue-500 hover:to-blue-400 transition font-medium text-sm"><i class="fas fa-play mr-2"></i>Analyze</button></div>';
         
         displayContainer.innerHTML = html;
-        document.querySelector('#upload-section .bg-white').appendChild(displayContainer);
+        var uploadContainer = document.querySelector('#upload-section .glass') || document.querySelector('#upload-section > div');
+        if (uploadContainer) uploadContainer.appendChild(displayContainer);
         this.createMappingModal();
         this.setupChannelMappingEvents(detected);
     }
@@ -898,7 +899,7 @@ class TelemetryAnalysisApp {
             this.displayAnalysisResults(results);
             document.getElementById('upload-section').classList.add('hidden');
             document.getElementById('results-section').classList.remove('hidden');
-            this.addAyrtonMessage(results.ayrton_says || results.initial_message || "I have analyzed your data.");
+            this.addAIrtonMessage(results.ayrton_says || results.initial_message || "I have analyzed your data.");
         } catch (error) {
             console.error('Analysis error:', error);
             this.showNotification('Analysis failed: ' + error.message, 'error');
@@ -2022,7 +2023,7 @@ class TelemetryAnalysisApp {
         input.value = '';
         this.showTypingIndicator();
         try {
-            // Prepare telemetry summary for Ayrton (sampled to reduce size)
+            // Prepare telemetry summary for AIrton (sampled to reduce size)
             var telemetrySummary = null;
             if (this.referenceData && this.currentData) {
                 var sampleRate = Math.max(1, Math.floor(this.referenceData.length / 200));
@@ -2049,10 +2050,10 @@ class TelemetryAnalysisApp {
             if (!response.ok) throw new Error('HTTP error: ' + response.status);
             var result = await response.json();
             this.hideTypingIndicator();
-            this.addAyrtonMessage(result.ayrton_says || result.response || 'Response received');
+            this.addAIrtonMessage(result.ayrton_says || result.response || 'Response received');
         } catch (error) {
             this.hideTypingIndicator();
-            this.addAyrtonMessage('Error processing message. Please try again.');
+            this.addAIrtonMessage('Error processing message. Please try again.');
         }
     }
     
@@ -2060,17 +2061,17 @@ class TelemetryAnalysisApp {
         var chatMessages = document.getElementById('chat-messages');
         var messageDiv = document.createElement('div');
         messageDiv.className = 'flex justify-end';
-        messageDiv.innerHTML = '<div class="bg-gray-200 rounded-lg p-3 max-w-md"><p class="font-medium">You</p><p>' + message + '</p></div>';
+        messageDiv.innerHTML = '<div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 max-w-md"><p class="text-sm text-zinc-300">' + message + '</p></div>';
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
     
-    addAyrtonMessage(message) {
+    addAIrtonMessage(message) {
         var chatMessages = document.getElementById('chat-messages');
         var messageDiv = document.createElement('div');
         messageDiv.className = 'flex items-start';
         var cleanMessage = message.replace(/<[^>]*>/g, '');
-        messageDiv.innerHTML = '<div class="bg-gradient-to-r from-purple-700 to-purple-900 text-white rounded-lg p-4 max-w-2xl shadow-lg"><div class="flex items-center mb-2"><div class="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center mr-3"><span class="text-purple-900 font-bold text-lg">A</span></div><div><p class="font-bold text-yellow-300">Ayrton</p><p class="text-xs text-purple-200">Racing Coach</p></div></div><div class="text-white">' + cleanMessage.replace(/\n/g, '<br>') + '</div></div>';
+        messageDiv.innerHTML = '<div class="chat-ai rounded-xl p-4 max-w-2xl"><div class="flex items-center mb-2"><div class="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center mr-3"><span class="text-white font-bold text-sm">A</span></div><div><p class="font-medium text-orange-400 text-sm">AIrton</p></div></div><div class="text-zinc-300 text-sm leading-relaxed">' + cleanMessage.replace(/\n/g, '<br>') + '</div></div>';
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
@@ -2080,7 +2081,7 @@ class TelemetryAnalysisApp {
         var typingDiv = document.createElement('div');
         typingDiv.id = 'typing-indicator';
         typingDiv.className = 'flex items-start';
-        typingDiv.innerHTML = '<div class="bg-purple-100 rounded-lg p-3"><p class="text-purple-600">Ayrton is thinking...</p></div>';
+        typingDiv.innerHTML = '<div class="rounded-xl p-3 bg-zinc-800/50 border border-zinc-700/50"><p class="text-zinc-500 text-sm"><i class="fas fa-circle-notch fa-spin mr-2 text-orange-500"></i>Analyzing...</p></div>';
         chatMessages.appendChild(typingDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
