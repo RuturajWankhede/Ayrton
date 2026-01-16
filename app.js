@@ -1143,7 +1143,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm text-center mb-2">Entry Speed</div>';
         html += '<div class="flex justify-between items-center">';
-        html += '<div class="text-center flex-1"><div class="text-purple-600 font-bold text-lg">' + entrySpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-orange-500 font-bold text-lg">' + entrySpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
         html += '<div class="text-center px-2"><div class="text-' + (deltaEntry >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaEntry >= 0 ? '+' : '') + deltaEntry + '</div><div class="text-xs text-gray-400">km/h</div></div>';
         html += '<div class="text-center flex-1"><div class="text-gray-600 font-bold text-lg">' + refEntry + '</div><div class="text-xs text-gray-400">Ref</div></div>';
         html += '</div></div>';
@@ -1152,7 +1152,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm text-center mb-2">Apex Speed</div>';
         html += '<div class="flex justify-between items-center">';
-        html += '<div class="text-center flex-1"><div class="text-purple-600 font-bold text-lg">' + apexSpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-orange-500 font-bold text-lg">' + apexSpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
         html += '<div class="text-center px-2"><div class="text-' + (deltaApex >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaApex >= 0 ? '+' : '') + deltaApex + '</div><div class="text-xs text-gray-400">km/h</div></div>';
         html += '<div class="text-center flex-1"><div class="text-gray-600 font-bold text-lg">' + refApex + '</div><div class="text-xs text-gray-400">Ref</div></div>';
         html += '</div></div>';
@@ -1161,7 +1161,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm text-center mb-2">Exit Speed</div>';
         html += '<div class="flex justify-between items-center">';
-        html += '<div class="text-center flex-1"><div class="text-purple-600 font-bold text-lg">' + exitSpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-orange-500 font-bold text-lg">' + exitSpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
         html += '<div class="text-center px-2"><div class="text-' + (deltaExit >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaExit >= 0 ? '+' : '') + deltaExit + '</div><div class="text-xs text-gray-400">km/h</div></div>';
         html += '<div class="text-center flex-1"><div class="text-gray-600 font-bold text-lg">' + refExit + '</div><div class="text-xs text-gray-400">Ref</div></div>';
         html += '</div></div>';
@@ -1182,7 +1182,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-gray-100 rounded p-2">';
         html += '<div class="text-xs text-gray-500 text-center mb-1">Peak Brake</div>';
         html += '<div class="flex justify-between items-center text-sm">';
-        html += '<div class="text-center flex-1"><div class="text-purple-600 font-bold">' + peakBrake + '%</div><div class="text-xs text-gray-400">You</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-orange-500 font-bold">' + peakBrake + '%</div><div class="text-xs text-gray-400">You</div></div>';
         if (typeof deltaPeakBrake === 'number' && deltaPeakBrake !== 0) {
             html += '<div class="text-center px-1"><div class="text-' + (deltaPeakBrake >= 0 ? 'green' : 'red') + '-600 font-bold text-xs">' + (deltaPeakBrake >= 0 ? '+' : '') + deltaPeakBrake + '</div></div>';
         }
@@ -1210,7 +1210,7 @@ class TelemetryAnalysisApp {
         // Your trail braking
         html += '<div class="text-center flex-1">';
         if (trailBraking === true) {
-            html += '<div class="text-purple-600 font-bold">' + (trailDist > 0 ? trailDist + 'm' : 'Yes') + '</div>';
+            html += '<div class="text-orange-500 font-bold">' + (trailDist > 0 ? trailDist + 'm' : 'Yes') + '</div>';
         } else if (trailBraking === false) {
             html += '<div class="text-red-600 font-bold">No</div>';
         } else {
@@ -1317,7 +1317,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm mb-2 text-center">Entry Speed</div>';
         html += '<div class="flex justify-between items-center text-sm">';
-        html += '<div class="text-center"><div class="text-purple-600 font-bold text-lg">' + entrySpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
+        html += '<div class="text-center"><div class="text-orange-500 font-bold text-lg">' + entrySpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
         html += '<div class="text-center"><div class="text-' + (deltaEntry >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaEntry >= 0 ? '+' : '') + deltaEntry + '</div></div>';
         html += '<div class="text-center"><div class="text-gray-600 font-bold text-lg">' + refEntrySpeed + '</div><div class="text-gray-400 text-xs">Ref</div></div>';
         html += '</div></div>';
@@ -1326,7 +1326,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm mb-2 text-center">Max Speed</div>';
         html += '<div class="flex justify-between items-center text-sm">';
-        html += '<div class="text-center"><div class="text-purple-600 font-bold text-lg">' + maxSpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
+        html += '<div class="text-center"><div class="text-orange-500 font-bold text-lg">' + maxSpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
         html += '<div class="text-center"><div class="text-' + (deltaMax >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaMax >= 0 ? '+' : '') + deltaMax + '</div></div>';
         html += '<div class="text-center"><div class="text-gray-600 font-bold text-lg">' + refMaxSpeed + '</div><div class="text-gray-400 text-xs">Ref</div></div>';
         html += '</div></div>';
@@ -1335,7 +1335,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm mb-2 text-center">Exit Speed</div>';
         html += '<div class="flex justify-between items-center text-sm">';
-        html += '<div class="text-center"><div class="text-purple-600 font-bold text-lg">' + exitSpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
+        html += '<div class="text-center"><div class="text-orange-500 font-bold text-lg">' + exitSpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
         html += '<div class="text-center"><div class="text-' + (deltaExit >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaExit >= 0 ? '+' : '') + deltaExit + '</div></div>';
         html += '<div class="text-center"><div class="text-gray-600 font-bold text-lg">' + refExitSpeed + '</div><div class="text-gray-400 text-xs">Ref</div></div>';
         html += '</div></div>';
@@ -1347,7 +1347,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm">Avg Throttle</div>';
         html += '<div class="flex justify-between items-center">';
-        html += '<span class="text-purple-600 font-bold">' + avgThrottle + '%</span>';
+        html += '<span class="text-orange-500 font-bold">' + avgThrottle + '%</span>';
         html += '<span class="text-gray-400">vs</span>';
         html += '<span class="text-gray-600 font-bold">' + refAvgThrottle + '%</span>';
         html += '</div></div>';
@@ -1689,24 +1689,17 @@ class TelemetryAnalysisApp {
         });
         allTraces.push({ x: outerEdge.x, y: outerEdge.y, mode: 'lines', line: { color: '#ffffff', width: 2 }, hoverinfo: 'skip', showlegend: false });
         allTraces.push({ x: innerEdge.x, y: innerEdge.y, mode: 'lines', line: { color: '#ffffff', width: 2 }, hoverinfo: 'skip', showlegend: false });
-        allTraces.push({ x: refNorm.map(function(p) { return p.x; }), y: refNorm.map(function(p) { return p.y; }), mode: 'lines', name: 'Reference', line: { color: '#9ca3af', width: 4 }, hoverinfo: 'name' });
+        allTraces.push({ x: refNorm.map(function(p) { return p.x; }), y: refNorm.map(function(p) { return p.y; }), mode: 'lines', name: 'Reference', line: { color: '#3b82f6', width: 4 }, hoverinfo: 'name' });
         
-        var allSpeeds = currNorm.map(function(p) { return p.speed; });
-        var minSpeed = Math.min.apply(null, allSpeeds);
-        var maxSpeed = Math.max.apply(null, allSpeeds);
-        var getColor = function(speed) {
-            var ratio = Math.max(0, Math.min(1, (speed - minSpeed) / (maxSpeed - minSpeed || 1)));
-            if (ratio < 0.5) return 'rgb(255,' + Math.round(ratio * 2 * 255) + ',0)';
-            return 'rgb(' + Math.round((1 - (ratio - 0.5) * 2) * 255) + ',255,0)';
-        };
-        
-        for (var i = 0; i < currNorm.length - 1; i++) {
-            allTraces.push({ 
-                x: [currNorm[i].x, currNorm[i + 1].x], y: [currNorm[i].y, currNorm[i + 1].y], 
-                mode: 'lines', showlegend: i === 0, name: i === 0 ? 'Your Lap (colored by speed)' : '', 
-                line: { color: getColor(currNorm[i].speed), width: 3 }, hoverinfo: 'skip' 
-            });
-        }
+        // Your lap - solid orange line (no speed coloring)
+        allTraces.push({ 
+            x: currNorm.map(function(p) { return p.x; }), 
+            y: currNorm.map(function(p) { return p.y; }), 
+            mode: 'lines', 
+            name: 'Your Lap', 
+            line: { color: '#f97316', width: 3 }, 
+            hoverinfo: 'name' 
+        });
         
         // Add segment markers (Turns and Straights) from analysis
         var annotations = [];
@@ -1801,7 +1794,7 @@ class TelemetryAnalysisApp {
     }
     
     getOverlayChannels() {
-        var refColor = '#6b7280', yourColor = '#8b5cf6';
+        var refColor = '#3b82f6', yourColor = '#f97316';  // Blue for reference, Orange for your lap
         return {
             speed: { names: ['Ground Speed', 'Speed', 'Drive Speed'], label: 'Speed', unit: 'km/h', color: { ref: refColor, curr: yourColor } },
             throttle: { names: ['Throttle Pos', 'Throttle', 'TPS'], label: 'Throttle', unit: '%', color: { ref: refColor, curr: yourColor } },
@@ -1965,8 +1958,8 @@ class TelemetryAnalysisApp {
         refData.forEach(function(row) { var dist = self.getValue(row, distNames, null); var val = self.getValue(row, [colName], null); if (dist !== null && val !== null) { refX.push(dist); refY.push(val); } });
         currData.forEach(function(row) { var dist = self.getValue(row, distNames, null); var val = self.getValue(row, [colName], null); if (dist !== null && val !== null) { currX.push(dist); currY.push(val); } });
         var traces = [];
-        if (refX.length > 0) traces.push({ x: refX, y: refY, mode: 'lines', name: 'Reference', line: { color: '#6b7280', width: 1.5 } });
-        if (currX.length > 0) traces.push({ x: currX, y: currY, mode: 'lines', name: 'Your Lap', line: { color: '#8b5cf6', width: 2 } });
+        if (refX.length > 0) traces.push({ x: refX, y: refY, mode: 'lines', name: 'Reference', line: { color: '#3b82f6', width: 1.5 } });
+        if (currX.length > 0) traces.push({ x: currX, y: currY, mode: 'lines', name: 'Your Lap', line: { color: '#f97316', width: 2 } });
         var layout = { xaxis: { title: 'Distance (m)', tickfont: { size: 10 } }, yaxis: { tickfont: { size: 10 } }, margin: { t: 10, b: 40, l: 50, r: 10 }, legend: { orientation: 'h', y: 1.05, x: 0.5, xanchor: 'center', font: { size: 10 } }, hovermode: 'x unified', autosize: true };
         Plotly.newPlot(chartId, traces, layout, { responsive: true, displayModeBar: false });
     }
@@ -1987,8 +1980,8 @@ class TelemetryAnalysisApp {
         var container = document.getElementById('speed-comparison');
         if (!container) return;
         if (!analysis.avgSpeedCurr) { container.innerHTML = '<p class="text-gray-500 text-center py-10">No speed data</p>'; return; }
-        var yourTrace = { x: ['Average', 'Top', 'Min Corner'], y: [analysis.avgSpeedCurr || 0, analysis.maxSpeedCurr || 0, analysis.minSpeedCurr || 0], type: 'bar', name: 'Your Lap', marker: { color: '#8b5cf6' } };
-        var refTrace = { x: ['Average', 'Top', 'Min Corner'], y: [analysis.avgSpeedRef || 0, analysis.maxSpeedRef || 0, analysis.minSpeedRef || 0], type: 'bar', name: 'Reference', marker: { color: '#6b7280' } };
+        var yourTrace = { x: ['Average', 'Top', 'Min Corner'], y: [analysis.avgSpeedCurr || 0, analysis.maxSpeedCurr || 0, analysis.minSpeedCurr || 0], type: 'bar', name: 'Your Lap', marker: { color: '#f97316' } };
+        var refTrace = { x: ['Average', 'Top', 'Min Corner'], y: [analysis.avgSpeedRef || 0, analysis.maxSpeedRef || 0, analysis.minSpeedRef || 0], type: 'bar', name: 'Reference', marker: { color: '#3b82f6' } };
         var layout = { barmode: 'group', yaxis: { title: 'Speed (km/h)' }, margin: { t: 30, b: 40, l: 50, r: 20 }, legend: { orientation: 'h', y: -0.15 } };
         Plotly.newPlot('speed-comparison', [yourTrace, refTrace], layout, { responsive: true });
     }
@@ -2006,7 +1999,8 @@ class TelemetryAnalysisApp {
     }
     
     generateFullReport(analysis) {
-        var container = document.getElementById('full-report');
+        var container = document.getElementById('lap-analysis');
+        if (!container) return;
         var timeDelta = analysis.timeDelta || 0;
         var html = '<h2 class="text-2xl font-bold mb-4">Telemetry Report</h2>';
         html += '<div class="bg-gray-50 p-4 rounded-lg mb-4"><p class="text-lg font-bold">Lap Time Delta: ' + (timeDelta > 0 ? '+' : '') + timeDelta.toFixed(3) + 's</p>';
