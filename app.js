@@ -1923,9 +1923,29 @@ class TelemetryAnalysisApp {
         input.value = '';
         this.showTypingIndicator();
         try {
+            // Prepare telemetry summary for Ayrton (sampled to reduce size)
+            var telemetrySummary = null;
+            if (this.referenceData && this.currentData) {
+                var sampleRate = Math.max(1, Math.floor(this.referenceData.length / 200));
+                var sampleData = function(data) {
+                    return data.filter(function(_, i) { return i % sampleRate === 0; });
+                };
+                telemetrySummary = {
+                    reference: sampleData(self.referenceData),
+                    current: sampleData(self.currentData),
+                    channels: self.detectedChannels || {}
+                };
+            }
+            
             var response = await fetch(this.webhookUrl + '/webhook/ayrton-chat', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: this.sessionId, message: message, session_data: this.sessionData, context: { analysis: this.analysisResults } })
+                body: JSON.stringify({ 
+                    session_id: this.sessionId, 
+                    message: message, 
+                    session_data: this.sessionData, 
+                    context: { analysis: this.analysisResults },
+                    telemetry_data: telemetrySummary
+                })
             });
             if (!response.ok) throw new Error('HTTP error: ' + response.status);
             var result = await response.json();
