@@ -238,50 +238,381 @@ class TelemetryAnalysisApp {
         var reader = new FileReader();
         reader.onload = function(e) {
             var text = e.target.result;
-            var lines = text.split(/\r?\n/);
-            var headerRowIndex = 0;
-            var isMoTeCFormat = false;
+            var formatSelect = document.getElementById('csv-format');
+            var selectedFormat = formatSelect ? formatSelect.value : 'auto';
             
-            if (lines[0] && lines[0].indexOf('MoTeC CSV File') !== -1) {
-                isMoTeCFormat = true;
-                for (var i = 0; i < Math.min(lines.length, 30); i++) {
-                    var cells = lines[i].split(',').map(function(c) { return c.replace(/"/g, '').trim(); });
-                    if (cells[0] === 'Time' || cells.indexOf('Time') !== -1) {
-                        headerRowIndex = i;
+            // Detect or use selected format
+            var format = selectedFormat === 'auto' ? self.detectCSVFormat(text) : selectedFormat;
+            console.log('CSV Format detected/selected:', format);
+            
+            // Show format detection notification
+            if (selectedFormat === 'auto' && format !== 'generic') {
+                var formatNames = {
+                    'pitoolbox': 'Pi Toolbox',
+                    'motec': 'MoTeC i2',
+                    'aim': 'AiM RaceStudio',
+                    'racebox': 'RaceBox',
+                    'iracing': 'iRacing'
+                };
+                self.showNotification('Auto-detected: ' + (formatNames[format] || format) + ' format', 'success');
+            }
+            
+            var parsedData;
+            try {
+                switch(format) {
+                    case 'pitoolbox':
+                        parsedData = self.parsePiToolbox(text);
                         break;
-                    }
+                    case 'motec':
+                        parsedData = self.parseMoTeC(text);
+                        break;
+                    case 'aim':
+                        parsedData = self.parseAiM(text);
+                        break;
+                    default:
+                        parsedData = self.parseGenericCSV(text);
                 }
+                
+                if (!parsedData || parsedData.length === 0) {
+                    self.showNotification('No data found in CSV file', 'error');
+                    return;
+                }
+                
+                if (type === 'ref') { 
+                    self.referenceData = parsedData; 
+                    self.displayFileInfo('ref', file); 
+                } else { 
+                    self.currentData = parsedData; 
+                    self.displayFileInfo('curr', file); 
+                }
+                
+                if (self.referenceData && self.currentData) {
+                    self.detectChannels();
+                }
+            } catch(err) {
+                console.error('CSV parsing error:', err);
+                self.showNotification('Error parsing CSV: ' + err.message, 'error');
             }
-            
-            var csvText = text;
-            if (isMoTeCFormat && headerRowIndex > 0) {
-                var headerLine = lines[headerRowIndex];
-                var dataLines = lines.slice(headerRowIndex + 2);
-                csvText = [headerLine].concat(dataLines).join('\n');
-            }
-            
-            Papa.parse(csvText, {
-                header: true,
-                dynamicTyping: true,
-                skipEmptyLines: true,
-                complete: function(results) {
-                    var cleanedData = results.data.filter(function(row) {
-                        if (!row || Object.keys(row).length === 0) return false;
-                        return Object.values(row).some(function(val) { return val !== null && val !== '' && val !== undefined; });
-                    });
-                    
-                    if (type === 'ref') { self.referenceData = cleanedData; self.displayFileInfo('ref', file); }
-                    else { self.currentData = cleanedData; self.displayFileInfo('curr', file); }
-                    
-                    if (self.referenceData && self.currentData) {
-                        self.detectChannels();
-                    }
-                },
-                error: function(error) { self.showNotification('Error parsing CSV: ' + error.message, 'error'); }
-            });
         };
         reader.onerror = function() { self.showNotification('Error reading file', 'error'); };
         reader.readAsText(file);
+    }
+    
+    detectCSVFormat(text) {
+        var lines = text.split(/\r?\n/);
+        var firstLine = lines[0] || '';
+        var secondLine = lines[1] || '';
+        
+        // Pi Toolbox detection
+        if (firstLine.indexOf('PiToolboxVersionedASCIIDataSet') !== -1) {
+            return 'pitoolbox';
+        }
+        
+        // MoTeC detection
+        if (firstLine.indexOf('MoTeC CSV File') !== -1 || firstLine.indexOf('MoTeC') !== -1) {
+            return 'motec';
+        }
+        
+        // AiM detection
+        if (firstLine.indexOf('AiM') !== -1 || firstLine.indexOf('RaceStudio') !== -1) {
+            return 'aim';
+        }
+        
+        // RaceBox detection
+        if (firstLine.indexOf('RaceBox') !== -1 || text.indexOf('GPS_Latitude') !== -1) {
+            return 'racebox';
+        }
+        
+        // iRacing IBT export
+        if (text.indexOf('SessionTime') !== -1 && text.indexOf('Lap') !== -1) {
+            return 'iracing';
+        }
+        
+        return 'generic';
+    }
+    
+    parsePiToolbox(text) {
+        var lines = text.split(/\r?\n/);
+        var channelBlocks = [];
+        var currentBlock = null;
+        var metadata = {};
+        var inOuting = false;
+        
+        // Parse the file structure
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            
+            // Skip empty lines
+            if (!line) continue;
+            
+            // Parse outing information
+            if (line === '{OutingInformation}') {
+                inOuting = true;
+                continue;
+            }
+            
+            if (inOuting && line.startsWith('{')) {
+                inOuting = false;
+            }
+            
+            if (inOuting && line.indexOf('\t') !== -1) {
+                var parts = line.split('\t');
+                if (parts.length >= 2) {
+                    metadata[parts[0]] = parts[1];
+                }
+                continue;
+            }
+            
+            // Detect channel block start
+            if (line === '{ChannelBlock}') {
+                if (currentBlock && currentBlock.data.length > 0) {
+                    channelBlocks.push(currentBlock);
+                }
+                currentBlock = { channelName: null, data: [] };
+                continue;
+            }
+            
+            // Parse channel header (Time + ChannelName)
+            if (currentBlock && currentBlock.channelName === null && line.indexOf('Time') === 0) {
+                var headers = line.split('\t');
+                if (headers.length >= 2) {
+                    currentBlock.channelName = headers[1].trim();
+                }
+                continue;
+            }
+            
+            // Parse data rows
+            if (currentBlock && currentBlock.channelName) {
+                var values = line.split('\t');
+                if (values.length >= 2) {
+                    var time = parseFloat(values[0]);
+                    var value = parseFloat(values[1]);
+                    if (!isNaN(time) && !isNaN(value)) {
+                        currentBlock.data.push({ time: time, value: value });
+                    }
+                }
+            }
+        }
+        
+        // Don't forget the last block
+        if (currentBlock && currentBlock.data.length > 0) {
+            channelBlocks.push(currentBlock);
+        }
+        
+        console.log('Pi Toolbox: Found', channelBlocks.length, 'channel blocks');
+        console.log('Channels:', channelBlocks.map(function(b) { return b.channelName; }));
+        
+        // Auto-populate driver and track from metadata
+        if (metadata.DriverName) {
+            var driverInput = document.getElementById('driver-name');
+            if (driverInput && !driverInput.value) {
+                driverInput.value = metadata.DriverName;
+            }
+        }
+        if (metadata.TrackName) {
+            var trackInput = document.getElementById('track-name');
+            if (trackInput && !trackInput.value) {
+                // Clean up track name (remove path separators)
+                var trackName = metadata.TrackName.replace(/\\/g, ' ').replace(/\//g, ' ').trim();
+                trackInput.value = trackName;
+            }
+        }
+        
+        // Merge all channels to a common time base
+        return this.mergeChannelBlocks(channelBlocks, metadata);
+    }
+    
+    mergeChannelBlocks(channelBlocks, metadata) {
+        if (channelBlocks.length === 0) return [];
+        
+        // Find the master time channel (use the one with most data points)
+        var masterBlock = channelBlocks.reduce(function(max, block) {
+            return block.data.length > max.data.length ? block : max;
+        }, channelBlocks[0]);
+        
+        var masterTimes = masterBlock.data.map(function(d) { return d.time; });
+        
+        // Create merged data array
+        var mergedData = masterTimes.map(function(time) {
+            return { 'Time': time };
+        });
+        
+        // For each channel, interpolate values to master time base
+        var self = this;
+        channelBlocks.forEach(function(block) {
+            var channelName = self.normalizeChannelName(block.channelName);
+            
+            for (var i = 0; i < masterTimes.length; i++) {
+                var t = masterTimes[i];
+                var value = self.interpolateValue(block.data, t);
+                mergedData[i][channelName] = value;
+            }
+        });
+        
+        // Add metadata as properties (can be accessed later)
+        if (mergedData.length > 0) {
+            mergedData.metadata = metadata;
+        }
+        
+        console.log('Merged data rows:', mergedData.length);
+        console.log('Sample row:', mergedData[0]);
+        
+        // Convert units (mph/m/s to km/h)
+        mergedData = this.convertUnits(mergedData);
+        
+        return mergedData;
+    }
+    
+    normalizeChannelName(name) {
+        // Convert Pi Toolbox names to standard names
+        var mappings = {
+            'Brake[%]': 'Brake',
+            'Throttle[%]': 'Throttle',
+            'Clutch[%]': 'Clutch',
+            'Speed[mph]': 'Speed_mph',  // Mark for conversion
+            'Speed[m/s]': 'Speed_ms',   // Mark for conversion
+            'Corrected Speed[m/s]': 'Ground Speed_ms',
+            'Distance[m]': 'Distance',
+            'Corrected Distance[m]': 'Corrected Distance',
+            'Lap Distance[m]': 'Lap Distance',
+            'Steering Wheel Angle[°]': 'Steered Angle',
+            'Gear': 'Gear',
+            'Heading[°]': 'Heading',
+            'Pitch[°]': 'Pitch',
+            'Roll[°]': 'Roll',
+            'Elapsed Time[s]': 'Elapsed Time',
+            'Elapsed Lap Time[s]': 'Lap Time',
+            'Elapsed Sector Time[s]': 'Sector Time',
+            'Lateral Track Pos[mile]': 'Track Position'
+        };
+        
+        return mappings[name] || name;
+    }
+    
+    convertUnits(data) {
+        // Convert speed units to km/h for consistency
+        var hasSpeedMph = data[0] && data[0]['Speed_mph'] !== undefined;
+        var hasSpeedMs = data[0] && (data[0]['Speed_ms'] !== undefined || data[0]['Ground Speed_ms'] !== undefined);
+        
+        data.forEach(function(row) {
+            // Convert mph to km/h
+            if (row['Speed_mph'] !== undefined) {
+                row['Speed'] = row['Speed_mph'] * 1.60934;
+                row['Ground Speed'] = row['Speed'];
+            }
+            // Convert m/s to km/h
+            if (row['Speed_ms'] !== undefined) {
+                row['Speed'] = row['Speed_ms'] * 3.6;
+            }
+            if (row['Ground Speed_ms'] !== undefined) {
+                row['Ground Speed'] = row['Ground Speed_ms'] * 3.6;
+                if (!row['Speed']) row['Speed'] = row['Ground Speed'];
+            }
+            
+            // Ensure we have a Distance channel
+            if (!row['Distance'] && row['Corrected Distance']) {
+                row['Distance'] = row['Corrected Distance'];
+            }
+            if (!row['Distance'] && row['Lap Distance']) {
+                row['Distance'] = row['Lap Distance'];
+            }
+        });
+        
+        return data;
+    }
+    
+    interpolateValue(data, targetTime) {
+        if (data.length === 0) return 0;
+        if (data.length === 1) return data[0].value;
+        
+        // Binary search for closest times
+        var low = 0, high = data.length - 1;
+        
+        // Handle edge cases
+        if (targetTime <= data[0].time) return data[0].value;
+        if (targetTime >= data[high].time) return data[high].value;
+        
+        // Find bracketing points
+        while (high - low > 1) {
+            var mid = Math.floor((low + high) / 2);
+            if (data[mid].time <= targetTime) {
+                low = mid;
+            } else {
+                high = mid;
+            }
+        }
+        
+        // Linear interpolation
+        var t0 = data[low].time, t1 = data[high].time;
+        var v0 = data[low].value, v1 = data[high].value;
+        
+        if (t1 === t0) return v0;
+        
+        var ratio = (targetTime - t0) / (t1 - t0);
+        return v0 + ratio * (v1 - v0);
+    }
+    
+    parseMoTeC(text) {
+        var lines = text.split(/\r?\n/);
+        var headerRowIndex = 0;
+        
+        // Find header row (contains "Time")
+        for (var i = 0; i < Math.min(lines.length, 30); i++) {
+            var cells = lines[i].split(',').map(function(c) { return c.replace(/"/g, '').trim(); });
+            if (cells[0] === 'Time' || cells.indexOf('Time') !== -1) {
+                headerRowIndex = i;
+                break;
+            }
+        }
+        
+        // Extract header and data (skip units row after header)
+        var headerLine = lines[headerRowIndex];
+        var dataLines = lines.slice(headerRowIndex + 2); // +2 to skip units row
+        var csvText = [headerLine].concat(dataLines).join('\n');
+        
+        return this.parseGenericCSV(csvText);
+    }
+    
+    parseAiM(text) {
+        // AiM format is similar to generic CSV but may have metadata rows
+        var lines = text.split(/\r?\n/);
+        var headerRowIndex = 0;
+        
+        // Find the data header
+        for (var i = 0; i < Math.min(lines.length, 50); i++) {
+            var line = lines[i];
+            if (line.indexOf('Time') !== -1 && (line.indexOf(',') !== -1 || line.indexOf('\t') !== -1)) {
+                headerRowIndex = i;
+                break;
+            }
+        }
+        
+        var csvText = lines.slice(headerRowIndex).join('\n');
+        return this.parseGenericCSV(csvText);
+    }
+    
+    parseGenericCSV(text) {
+        var result = [];
+        var self = this;
+        
+        Papa.parse(text, {
+            header: true,
+            dynamicTyping: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                result = results.data.filter(function(row) {
+                    if (!row || Object.keys(row).length === 0) return false;
+                    return Object.values(row).some(function(val) { 
+                        return val !== null && val !== '' && val !== undefined; 
+                    });
+                });
+            },
+            error: function(error) { 
+                self.showNotification('Error parsing CSV: ' + error.message, 'error'); 
+            }
+        });
+        
+        return result;
     }
     
     displayFileInfo(type, file) {
@@ -291,9 +622,14 @@ class TelemetryAnalysisApp {
         nameSpan.textContent = file.name;
         sizeSpan.textContent = (file.size / 1024).toFixed(1) + ' KB';
         infoDiv.classList.remove('hidden');
+        
         var uploadArea = document.getElementById(type + '-upload');
-        uploadArea.classList.add('border-green-500', 'bg-green-50');
-        uploadArea.innerHTML = '<i class="fas fa-check-circle text-4xl text-green-500 mb-2"></i><p class="text-green-600">' + file.name + '</p>';
+        var accentColor = type === 'ref' ? '#00d4aa' : '#ff6b9d';
+        var label = type === 'ref' ? 'Reference' : 'Comparison';
+        uploadArea.style.borderColor = accentColor;
+        uploadArea.style.borderStyle = 'solid';
+        uploadArea.style.background = 'rgba(' + (type === 'ref' ? '0,212,170' : '255,107,157') + ',0.1)';
+        uploadArea.innerHTML = '<i class="fas fa-check-circle text-4xl mb-2" style="color:' + accentColor + '"></i><p style="color:' + accentColor + '">' + file.name + '</p><p class="text-xs text-[var(--text-muted)] mt-1">' + label + ' lap loaded</p>';
     }
     
     escapeHtml(text) {
@@ -2117,11 +2453,20 @@ class TelemetryAnalysisApp {
     
     showNotification(message, type) {
         var notification = document.createElement('div');
-        var bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
-        notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ' + bgColor + ' text-white';
-        notification.innerHTML = '<p>' + message + '</p>';
+        var colors = {
+            success: 'background: rgba(0, 212, 170, 0.95); border-color: #00d4aa; color: #0d1117;',
+            error: 'background: rgba(248, 81, 73, 0.95); border-color: #f85149; color: white;',
+            info: 'background: rgba(56, 139, 253, 0.95); border-color: #388bfd; color: white;'
+        };
+        var style = colors[type] || colors.info;
+        notification.style.cssText = 'position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; border: 1px solid; z-index: 9999; font-family: Rajdhani, sans-serif; font-weight: 600; font-size: 14px; letter-spacing: 0.02em; box-shadow: 0 4px 20px rgba(0,0,0,0.3);' + style;
+        notification.innerHTML = '<i class="fas fa-' + (type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle') + '" style="margin-right: 8px;"></i>' + message;
         document.body.appendChild(notification);
-        setTimeout(function() { notification.remove(); }, 3000);
+        setTimeout(function() { 
+            notification.style.opacity = '0';
+            notification.style.transition = 'opacity 0.3s ease';
+            setTimeout(function() { notification.remove(); }, 300);
+        }, 3000);
     }
 }
 
