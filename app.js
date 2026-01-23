@@ -1196,6 +1196,13 @@ class TelemetryAnalysisApp {
                 if (colName) columnsToKeep.push(colName);
             }
             
+            // Always include standard column names (for converted units)
+            var standardColumns = ['Time', 'Distance', 'Speed', 'Ground Speed', 'Throttle', 'Brake', 'Gear', 'Steered Angle', 
+                                   'Corrected Distance', 'Lap Distance', 'Heading', 'Elapsed Time', 'Lap Time'];
+            standardColumns.forEach(function(col) {
+                if (columnsToKeep.indexOf(col) === -1) columnsToKeep.push(col);
+            });
+            
             var filterColumns = function(data) {
                 return data.map(function(row) {
                     var filtered = {};
