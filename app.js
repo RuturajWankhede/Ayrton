@@ -1912,6 +1912,164 @@ class TelemetryAnalysisApp {
             document.getElementById('track-map').innerHTML = '<p class="text-gray-400 text-center py-20">No track data</p>'; 
             return; 
         }
+        
+        // Pre-built track maps for iRacing circuits
+        var TRACK_MAPS = {
+            "miami": {
+                name: "Miami International Autodrome",
+                variants: ["miami", "miami gp", "miami\\gp", "miami international"],
+                length: 5412,
+                points: [
+                    {x: 850, y: 500, distPct: 0}, {x: 980, y: 480, distPct: 6}, {x: 990, y: 450, distPct: 8},
+                    {x: 980, y: 400, distPct: 10}, {x: 950, y: 360, distPct: 12}, {x: 850, y: 330, distPct: 16},
+                    {x: 750, y: 300, distPct: 20}, {x: 650, y: 270, distPct: 24}, {x: 550, y: 300, distPct: 28},
+                    {x: 450, y: 260, distPct: 32}, {x: 300, y: 230, distPct: 38}, {x: 150, y: 200, distPct: 44},
+                    {x: 70, y: 240, distPct: 48}, {x: 40, y: 330, distPct: 52}, {x: 70, y: 430, distPct: 56},
+                    {x: 140, y: 500, distPct: 60}, {x: 220, y: 530, distPct: 64}, {x: 310, y: 500, distPct: 68},
+                    {x: 400, y: 530, distPct: 72}, {x: 500, y: 530, distPct: 76}, {x: 600, y: 500, distPct: 80},
+                    {x: 700, y: 520, distPct: 84}, {x: 800, y: 505, distPct: 92}, {x: 850, y: 500, distPct: 100}
+                ]
+            },
+            "spa": {
+                name: "Circuit de Spa-Francorchamps",
+                variants: ["spa", "spa-francorchamps", "spa francorchamps"],
+                length: 7004,
+                points: [
+                    {x: 800, y: 200, distPct: 0}, {x: 890, y: 260, distPct: 3}, {x: 830, y: 300, distPct: 5},
+                    {x: 680, y: 240, distPct: 8}, {x: 590, y: 100, distPct: 11}, {x: 450, y: 30, distPct: 17},
+                    {x: 280, y: 70, distPct: 23}, {x: 270, y: 150, distPct: 27}, {x: 220, y: 250, distPct: 33},
+                    {x: 130, y: 400, distPct: 42}, {x: 90, y: 540, distPct: 52}, {x: 150, y: 670, distPct: 62},
+                    {x: 350, y: 760, distPct: 71}, {x: 600, y: 670, distPct: 82}, {x: 780, y: 450, distPct: 91},
+                    {x: 800, y: 260, distPct: 97}, {x: 800, y: 200, distPct: 100}
+                ]
+            },
+            "monza": {
+                name: "Autodromo Nazionale Monza",
+                variants: ["monza", "autodromo monza"],
+                length: 5793,
+                points: [
+                    {x: 900, y: 400, distPct: 0}, {x: 970, y: 350, distPct: 8}, {x: 900, y: 340, distPct: 12},
+                    {x: 700, y: 450, distPct: 25}, {x: 500, y: 470, distPct: 35}, {x: 480, y: 400, distPct: 39},
+                    {x: 440, y: 280, distPct: 48}, {x: 320, y: 270, distPct: 55}, {x: 150, y: 420, distPct: 66},
+                    {x: 80, y: 580, distPct: 76}, {x: 280, y: 620, distPct: 83}, {x: 520, y: 580, distPct: 89},
+                    {x: 750, y: 470, distPct: 95}, {x: 900, y: 400, distPct: 100}
+                ]
+            },
+            "silverstone": {
+                name: "Silverstone Circuit",
+                variants: ["silverstone", "silverstone gp"],
+                length: 5891,
+                points: [
+                    {x: 700, y: 300, distPct: 0}, {x: 880, y: 260, distPct: 8}, {x: 900, y: 150, distPct: 16},
+                    {x: 760, y: 130, distPct: 24}, {x: 600, y: 140, distPct: 32}, {x: 440, y: 90, distPct: 40},
+                    {x: 300, y: 180, distPct: 48}, {x: 200, y: 340, distPct: 56}, {x: 120, y: 500, distPct: 64},
+                    {x: 240, y: 600, distPct: 72}, {x: 440, y: 540, distPct: 80}, {x: 580, y: 400, distPct: 88},
+                    {x: 700, y: 300, distPct: 100}
+                ]
+            },
+            "watkins": {
+                name: "Watkins Glen International",
+                variants: ["watkins", "watkins glen", "the glen"],
+                length: 5430,
+                points: [
+                    {x: 800, y: 300, distPct: 0}, {x: 920, y: 220, distPct: 10}, {x: 820, y: 100, distPct: 20},
+                    {x: 600, y: 100, distPct: 30}, {x: 400, y: 180, distPct: 40}, {x: 200, y: 200, distPct: 50},
+                    {x: 180, y: 380, distPct: 60}, {x: 380, y: 500, distPct: 70}, {x: 620, y: 500, distPct: 80},
+                    {x: 780, y: 370, distPct: 90}, {x: 800, y: 300, distPct: 100}
+                ]
+            },
+            "roadamerica": {
+                name: "Road America",
+                variants: ["road america", "roadamerica", "elkhart"],
+                length: 6515,
+                points: [
+                    {x: 700, y: 200, distPct: 0}, {x: 880, y: 140, distPct: 8}, {x: 900, y: 280, distPct: 16},
+                    {x: 760, y: 400, distPct: 24}, {x: 580, y: 480, distPct: 32}, {x: 380, y: 540, distPct: 40},
+                    {x: 200, y: 460, distPct: 48}, {x: 140, y: 300, distPct: 56}, {x: 220, y: 160, distPct: 64},
+                    {x: 420, y: 100, distPct: 72}, {x: 600, y: 160, distPct: 80}, {x: 700, y: 200, distPct: 100}
+                ]
+            },
+            "sebring": {
+                name: "Sebring International Raceway",
+                variants: ["sebring"],
+                length: 6019,
+                points: [
+                    {x: 500, y: 100, distPct: 0}, {x: 700, y: 120, distPct: 10}, {x: 800, y: 280, distPct: 20},
+                    {x: 720, y: 460, distPct: 30}, {x: 500, y: 560, distPct: 40}, {x: 280, y: 480, distPct: 50},
+                    {x: 160, y: 300, distPct: 60}, {x: 240, y: 140, distPct: 70}, {x: 400, y: 90, distPct: 80},
+                    {x: 500, y: 100, distPct: 100}
+                ]
+            },
+            "daytona": {
+                name: "Daytona International Speedway",
+                variants: ["daytona", "daytona road"],
+                length: 5729,
+                points: [
+                    {x: 200, y: 400, distPct: 0}, {x: 450, y: 400, distPct: 12}, {x: 750, y: 400, distPct: 26},
+                    {x: 900, y: 320, distPct: 34}, {x: 800, y: 200, distPct: 42}, {x: 600, y: 200, distPct: 50},
+                    {x: 480, y: 320, distPct: 58}, {x: 300, y: 280, distPct: 66}, {x: 120, y: 350, distPct: 78},
+                    {x: 150, y: 420, distPct: 93}, {x: 200, y: 400, distPct: 100}
+                ]
+            },
+            "imola": {
+                name: "Autodromo Enzo e Dino Ferrari",
+                variants: ["imola", "enzo e dino"],
+                length: 4909,
+                points: [
+                    {x: 500, y: 600, distPct: 0}, {x: 700, y: 540, distPct: 10}, {x: 820, y: 400, distPct: 20},
+                    {x: 720, y: 260, distPct: 30}, {x: 520, y: 200, distPct: 40}, {x: 320, y: 200, distPct: 50},
+                    {x: 200, y: 340, distPct: 60}, {x: 200, y: 500, distPct: 70}, {x: 340, y: 590, distPct: 80},
+                    {x: 500, y: 600, distPct: 100}
+                ]
+            },
+            "nurburgring": {
+                name: "Nürburgring Grand Prix",
+                variants: ["nurburgring", "nürburgring", "nuerburgring"],
+                length: 5148,
+                points: [
+                    {x: 800, y: 500, distPct: 0}, {x: 950, y: 420, distPct: 10}, {x: 850, y: 300, distPct: 20},
+                    {x: 660, y: 290, distPct: 30}, {x: 500, y: 200, distPct: 40}, {x: 300, y: 200, distPct: 50},
+                    {x: 180, y: 340, distPct: 60}, {x: 280, y: 480, distPct: 70}, {x: 500, y: 540, distPct: 80},
+                    {x: 700, y: 510, distPct: 90}, {x: 800, y: 500, distPct: 100}
+                ]
+            }
+        };
+        
+        // Function to find matching track map
+        var findTrackMap = function(trackName) {
+            if (!trackName) return null;
+            var searchName = trackName.toLowerCase().replace(/[\\\/]/g, ' ').trim();
+            for (var key in TRACK_MAPS) {
+                if (searchName.indexOf(key) !== -1) return TRACK_MAPS[key];
+                var variants = TRACK_MAPS[key].variants;
+                for (var i = 0; i < variants.length; i++) {
+                    if (searchName.indexOf(variants[i]) !== -1 || variants[i].indexOf(searchName) !== -1) {
+                        return TRACK_MAPS[key];
+                    }
+                }
+            }
+            return null;
+        };
+        
+        // Function to interpolate position on pre-built track
+        var getPositionOnTrack = function(track, distPct) {
+            if (!track || !track.points || track.points.length < 2) return null;
+            distPct = distPct % 100;
+            if (distPct < 0) distPct += 100;
+            
+            var p1 = track.points[0], p2 = track.points[1];
+            for (var i = 0; i < track.points.length - 1; i++) {
+                if (track.points[i].distPct <= distPct && track.points[i + 1].distPct >= distPct) {
+                    p1 = track.points[i];
+                    p2 = track.points[i + 1];
+                    break;
+                }
+            }
+            var range = p2.distPct - p1.distPct;
+            var t = range > 0 ? (distPct - p1.distPct) / range : 0;
+            return { x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t };
+        };
+        
         var getValue = function(row, names, def) {
             for (var i = 0; i < names.length; i++) {
                 if (row[names[i]] !== undefined && row[names[i]] !== null && row[names[i]] !== '') {
@@ -1928,6 +2086,7 @@ class TelemetryAnalysisApp {
         var latNames = ['GPS Latitude', 'Latitude', 'Lat'];
         var lonNames = ['GPS Longitude', 'Longitude', 'Lon'];
         var distNames = ['Distance', 'Dist', 'Lap Distance', 'LapDist', 'Corrected Distance'];
+        var distPctNames = ['LapDistPct', 'Lap Distance Pct', 'DistPct'];
         var headingNames = ['Heading', 'Heading[°]', 'Car Heading', 'Yaw'];
         var iRacingPosXNames = ['CarPosX', 'PosX', 'Car Pos X'];
         var iRacingPosZNames = ['CarPosZ', 'PosZ', 'Car Pos Z'];
@@ -1938,6 +2097,11 @@ class TelemetryAnalysisApp {
         var hasIRacingPos = getValue(sampleRow, iRacingPosXNames, null) !== null && getValue(sampleRow, iRacingPosZNames, null) !== null;
         var hasHeading = getValue(sampleRow, headingNames, null) !== null;
         var hasDistance = getValue(sampleRow, distNames, null) !== null;
+        var hasDistPct = getValue(sampleRow, distPctNames, null) !== null;
+        
+        // Check for pre-built track map
+        var trackName = document.getElementById('track-name').value || this.selectedTrack?.name || '';
+        var prebuiltTrack = findTrackMap(trackName);
         
         // Check if steering data is actually valid (not all zeros)
         var steeringSampleCount = 0;
@@ -1950,14 +2114,40 @@ class TelemetryAnalysisApp {
         var hasValidSteering = steeringNonZero > steeringSampleCount * 0.1; // At least 10% non-zero
         
         var positionSource = 'reconstructed';
-        if (hasGPS) positionSource = 'GPS';
-        else if (hasIRacingPos) positionSource = 'iRacing';
-        else if (hasHeading && hasDistance) positionSource = 'heading'; // Pi Toolbox iRacing
         
-        console.log('Track map source:', positionSource, '| hasHeading:', hasHeading, '| hasDistance:', hasDistance, '| hasValidSteering:', hasValidSteering);
+        // Priority: 1. Pre-built track map, 2. GPS, 3. iRacing coords, 4. Heading+Dist, 5. Reconstructed
+        if (prebuiltTrack && hasDistance) {
+            positionSource = 'prebuilt';
+        } else if (hasGPS) {
+            positionSource = 'GPS';
+        } else if (hasIRacingPos) {
+            positionSource = 'iRacing';
+        } else if (hasHeading && hasDistance) {
+            positionSource = 'heading';
+        }
+        
+        console.log('Track map source:', positionSource, '| prebuiltTrack:', prebuiltTrack?.name || 'none', '| hasHeading:', hasHeading, '| hasDistance:', hasDistance, '| hasValidSteering:', hasValidSteering);
         
         var buildTrack = function(data, source) {
             var positions = [];
+            
+            // Pre-built track map - use distance to plot on known track shape
+            if (source === 'prebuilt' && prebuiltTrack) {
+                var trackLength = prebuiltTrack.length || 5000;
+                for (var i = 0; i < data.length; i += sampleRate) {
+                    var row = data[i];
+                    var dist = getValue(row, distNames, 0);
+                    var speed = getValue(row, speedNames, 100);
+                    var distPct = (dist / trackLength) * 100;
+                    
+                    var pos = getPositionOnTrack(prebuiltTrack, distPct);
+                    if (pos) {
+                        positions.push({ x: pos.x, y: pos.y, speed: speed, heading: 0, distance: dist });
+                    }
+                }
+                return positions;
+            }
+            
             if (source === 'GPS') {
                 for (var i = 0; i < data.length; i += sampleRate) {
                     var row = data[i];
@@ -2052,7 +2242,7 @@ class TelemetryAnalysisApp {
         var currNorm = normalize(currTrack);
         var allTraces = [];
         var trackName = this.selectedTrack ? this.selectedTrack.name : 'Track';
-        var sourceLabel = positionSource === 'GPS' ? ' (GPS)' : positionSource === 'iRacing' ? ' (iRacing)' : positionSource === 'heading' ? ' (Heading)' : '';
+        var sourceLabel = positionSource === 'prebuilt' ? ' (' + (prebuiltTrack?.name || 'Track Map') + ')' : positionSource === 'GPS' ? ' (GPS)' : positionSource === 'iRacing' ? ' (iRacing)' : positionSource === 'heading' ? ' (Heading)' : '';
         var trackWidth = 0.03;
         var outerEdge = { x: [], y: [] };
         var innerEdge = { x: [], y: [] };
