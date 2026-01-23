@@ -354,7 +354,7 @@
                 </div>
                 
                 <!-- Session Info -->
-                <div class="grid grid-cols-3 gap-4 mb-6">
+                <div class="grid grid-cols-4 gap-4 mb-6">
                     <div>
                         <label class="metric-label text-[var(--text-muted)] block mb-2">Driver</label>
                         <input type="text" id="driver-name" placeholder="Enter driver name" class="w-full rounded">
@@ -367,6 +367,18 @@
                         <label class="metric-label text-[var(--text-muted)] block mb-2">Track Database</label>
                         <select id="track-select" class="w-full rounded">
                             <option value="">Select for accurate mapping...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="metric-label text-[var(--text-muted)] block mb-2">CSV Format</label>
+                        <select id="csv-format" class="w-full rounded">
+                            <option value="auto">Auto-Detect</option>
+                            <option value="motec">MoTeC i2 Export</option>
+                            <option value="pitoolbox">Pi Toolbox</option>
+                            <option value="aim">AiM RaceStudio</option>
+                            <option value="racebox">RaceBox</option>
+                            <option value="iracing">iRacing CSV</option>
+                            <option value="generic">Generic CSV</option>
                         </select>
                     </div>
                 </div>
