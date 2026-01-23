@@ -676,6 +676,7 @@ class TelemetryAnalysisApp {
                 gLat: { description: 'Lateral G-force', icon: 'fa-arrows-alt-h', category: 'G-Forces' },
                 gLong: { description: 'Longitudinal G-force', icon: 'fa-arrows-alt-v', category: 'G-Forces' },
                 gVert: { description: 'Vertical G-force', icon: 'fa-arrows-alt-v', category: 'G-Forces' },
+                heading: { description: 'Car heading/direction', icon: 'fa-compass', category: 'Position' },
                 yaw1: { description: 'Yaw sensor 1', icon: 'fa-sync', category: 'G-Forces' },
                 yaw2: { description: 'Yaw sensor 2', icon: 'fa-sync', category: 'G-Forces' },
                 tireTempFLI: { description: 'FL Tire Inner', icon: 'fa-temperature-high', category: 'Tire Temps' },
@@ -755,12 +756,12 @@ class TelemetryAnalysisApp {
         } else {
             var ruleVariants = {
                 time: ['Time', 'Elapsed Time', 'Session Time', 'time', 'TIME', 'elapsed', 'Elapsed', 'Lap Time', 'Running Lap Time'],
-                distance: ['Distance', 'Dist', 'LapDist', 'Lap Distance', 'distance', 'DISTANCE', 'Lap Dist'],
-                speed: ['Ground Speed', 'Speed', 'Drive Speed', 'Vehicle Speed', 'speed', 'SPEED', 'Velocity', 'Max Straight Speed'],
+                distance: ['Distance', 'Dist', 'LapDist', 'Lap Distance', 'distance', 'DISTANCE', 'Lap Dist', 'Corrected Distance'],
+                speed: ['Ground Speed', 'Speed', 'Drive Speed', 'Vehicle Speed', 'speed', 'SPEED', 'Velocity', 'Max Straight Speed', 'Speed_mph', 'Speed_ms', 'Ground Speed_ms'],
                 throttle: ['Throttle Pos', 'Throttle', 'TPS', 'throttle', 'THROTTLE', 'Throttle %', 'ThrottlePos', 'Error Throttle Pos'],
                 brake: ['Brake Pres Front', 'Brake Pressure', 'Brake', 'brake', 'BRAKE', 'BrakePressure', 'Brake Pres', 'Brake Pres Rear'],
                 gear: ['Gear', 'gear', 'GEAR', 'Gear Position', 'GearPos', 'Gear Pos Volts'],
-                steer: ['Steered Angle', 'Steering Angle', 'Steer', 'steer', 'STEER', 'SteerAngle', 'Steering', 'Wheel Slip'],
+                steer: ['Steered Angle', 'Steering Angle', 'Steer', 'steer', 'STEER', 'SteerAngle', 'Steering', 'Wheel Slip', 'Steering Wheel Angle'],
                 rpm: ['Engine RPM', 'RPM', 'rpm', 'EngineRPM', 'Engine Speed', 'Error Over RPM'],
                 engineTemp: ['Engine Temp', 'Water Temp', 'Coolant Temp', 'EngineTemp', 'WaterTemp', 'Error Engine Temp'],
                 oilTemp: ['Eng Oil Temp', 'Oil Temp', 'OilTemp', 'Error Oil Temp', 'Gbox Oil Temp', 'Diff Oil Temp'],
@@ -769,6 +770,7 @@ class TelemetryAnalysisApp {
                 gLong: ['G Force Long', 'Longitudinal G', 'G_Long', 'gLong', 'GLong', 'LongG', 'LongAccel', 'G Force Long Front', 'G Force Long Mid', 'Error Long G'],
                 gVert: ['G Force Vert', 'Vertical G', 'G_Vert', 'gVert', 'GVert'],
                 yaw: ['Gyro Yaw Velocity', 'Yaw Rate', 'Yaw', 'YawRate', 'yaw', 'G Lat Yaw 1 - velcro mount', 'G Lat Yaw 2 - rubber mount'],
+                heading: ['Heading', 'Heading[°]', 'Car Heading', 'Yaw Angle'],
                 tireTempFL: ['Tyre Temp FL Centre', 'Tyre Temp FL Inner', 'Tyre Temp FL Outer', 'Tire Temp FL', 'TireTempFL'],
                 tireTempFR: ['Tyre Temp FR Centre', 'Tyre Temp FR Center', 'Tyre Temp FR Inner', 'Tyre Temp FR Outer', 'Tire Temp FR'],
                 tireTempRL: ['Tyre Temp RL', 'Tire Temp RL'],
@@ -830,6 +832,7 @@ class TelemetryAnalysisApp {
         if (detected.optional.throttle && detected.optional.brake) detected.capabilities.push({ name: 'Driver Input Analysis', icon: 'fa-shoe-prints', color: 'blue' });
         if (detected.optional.gLat || detected.optional.gLong) detected.capabilities.push({ name: 'G-Force Analysis', icon: 'fa-circle-notch', color: 'purple' });
         if (detected.optional.gpsLat && detected.optional.gpsLon) detected.capabilities.push({ name: 'GPS Track Mapping', icon: 'fa-map-marked-alt', color: 'teal' });
+        if (detected.optional.heading) detected.capabilities.push({ name: 'Heading Track Mapping', icon: 'fa-compass', color: 'cyan' });
         
         this.detectedChannels = detected;
         this.displayChannelInfo(detected);
@@ -1911,13 +1914,14 @@ class TelemetryAnalysisApp {
             }
             return def;
         };
-        var speedNames = ['Ground Speed', 'Speed', 'Drive Speed'];
+        var speedNames = ['Ground Speed', 'Speed', 'Drive Speed', 'Speed_mph', 'Ground Speed_ms', 'Speed_ms'];
         var steerNames = ['Steered Angle', 'Steering Angle', 'Steer'];
         var gLatNames = ['G Force Lat', 'Lateral G'];
         var yawNames = ['Gyro Yaw Velocity', 'Yaw Rate'];
         var latNames = ['GPS Latitude', 'Latitude', 'Lat'];
         var lonNames = ['GPS Longitude', 'Longitude', 'Lon'];
-        var distNames = ['Distance', 'Dist', 'Lap Distance', 'LapDist'];
+        var distNames = ['Distance', 'Dist', 'Lap Distance', 'LapDist', 'Corrected Distance'];
+        var headingNames = ['Heading', 'Heading[°]', 'Car Heading', 'Yaw'];
         var iRacingPosXNames = ['CarPosX', 'PosX', 'Car Pos X'];
         var iRacingPosZNames = ['CarPosZ', 'PosZ', 'Car Pos Z'];
         var sampleRate = Math.max(1, Math.floor(this.referenceData.length / 500));
@@ -1925,10 +1929,25 @@ class TelemetryAnalysisApp {
         var sampleRow = this.referenceData[0];
         var hasGPS = getValue(sampleRow, latNames, null) !== null && getValue(sampleRow, lonNames, null) !== null;
         var hasIRacingPos = getValue(sampleRow, iRacingPosXNames, null) !== null && getValue(sampleRow, iRacingPosZNames, null) !== null;
+        var hasHeading = getValue(sampleRow, headingNames, null) !== null;
+        var hasDistance = getValue(sampleRow, distNames, null) !== null;
+        
+        // Check if steering data is actually valid (not all zeros)
+        var steeringSampleCount = 0;
+        var steeringNonZero = 0;
+        for (var i = 0; i < Math.min(100, this.referenceData.length); i++) {
+            var steer = getValue(this.referenceData[i], steerNames, 0);
+            steeringSampleCount++;
+            if (Math.abs(steer) > 0.1) steeringNonZero++;
+        }
+        var hasValidSteering = steeringNonZero > steeringSampleCount * 0.1; // At least 10% non-zero
         
         var positionSource = 'reconstructed';
         if (hasGPS) positionSource = 'GPS';
         else if (hasIRacingPos) positionSource = 'iRacing';
+        else if (hasHeading && hasDistance) positionSource = 'heading'; // Pi Toolbox iRacing
+        
+        console.log('Track map source:', positionSource, '| hasHeading:', hasHeading, '| hasDistance:', hasDistance, '| hasValidSteering:', hasValidSteering);
         
         var buildTrack = function(data, source) {
             var positions = [];
@@ -1950,7 +1969,30 @@ class TelemetryAnalysisApp {
                     var dist = getValue(row, distNames, 0);
                     if (posX !== null && posZ !== null) positions.push({ x: posX, y: posZ, speed: speed, heading: 0, distance: dist });
                 }
+            } else if (source === 'heading') {
+                // Pi Toolbox iRacing export: use Heading + Distance to reconstruct track
+                var x = 0, y = 0;
+                var lastDist = 0;
+                for (var i = 0; i < data.length; i += sampleRate) {
+                    var row = data[i];
+                    var headingDeg = getValue(row, headingNames, 0);
+                    var headingRad = headingDeg * (Math.PI / 180);
+                    var dist = getValue(row, distNames, 0);
+                    var speed = getValue(row, speedNames, 100);
+                    
+                    // Calculate position change based on distance delta and heading
+                    var deltaDist = dist - lastDist;
+                    if (deltaDist > 0 && deltaDist < 100) { // Sanity check
+                        x += deltaDist * Math.cos(headingRad);
+                        y += deltaDist * Math.sin(headingRad);
+                    }
+                    lastDist = dist;
+                    
+                    positions.push({ x: x, y: y, speed: speed, heading: headingRad, distance: dist });
+                }
+                return positions;
             } else {
+                // Fallback: reconstruct from steering/G-force/yaw
                 var x = 0, y = 0, heading = 0, dt = 0.01;
                 for (var i = 0; i < data.length; i += sampleRate) {
                     var row = data[i];
@@ -1971,6 +2013,7 @@ class TelemetryAnalysisApp {
                 }
                 return positions;
             }
+            // Calculate heading from position deltas for GPS/iRacing sources
             for (var i = 0; i < positions.length - 1; i++) {
                 var dx = positions[i + 1].x - positions[i].x;
                 var dy = positions[i + 1].y - positions[i].y;
@@ -2002,7 +2045,7 @@ class TelemetryAnalysisApp {
         var currNorm = normalize(currTrack);
         var allTraces = [];
         var trackName = this.selectedTrack ? this.selectedTrack.name : 'Track';
-        var sourceLabel = positionSource === 'GPS' ? ' (GPS)' : positionSource === 'iRacing' ? ' (iRacing)' : '';
+        var sourceLabel = positionSource === 'GPS' ? ' (GPS)' : positionSource === 'iRacing' ? ' (iRacing)' : positionSource === 'heading' ? ' (Heading)' : '';
         var trackWidth = 0.03;
         var outerEdge = { x: [], y: [] };
         var innerEdge = { x: [], y: [] };
@@ -2133,7 +2176,7 @@ class TelemetryAnalysisApp {
     getOverlayChannels() {
         var refColor = '#00d4aa', yourColor = '#ff6b9d';  // Cyan for reference, Magenta for comparison
         return {
-            speed: { names: ['Ground Speed', 'Speed', 'Drive Speed'], label: 'Speed', unit: 'km/h', color: { ref: refColor, curr: yourColor } },
+            speed: { names: ['Ground Speed', 'Speed', 'Drive Speed', 'Speed_mph', 'Speed_ms', 'Ground Speed_ms'], label: 'Speed', unit: 'km/h', color: { ref: refColor, curr: yourColor } },
             throttle: { names: ['Throttle Pos', 'Throttle', 'TPS'], label: 'Throttle', unit: '%', color: { ref: refColor, curr: yourColor } },
             brake: { names: ['Brake Pres Front', 'Brake Pressure', 'Brake'], label: 'Brake', unit: '%', color: { ref: refColor, curr: yourColor } },
             steering: { names: ['Steered Angle', 'Steering Angle', 'Steer'], label: 'Steering', unit: 'deg', color: { ref: refColor, curr: yourColor } },
@@ -2157,7 +2200,7 @@ class TelemetryAnalysisApp {
     generateTelemetryOverlays() {
         var self = this;
         if (!this.referenceData || !this.currentData) return;
-        var distNames = ['Distance', 'Dist', 'Lap Distance', 'LapDist'];
+        var distNames = ['Distance', 'Dist', 'Lap Distance', 'LapDist', 'Corrected Distance'];
         var channels = this.getOverlayChannels();
         var sampleRate = Math.max(1, Math.floor(this.referenceData.length / 500));
         var refData = this.referenceData.filter(function(_, i) { return i % sampleRate === 0; });
@@ -2281,7 +2324,7 @@ class TelemetryAnalysisApp {
         var self = this;
         var container = document.getElementById('custom-overlays-container');
         if (!container) return;
-        var distNames = ['Distance', 'Dist', 'Lap Distance', 'LapDist'];
+        var distNames = ['Distance', 'Dist', 'Lap Distance', 'LapDist', 'Corrected Distance'];
         var sampleRate = Math.max(1, Math.floor(this.referenceData.length / 500));
         var refData = this.referenceData.filter(function(_, i) { return i % sampleRate === 0; });
         var currData = this.currentData.filter(function(_, i) { return i % sampleRate === 0; });
