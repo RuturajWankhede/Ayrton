@@ -13,6 +13,11 @@ class TelemetryAnalysisApp {
         this.selectedTrack = null;
         this.webhookUrl = localStorage.getItem('n8n_webhook_url') || 'https://ruturajw.app.n8n.cloud';
         this.useLLMMapping = true;
+        // Session loader data
+        this.fullSessionData = null;
+        this.detectedLaps = [];
+        this.selectedRefLap = null;
+        this.selectedCompLap = null;
         this.init();
     }
     
@@ -208,6 +213,651 @@ class TelemetryAnalysisApp {
             document.getElementById('config-modal').classList.add('hidden');
             self.showNotification('Configuration saved!', 'success');
         });
+        
+        // Session loader event listeners
+        var sessionUpload = document.getElementById('session-upload');
+        var sessionFile = document.getElementById('session-file');
+        if (sessionUpload && sessionFile) {
+            sessionUpload.addEventListener('click', function() { sessionFile.click(); });
+            sessionUpload.addEventListener('dragover', function(e) { e.preventDefault(); sessionUpload.classList.add('border-blue-500', 'bg-blue-900/20'); });
+            sessionUpload.addEventListener('dragleave', function() { sessionUpload.classList.remove('border-blue-500', 'bg-blue-900/20'); });
+            sessionUpload.addEventListener('drop', function(e) {
+                e.preventDefault();
+                sessionUpload.classList.remove('border-blue-500', 'bg-blue-900/20');
+                if (e.dataTransfer.files.length > 0) self.handleSessionFile(e.dataTransfer.files[0]);
+            });
+            sessionFile.addEventListener('change', function(e) {
+                if (e.target.files.length > 0) self.handleSessionFile(e.target.files[0]);
+            });
+        }
+        
+        // Toggle session loader expand/collapse
+        var toggleBtn = document.getElementById('toggle-session-loader');
+        var sessionContent = document.getElementById('session-loader-content');
+        if (toggleBtn && sessionContent) {
+            toggleBtn.addEventListener('click', function() {
+                var isHidden = sessionContent.classList.contains('hidden');
+                sessionContent.classList.toggle('hidden');
+                toggleBtn.innerHTML = isHidden ? 
+                    '<i class="fas fa-chevron-up mr-1"></i> Collapse' : 
+                    '<i class="fas fa-chevron-down mr-1"></i> Expand';
+            });
+        }
+    }
+    
+    // =====================================================
+    // SESSION LOADER - Load full outing and select laps
+    // =====================================================
+    
+    handleSessionFile(file) {
+        var self = this;
+        if (!file.name.endsWith('.csv')) {
+            this.showNotification('Please upload a CSV file', 'error');
+            return;
+        }
+        
+        // Check file size - warn if very large
+        var fileSizeMB = file.size / (1024 * 1024);
+        if (fileSizeMB > 100) {
+            this.showNotification('Large file (' + fileSizeMB.toFixed(0) + 'MB) - processing may take a moment...', 'warning');
+        }
+        
+        document.getElementById('session-upload').innerHTML = 
+            '<i class="fas fa-spinner fa-spin text-4xl text-blue-400 mb-2"></i>' +
+            '<p>Loading session... <span id="load-progress">0%</span></p>' +
+            '<p class="text-xs text-gray-500">' + fileSizeMB.toFixed(1) + ' MB</p>';
+        
+        // For very large files, use chunked reading
+        if (fileSizeMB > 50) {
+            this.handleLargeSessionFile(file);
+            return;
+        }
+        
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                var text = e.target.result;
+                var format = self.detectCSVFormat(text);
+                console.log('Session format:', format);
+                
+                var parsedData;
+                switch(format) {
+                    case 'pitoolbox':
+                        parsedData = self.parsePiToolbox(text);
+                        break;
+                    case 'motec':
+                        parsedData = self.parseMoTeC(text);
+                        break;
+                    default:
+                        parsedData = self.parseGenericCSV(text);
+                }
+                
+                if (!parsedData || parsedData.length === 0) {
+                    self.showNotification('No data found in session file', 'error');
+                    self.resetSessionUpload();
+                    return;
+                }
+                
+                self.fullSessionData = parsedData;
+                self.detectLapsInSession();
+                self.showNotification('Session loaded: ' + self.detectedLaps.length + ' laps detected', 'success');
+                
+                // Update upload area to show success
+                document.getElementById('session-upload').innerHTML = 
+                    '<i class="fas fa-check-circle text-4xl text-green-400 mb-2"></i>' +
+                    '<p class="text-green-400 font-medium">' + file.name + '</p>' +
+                    '<p class="text-sm text-gray-400">' + self.detectedLaps.length + ' laps • ' + parsedData.length + ' data points</p>';
+                
+            } catch(err) {
+                console.error('Session parsing error:', err);
+                self.showNotification('Error parsing session: ' + err.message, 'error');
+                self.resetSessionUpload();
+            }
+        };
+        reader.onprogress = function(e) {
+            if (e.lengthComputable) {
+                var pct = Math.round((e.loaded / e.total) * 100);
+                var progressEl = document.getElementById('load-progress');
+                if (progressEl) progressEl.textContent = pct + '%';
+            }
+        };
+        reader.onerror = function() { 
+            self.showNotification('Error reading file', 'error'); 
+            self.resetSessionUpload();
+        };
+        reader.readAsText(file);
+    }
+    
+    handleLargeSessionFile(file) {
+        var self = this;
+        var CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks
+        var offset = 0;
+        var lineBuffer = '';
+        var parsedRows = [];
+        var headers = null;
+        var channelData = {};
+        var isPiToolbox = false;
+        var currentChannel = null;
+        var channelBlocks = [];
+        
+        // Key channels we need for lap detection (minimal set)
+        var essentialChannels = ['time', 'lap distance', 'lapdist', 'speed', 'elapsed time', 'elapsed lap time', 'distance'];
+        
+        function shouldKeepChannel(channelName) {
+            var lower = channelName.toLowerCase();
+            // Keep essential channels plus a few useful ones
+            var keepPatterns = ['time', 'distance', 'speed', 'throttle', 'brake', 'gear', 'heading', 'steer', 'lap'];
+            return keepPatterns.some(function(p) { return lower.indexOf(p) !== -1; });
+        }
+        
+        function processChunk() {
+            var slice = file.slice(offset, offset + CHUNK_SIZE);
+            var reader = new FileReader();
+            
+            reader.onload = function(e) {
+                var chunk = e.target.result;
+                lineBuffer += chunk;
+                
+                // Update progress
+                var pct = Math.round((offset / file.size) * 100);
+                var progressEl = document.getElementById('load-progress');
+                if (progressEl) progressEl.textContent = pct + '% (parsing...)';
+                
+                // Check if Pi Toolbox format on first chunk
+                if (offset === 0 && lineBuffer.indexOf('PiToolboxVersionedASCIIDataSet') !== -1) {
+                    isPiToolbox = true;
+                }
+                
+                offset += CHUNK_SIZE;
+                
+                if (offset < file.size) {
+                    // More chunks to process
+                    setTimeout(processChunk, 10); // Small delay to not block UI
+                } else {
+                    // Done reading, now parse
+                    finalizeParsing();
+                }
+            };
+            
+            reader.onerror = function() {
+                self.showNotification('Error reading file chunk', 'error');
+                self.resetSessionUpload();
+            };
+            
+            reader.readAsText(slice);
+        }
+        
+        function finalizeParsing() {
+            var progressEl = document.getElementById('load-progress');
+            if (progressEl) progressEl.textContent = 'Processing data...';
+            
+            try {
+                var parsedData;
+                if (isPiToolbox) {
+                    parsedData = self.parsePiToolboxLargeFile(lineBuffer, shouldKeepChannel);
+                } else {
+                    parsedData = self.parseGenericCSVLarge(lineBuffer, shouldKeepChannel);
+                }
+                
+                lineBuffer = ''; // Free memory
+                
+                if (!parsedData || parsedData.length === 0) {
+                    self.showNotification('No data found in session file', 'error');
+                    self.resetSessionUpload();
+                    return;
+                }
+                
+                self.fullSessionData = parsedData;
+                self.detectLapsInSession();
+                
+                var fileSizeMB = file.size / (1024 * 1024);
+                self.showNotification('Session loaded: ' + self.detectedLaps.length + ' laps detected', 'success');
+                
+                document.getElementById('session-upload').innerHTML = 
+                    '<i class="fas fa-check-circle text-4xl text-green-400 mb-2"></i>' +
+                    '<p class="text-green-400 font-medium">' + file.name + '</p>' +
+                    '<p class="text-sm text-gray-400">' + self.detectedLaps.length + ' laps • ' + parsedData.length.toLocaleString() + ' points • ' + fileSizeMB.toFixed(0) + 'MB</p>';
+                    
+            } catch(err) {
+                console.error('Large file parsing error:', err);
+                self.showNotification('Error parsing large file: ' + err.message, 'error');
+                self.resetSessionUpload();
+            }
+        }
+        
+        processChunk();
+    }
+    
+    parsePiToolboxLargeFile(text, channelFilter) {
+        // Optimized Pi Toolbox parser for large files
+        // Only keeps essential channels to reduce memory usage
+        var lines = text.split(/\r?\n/);
+        var channelBlocks = [];
+        var currentBlock = null;
+        var metadata = {};
+        
+        console.log('Parsing large Pi Toolbox file:', lines.length, 'lines');
+        
+        // First pass: identify channel blocks
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line) continue;
+            
+            if (line === '{ChannelBlock}') {
+                currentBlock = { headerLine: i + 1, dataStart: i + 2, data: [], channelName: '' };
+                continue;
+            }
+            
+            if (currentBlock && currentBlock.data.length === 0) {
+                // This is the header line
+                var parts = line.split('\t');
+                currentBlock.channelName = parts[1] || '';
+                
+                // Only keep channels that pass the filter
+                if (channelFilter && !channelFilter(currentBlock.channelName)) {
+                    currentBlock = null;
+                    continue;
+                }
+            }
+            
+            if (currentBlock) {
+                if (line.startsWith('{')) {
+                    channelBlocks.push(currentBlock);
+                    currentBlock = null;
+                } else {
+                    currentBlock.data.push(line);
+                }
+            }
+        }
+        
+        if (currentBlock && currentBlock.data.length > 0) {
+            channelBlocks.push(currentBlock);
+        }
+        
+        console.log('Found', channelBlocks.length, 'channel blocks to merge');
+        
+        // Merge channels by time
+        var mergedData = {};
+        channelBlocks.forEach(function(block) {
+            block.data.forEach(function(line) {
+                var parts = line.split('\t');
+                var time = parts[0];
+                var value = parts[1];
+                if (!mergedData[time]) mergedData[time] = { Time: parseFloat(time) };
+                mergedData[time][block.channelName] = parseFloat(value);
+            });
+        });
+        
+        // Convert to array and sort by time
+        var result = Object.values(mergedData).sort(function(a, b) { return a.Time - b.Time; });
+        console.log('Merged into', result.length, 'data points');
+        
+        return result;
+    }
+    
+    parseGenericCSVLarge(text, channelFilter) {
+        // Optimized generic CSV parser for large files
+        var lines = text.split(/\r?\n/);
+        var headers = null;
+        var keepIndices = [];
+        var result = [];
+        
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line) continue;
+            
+            var parts = line.split(',');
+            
+            if (!headers) {
+                headers = parts;
+                // Determine which columns to keep
+                for (var j = 0; j < headers.length; j++) {
+                    if (!channelFilter || channelFilter(headers[j])) {
+                        keepIndices.push(j);
+                    }
+                }
+                continue;
+            }
+            
+            var row = {};
+            keepIndices.forEach(function(idx) {
+                row[headers[idx]] = parts[idx];
+            });
+            result.push(row);
+        }
+        
+        return result;
+    }
+    
+    resetSessionUpload() {
+        document.getElementById('session-upload').innerHTML = 
+            '<i class="fas fa-folder-open text-4xl text-blue-400 mb-2"></i>' +
+            '<p>Drop full session CSV here</p>' +
+            '<p class="text-sm text-gray-500">or click to browse</p>';
+    }
+    
+    detectLapsInSession() {
+        var self = this;
+        var data = this.fullSessionData;
+        if (!data || data.length === 0) return;
+        
+        this.detectedLaps = [];
+        
+        // Find the lap distance channel
+        var distChannel = null;
+        var lapTimeChannel = null;
+        var elapsedTimeChannel = null;
+        var speedChannel = null;
+        
+        var sampleRow = data[0];
+        var columns = Object.keys(sampleRow);
+        
+        // Find key channels
+        columns.forEach(function(col) {
+            var colLower = col.toLowerCase();
+            if (!distChannel && (colLower.indexOf('lap dist') !== -1 || colLower.indexOf('lapdist') !== -1 || colLower === 'lap distance[m]')) {
+                distChannel = col;
+            }
+            if (!lapTimeChannel && (colLower.indexOf('elapsed lap') !== -1 || colLower.indexOf('laptime') !== -1 || colLower === 'elapsed lap time[s]')) {
+                lapTimeChannel = col;
+            }
+            if (!elapsedTimeChannel && (colLower.indexOf('elapsed time') !== -1 || colLower === 'time' || colLower === 'elapsed time[s]')) {
+                elapsedTimeChannel = col;
+            }
+            if (!speedChannel && (colLower.indexOf('speed') !== -1 && colLower.indexOf('corrected') === -1)) {
+                speedChannel = col;
+            }
+        });
+        
+        // Fallbacks
+        if (!distChannel) distChannel = columns.find(function(c) { return c.toLowerCase().indexOf('distance') !== -1; });
+        if (!elapsedTimeChannel) elapsedTimeChannel = columns.find(function(c) { return c.toLowerCase() === 'time'; });
+        if (!speedChannel) speedChannel = columns.find(function(c) { return c.toLowerCase().indexOf('speed') !== -1; });
+        
+        console.log('Lap detection channels:', { distChannel: distChannel, lapTimeChannel: lapTimeChannel, elapsedTimeChannel: elapsedTimeChannel, speedChannel: speedChannel });
+        
+        if (!distChannel) {
+            this.showNotification('Cannot detect laps: no distance channel found', 'error');
+            return;
+        }
+        
+        // Detect lap boundaries by looking for distance resets
+        var lapStartIndices = [0];
+        var lastDist = parseFloat(data[0][distChannel]) || 0;
+        var trackLength = 0;
+        
+        for (var i = 1; i < data.length; i++) {
+            var dist = parseFloat(data[i][distChannel]) || 0;
+            
+            // Track maximum distance for track length estimation
+            if (dist > trackLength) trackLength = dist;
+            
+            // Detect lap boundary: distance drops significantly (more than 50% of track)
+            if (lastDist > 1000 && dist < lastDist * 0.5) {
+                lapStartIndices.push(i);
+            }
+            lastDist = dist;
+        }
+        
+        // Add end index
+        lapStartIndices.push(data.length);
+        
+        console.log('Detected ' + (lapStartIndices.length - 1) + ' laps, track length ~' + Math.round(trackLength) + 'm');
+        
+        // Build lap objects with statistics
+        for (var lapNum = 0; lapNum < lapStartIndices.length - 1; lapNum++) {
+            var startIdx = lapStartIndices[lapNum];
+            var endIdx = lapStartIndices[lapNum + 1];
+            var lapData = data.slice(startIdx, endIdx);
+            
+            if (lapData.length < 50) continue; // Skip very short laps (out/in laps)
+            
+            // Calculate lap statistics
+            var lapTime = null;
+            var minSpeed = Infinity, maxSpeed = 0, avgSpeed = 0, speedSum = 0, speedCount = 0;
+            var startTime = null, endTime = null;
+            var maxDist = 0;
+            
+            for (var j = 0; j < lapData.length; j++) {
+                var row = lapData[j];
+                
+                // Speed stats
+                if (speedChannel) {
+                    var spd = parseFloat(row[speedChannel]) || 0;
+                    if (spd > 5) { // Ignore very low speeds
+                        if (spd < minSpeed) minSpeed = spd;
+                        if (spd > maxSpeed) maxSpeed = spd;
+                        speedSum += spd;
+                        speedCount++;
+                    }
+                }
+                
+                // Time tracking
+                if (elapsedTimeChannel) {
+                    var t = parseFloat(row[elapsedTimeChannel]) || 0;
+                    if (j === 0) startTime = t;
+                    if (j === lapData.length - 1) endTime = t;
+                }
+                
+                // Distance tracking
+                var d = parseFloat(row[distChannel]) || 0;
+                if (d > maxDist) maxDist = d;
+            }
+            
+            // Calculate lap time
+            if (lapTimeChannel && lapData.length > 0) {
+                // Use elapsed lap time from last data point
+                var lastLapTime = parseFloat(lapData[lapData.length - 1][lapTimeChannel]) || 0;
+                if (lastLapTime > 10 && lastLapTime < 600) { // Reasonable lap time (10s - 10min)
+                    lapTime = lastLapTime;
+                }
+            }
+            
+            if (!lapTime && startTime !== null && endTime !== null) {
+                lapTime = endTime - startTime;
+            }
+            
+            avgSpeed = speedCount > 0 ? speedSum / speedCount : 0;
+            
+            // Determine if this is a complete lap
+            var isComplete = maxDist > trackLength * 0.9;
+            
+            this.detectedLaps.push({
+                lapNumber: this.detectedLaps.length + 1,
+                startIndex: startIdx,
+                endIndex: endIdx,
+                dataPoints: lapData.length,
+                lapTime: lapTime,
+                lapTimeFormatted: lapTime ? this.formatLapTime(lapTime) : '--:--.---',
+                minSpeed: minSpeed === Infinity ? 0 : minSpeed,
+                maxSpeed: maxSpeed,
+                avgSpeed: avgSpeed,
+                distance: maxDist,
+                isComplete: isComplete,
+                selected: false
+            });
+        }
+        
+        // Sort by lap time (fastest first) for reference
+        var sortedByTime = this.detectedLaps.slice().sort(function(a, b) {
+            if (!a.lapTime) return 1;
+            if (!b.lapTime) return -1;
+            return a.lapTime - b.lapTime;
+        });
+        
+        // Mark fastest lap
+        if (sortedByTime.length > 0 && sortedByTime[0].lapTime) {
+            var fastestIdx = this.detectedLaps.findIndex(function(l) { return l === sortedByTime[0]; });
+            if (fastestIdx !== -1) this.detectedLaps[fastestIdx].isFastest = true;
+        }
+        
+        this.renderLapSelector();
+    }
+    
+    formatLapTime(seconds) {
+        if (!seconds || isNaN(seconds)) return '--:--.---';
+        var mins = Math.floor(seconds / 60);
+        var secs = seconds % 60;
+        return mins + ':' + (secs < 10 ? '0' : '') + secs.toFixed(3);
+    }
+    
+    renderLapSelector() {
+        var self = this;
+        var container = document.getElementById('lap-selector-container');
+        if (!container) return;
+        
+        if (this.detectedLaps.length === 0) {
+            container.innerHTML = '<p class="text-gray-400 text-center py-8">No laps detected. Upload a session file above.</p>';
+            return;
+        }
+        
+        var html = '<div class="mb-4 flex items-center justify-between">';
+        html += '<div class="text-sm text-gray-400">' + this.detectedLaps.length + ' laps detected</div>';
+        html += '<div class="flex gap-2">';
+        html += '<button id="auto-select-best" class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm">Auto-select Best</button>';
+        html += '<button id="clear-selection" class="px-3 py-1 bg-gray-600 hover:bg-gray-700 rounded text-sm">Clear</button>';
+        html += '</div></div>';
+        
+        html += '<div class="overflow-x-auto">';
+        html += '<table class="w-full text-sm">';
+        html += '<thead class="bg-gray-700">';
+        html += '<tr>';
+        html += '<th class="px-3 py-2 text-left">Lap</th>';
+        html += '<th class="px-3 py-2 text-left">Time</th>';
+        html += '<th class="px-3 py-2 text-center">Min Speed</th>';
+        html += '<th class="px-3 py-2 text-center">Max Speed</th>';
+        html += '<th class="px-3 py-2 text-center">Avg Speed</th>';
+        html += '<th class="px-3 py-2 text-center">Points</th>';
+        html += '<th class="px-3 py-2 text-center">Reference</th>';
+        html += '<th class="px-3 py-2 text-center">Comparison</th>';
+        html += '</tr></thead>';
+        html += '<tbody>';
+        
+        this.detectedLaps.forEach(function(lap, idx) {
+            var rowClass = lap.isFastest ? 'bg-green-900/30' : (lap.isComplete ? '' : 'bg-yellow-900/20 opacity-60');
+            var timeClass = lap.isFastest ? 'text-green-400 font-bold' : '';
+            
+            html += '<tr class="border-b border-gray-700 hover:bg-gray-700/50 ' + rowClass + '">';
+            html += '<td class="px-3 py-2">';
+            html += '<span class="font-mono">' + lap.lapNumber + '</span>';
+            if (lap.isFastest) html += ' <span class="text-green-400 text-xs">★ FASTEST</span>';
+            if (!lap.isComplete) html += ' <span class="text-yellow-400 text-xs">(incomplete)</span>';
+            html += '</td>';
+            html += '<td class="px-3 py-2 font-mono ' + timeClass + '">' + lap.lapTimeFormatted + '</td>';
+            html += '<td class="px-3 py-2 text-center font-mono">' + Math.round(lap.minSpeed) + '</td>';
+            html += '<td class="px-3 py-2 text-center font-mono">' + Math.round(lap.maxSpeed) + '</td>';
+            html += '<td class="px-3 py-2 text-center font-mono">' + Math.round(lap.avgSpeed) + '</td>';
+            html += '<td class="px-3 py-2 text-center text-gray-400">' + lap.dataPoints + '</td>';
+            html += '<td class="px-3 py-2 text-center">';
+            html += '<input type="radio" name="ref-lap" value="' + idx + '" class="ref-lap-radio w-4 h-4 accent-cyan-500" ' + (self.selectedRefLap === idx ? 'checked' : '') + '>';
+            html += '</td>';
+            html += '<td class="px-3 py-2 text-center">';
+            html += '<input type="radio" name="comp-lap" value="' + idx + '" class="comp-lap-radio w-4 h-4 accent-pink-500" ' + (self.selectedCompLap === idx ? 'checked' : '') + '>';
+            html += '</td>';
+            html += '</tr>';
+        });
+        
+        html += '</tbody></table></div>';
+        
+        html += '<div class="mt-4 flex items-center justify-between">';
+        html += '<div class="flex gap-4 text-sm">';
+        html += '<div><span class="inline-block w-3 h-3 bg-cyan-500 rounded mr-1"></span> Reference: <span id="ref-lap-display" class="font-mono">' + (this.selectedRefLap !== null ? 'Lap ' + this.detectedLaps[this.selectedRefLap].lapNumber : 'None') + '</span></div>';
+        html += '<div><span class="inline-block w-3 h-3 bg-pink-500 rounded mr-1"></span> Comparison: <span id="comp-lap-display" class="font-mono">' + (this.selectedCompLap !== null ? 'Lap ' + this.detectedLaps[this.selectedCompLap].lapNumber : 'None') + '</span></div>';
+        html += '</div>';
+        html += '<button id="load-selected-laps" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded font-medium disabled:opacity-50 disabled:cursor-not-allowed" ' + (this.selectedRefLap === null || this.selectedCompLap === null ? 'disabled' : '') + '>Load Selected Laps</button>';
+        html += '</div>';
+        
+        container.innerHTML = html;
+        
+        // Add event listeners
+        document.querySelectorAll('.ref-lap-radio').forEach(function(radio) {
+            radio.addEventListener('change', function(e) {
+                self.selectedRefLap = parseInt(e.target.value);
+                self.updateLapSelection();
+            });
+        });
+        
+        document.querySelectorAll('.comp-lap-radio').forEach(function(radio) {
+            radio.addEventListener('change', function(e) {
+                self.selectedCompLap = parseInt(e.target.value);
+                self.updateLapSelection();
+            });
+        });
+        
+        document.getElementById('auto-select-best').addEventListener('click', function() {
+            self.autoSelectBestLaps();
+        });
+        
+        document.getElementById('clear-selection').addEventListener('click', function() {
+            self.selectedRefLap = null;
+            self.selectedCompLap = null;
+            self.renderLapSelector();
+        });
+        
+        document.getElementById('load-selected-laps').addEventListener('click', function() {
+            self.loadSelectedLaps();
+        });
+    }
+    
+    updateLapSelection() {
+        var refDisplay = document.getElementById('ref-lap-display');
+        var compDisplay = document.getElementById('comp-lap-display');
+        var loadBtn = document.getElementById('load-selected-laps');
+        
+        if (refDisplay) {
+            refDisplay.textContent = this.selectedRefLap !== null ? 'Lap ' + this.detectedLaps[this.selectedRefLap].lapNumber : 'None';
+        }
+        if (compDisplay) {
+            compDisplay.textContent = this.selectedCompLap !== null ? 'Lap ' + this.detectedLaps[this.selectedCompLap].lapNumber : 'None';
+        }
+        if (loadBtn) {
+            loadBtn.disabled = this.selectedRefLap === null || this.selectedCompLap === null;
+        }
+    }
+    
+    autoSelectBestLaps() {
+        // Find fastest complete lap for reference
+        var completeLaps = this.detectedLaps.filter(function(l) { return l.isComplete && l.lapTime; });
+        if (completeLaps.length < 2) {
+            this.showNotification('Need at least 2 complete laps for auto-selection', 'error');
+            return;
+        }
+        
+        // Sort by time
+        completeLaps.sort(function(a, b) { return a.lapTime - b.lapTime; });
+        
+        // Fastest lap is reference, second fastest is comparison
+        this.selectedRefLap = this.detectedLaps.indexOf(completeLaps[0]);
+        this.selectedCompLap = this.detectedLaps.indexOf(completeLaps[1]);
+        
+        this.renderLapSelector();
+        this.showNotification('Auto-selected fastest lap (' + completeLaps[0].lapTimeFormatted + ') as reference', 'success');
+    }
+    
+    loadSelectedLaps() {
+        if (this.selectedRefLap === null || this.selectedCompLap === null) {
+            this.showNotification('Please select both reference and comparison laps', 'error');
+            return;
+        }
+        
+        var refLap = this.detectedLaps[this.selectedRefLap];
+        var compLap = this.detectedLaps[this.selectedCompLap];
+        
+        // Extract lap data from full session
+        this.referenceData = this.fullSessionData.slice(refLap.startIndex, refLap.endIndex);
+        this.currentData = this.fullSessionData.slice(compLap.startIndex, compLap.endIndex);
+        
+        // Update file info displays
+        this.displayFileInfo('ref', { name: 'Lap ' + refLap.lapNumber + ' (' + refLap.lapTimeFormatted + ')' });
+        this.displayFileInfo('curr', { name: 'Lap ' + compLap.lapNumber + ' (' + compLap.lapTimeFormatted + ')' });
+        
+        // Detect channels and update UI
+        this.detectChannels();
+        
+        this.showNotification('Loaded Lap ' + refLap.lapNumber + ' (ref) vs Lap ' + compLap.lapNumber + ' (comp)', 'success');
+        
+        // Switch to telemetry tab to show loaded data
+        this.switchTab('telemetry');
     }
     
     setupFileUpload(type) {
@@ -1919,15 +2569,94 @@ class TelemetryAnalysisApp {
                 name: "Miami International Autodrome",
                 variants: ["miami", "miami gp", "miami\\gp", "miami international"],
                 length: 5412,
+                // Miami GP - 19 corners, based on actual track layout
+                // Track runs roughly counterclockwise
                 points: [
-                    {x: 850, y: 500, distPct: 0}, {x: 980, y: 480, distPct: 6}, {x: 990, y: 450, distPct: 8},
-                    {x: 980, y: 400, distPct: 10}, {x: 950, y: 360, distPct: 12}, {x: 850, y: 330, distPct: 16},
-                    {x: 750, y: 300, distPct: 20}, {x: 650, y: 270, distPct: 24}, {x: 550, y: 300, distPct: 28},
-                    {x: 450, y: 260, distPct: 32}, {x: 300, y: 230, distPct: 38}, {x: 150, y: 200, distPct: 44},
-                    {x: 70, y: 240, distPct: 48}, {x: 40, y: 330, distPct: 52}, {x: 70, y: 430, distPct: 56},
-                    {x: 140, y: 500, distPct: 60}, {x: 220, y: 530, distPct: 64}, {x: 310, y: 500, distPct: 68},
-                    {x: 400, y: 530, distPct: 72}, {x: 500, y: 530, distPct: 76}, {x: 600, y: 500, distPct: 80},
-                    {x: 700, y: 520, distPct: 84}, {x: 800, y: 505, distPct: 92}, {x: 850, y: 500, distPct: 100}
+                    // Start/Finish straight (running left to right)
+                    {x: 50, y: 500, distPct: 0},
+                    {x: 150, y: 500, distPct: 3},
+                    {x: 300, y: 500, distPct: 6},
+                    {x: 450, y: 500, distPct: 9},
+                    {x: 600, y: 500, distPct: 12},
+                    // T1 - Hard right braking zone
+                    {x: 700, y: 495, distPct: 13},
+                    {x: 750, y: 480, distPct: 14},
+                    {x: 780, y: 450, distPct: 15},
+                    // T2 - Quick left
+                    {x: 790, y: 420, distPct: 16},
+                    {x: 780, y: 390, distPct: 17},
+                    // T3 - Right exit
+                    {x: 760, y: 360, distPct: 18},
+                    {x: 730, y: 340, distPct: 19},
+                    // T4 - Left kink
+                    {x: 690, y: 320, distPct: 20},
+                    {x: 650, y: 310, distPct: 21},
+                    // T5 - Right
+                    {x: 610, y: 310, distPct: 22},
+                    {x: 570, y: 320, distPct: 23},
+                    // T6 - Left
+                    {x: 530, y: 310, distPct: 24},
+                    {x: 490, y: 290, distPct: 25},
+                    // T7 - Tight right hairpin
+                    {x: 460, y: 260, distPct: 26},
+                    {x: 450, y: 220, distPct: 27},
+                    {x: 460, y: 180, distPct: 28},
+                    {x: 490, y: 160, distPct: 29},
+                    // Back straight section
+                    {x: 530, y: 150, distPct: 30},
+                    {x: 580, y: 145, distPct: 31},
+                    {x: 640, y: 140, distPct: 32},
+                    {x: 700, y: 135, distPct: 33},
+                    // T8 - Left into chicane
+                    {x: 750, y: 130, distPct: 34},
+                    {x: 790, y: 140, distPct: 35},
+                    // T9 - Right
+                    {x: 820, y: 160, distPct: 36},
+                    {x: 835, y: 190, distPct: 37},
+                    // T10 - Left
+                    {x: 830, y: 220, distPct: 38},
+                    {x: 810, y: 245, distPct: 39},
+                    // T11 - Hard right (marina entry)
+                    {x: 780, y: 270, distPct: 40},
+                    {x: 750, y: 300, distPct: 41},
+                    {x: 730, y: 340, distPct: 42},
+                    {x: 720, y: 380, distPct: 43},
+                    // Marina section
+                    {x: 700, y: 420, distPct: 44},
+                    {x: 670, y: 450, distPct: 45},
+                    // T12 - Left
+                    {x: 630, y: 470, distPct: 46},
+                    {x: 580, y: 480, distPct: 47},
+                    // T13 - Right
+                    {x: 530, y: 475, distPct: 48},
+                    {x: 480, y: 460, distPct: 49},
+                    // T14 - Right
+                    {x: 440, y: 440, distPct: 50},
+                    {x: 410, y: 410, distPct: 51},
+                    // T15 - Left
+                    {x: 390, y: 380, distPct: 52},
+                    {x: 380, y: 350, distPct: 53},
+                    // Stadium section
+                    {x: 360, y: 320, distPct: 54},
+                    {x: 330, y: 300, distPct: 55},
+                    // T16 - Left
+                    {x: 290, y: 290, distPct: 56},
+                    {x: 250, y: 295, distPct: 57},
+                    // T17 - Right
+                    {x: 210, y: 310, distPct: 58},
+                    {x: 180, y: 340, distPct: 59},
+                    {x: 160, y: 380, distPct: 60},
+                    // Back chicane
+                    {x: 150, y: 420, distPct: 61},
+                    // T18 - Left
+                    {x: 130, y: 450, distPct: 62},
+                    {x: 100, y: 470, distPct: 63},
+                    // T19 - Right onto main straight
+                    {x: 70, y: 485, distPct: 64},
+                    {x: 50, y: 500, distPct: 65},
+                    // Note: The remaining 35% is the long pit straight
+                    // which wraps around to the start
+                    {x: 50, y: 500, distPct: 100}
                 ]
             },
             "spa": {
@@ -2115,15 +2844,15 @@ class TelemetryAnalysisApp {
         
         var positionSource = 'reconstructed';
         
-        // Priority: 1. Pre-built track map, 2. GPS, 3. iRacing coords, 4. Heading+Dist, 5. Reconstructed
-        if (prebuiltTrack && hasDistance) {
-            positionSource = 'prebuilt';
-        } else if (hasGPS) {
+        // Priority: 1. GPS, 2. iRacing coords, 3. Heading+Dist (best for iRacing via Pi Toolbox), 4. Pre-built map, 5. Reconstructed
+        if (hasGPS) {
             positionSource = 'GPS';
         } else if (hasIRacingPos) {
             positionSource = 'iRacing';
         } else if (hasHeading && hasDistance) {
-            positionSource = 'heading';
+            positionSource = 'heading'; // Best for Pi Toolbox iRacing - uses actual telemetry
+        } else if (prebuiltTrack && hasDistance) {
+            positionSource = 'prebuilt'; // Fallback when no heading available
         }
         
         console.log('Track map source:', positionSource, '| prebuiltTrack:', prebuiltTrack?.name || 'none', '| hasHeading:', hasHeading, '| hasDistance:', hasDistance, '| hasValidSteering:', hasValidSteering);
