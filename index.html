@@ -341,6 +341,50 @@
     </header>
 
     <main class="max-w-screen-2xl mx-auto px-6 py-6">
+        <!-- Session Loader Section -->
+        <div id="session-loader-section" class="mb-6">
+            <div class="panel rounded-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="font-display text-lg font-semibold text-white tracking-wide">SESSION LOADER</h2>
+                        <p class="text-sm text-[var(--text-secondary)]">Load a full session and select laps to compare</p>
+                    </div>
+                    <button id="toggle-session-loader" class="text-xs font-data px-3 py-1 rounded bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-white transition-colors">
+                        <i class="fas fa-chevron-down mr-1"></i> Expand
+                    </button>
+                </div>
+                
+                <div id="session-loader-content" class="hidden">
+                    <div class="grid md:grid-cols-3 gap-6 mb-6">
+                        <!-- Session Upload -->
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <i class="fas fa-folder-open text-blue-400"></i>
+                                <span class="metric-label text-blue-400">Full Session File</span>
+                            </div>
+                            <div id="session-upload" class="upload-zone rounded-lg p-6 text-center cursor-pointer border-2 border-dashed border-[var(--border-primary)] hover:border-blue-500 transition-colors">
+                                <i class="fas fa-file-csv text-3xl text-blue-400 mb-2"></i>
+                                <p class="text-sm text-[var(--text-secondary)]">Drop full session CSV here</p>
+                                <p class="text-xs text-[var(--text-muted)]">or click to browse</p>
+                                <input type="file" id="session-file" accept=".csv" class="hidden">
+                            </div>
+                        </div>
+                        
+                        <!-- Lap Selector -->
+                        <div class="md:col-span-2">
+                            <div class="flex items-center gap-2 mb-3">
+                                <i class="fas fa-flag-checkered text-green-400"></i>
+                                <span class="metric-label text-green-400">Lap Selection</span>
+                            </div>
+                            <div id="lap-selector-container" class="bg-[var(--bg-tertiary)] rounded-lg p-4 max-h-80 overflow-y-auto">
+                                <p class="text-gray-400 text-center py-8">Upload a session file to see available laps</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Upload Section -->
         <div id="upload-section" class="mb-6">
             <div class="panel rounded-lg p-6">
