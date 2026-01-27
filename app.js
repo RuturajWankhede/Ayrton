@@ -18,6 +18,7 @@ class TelemetryAnalysisApp {
         this.detectedLaps = [];
         this.selectedRefLap = null;
         this.selectedCompLap = null;
+        this.detectedCorners = [];
         this.init();
     }
     
@@ -945,6 +946,9 @@ class TelemetryAnalysisApp {
         // Detect channels and update UI
         this.detectChannels();
         
+        // Detect corners from telemetry (for chart markers)
+        this.detectCornersFromTelemetry();
+        
         this.showNotification('Loaded Lap ' + refLap.lapNumber + ' (ref) vs Lap ' + compLap.lapNumber + ' (comp)', 'success');
         
         // Switch to telemetry tab to show loaded data
@@ -1050,6 +1054,217 @@ class TelemetryAnalysisApp {
         }
         
         return normalized;
+    }
+    
+    // =====================================================
+    // LOCAL CORNER DETECTION - Analyzes telemetry directly
+    // =====================================================
+    
+    detectCornersFromTelemetry() {
+        if (!this.referenceData || this.referenceData.length < 100) {
+            console.log('Not enough data for corner detection');
+            return [];
+        }
+        
+        var self = this;
+        var data = this.referenceData;
+        
+        // Find channel names
+        var speedNames = ['Speed', 'Speed[kph]', 'Ground Speed', 'Ground Speed_ms', 'speed'];
+        var distNames = ['Distance', 'Lap Distance', 'distance', 'Dist'];
+        var brakeNames = ['Brake', 'Brake[%]', 'brake'];
+        var steerNames = ['Steered Angle', 'Steering Wheel Angle[°]', 'SteeringWheelAngle[°]', 'steer'];
+        var headingNames = ['Heading', 'Heading[°]', 'Yaw[°]'];
+        
+        function getValue(row, names, def) {
+            for (var i = 0; i < names.length; i++) {
+                if (row[names[i]] !== undefined && row[names[i]] !== null) {
+                    var val = parseFloat(row[names[i]]);
+                    if (!isNaN(val)) return val;
+                }
+            }
+            return def;
+        }
+        
+        // Sample data at reasonable rate
+        var sampleRate = Math.max(1, Math.floor(data.length / 2000));
+        var sampledData = [];
+        for (var i = 0; i < data.length; i += sampleRate) {
+            var row = data[i];
+            sampledData.push({
+                index: i,
+                distance: getValue(row, distNames, 0),
+                speed: getValue(row, speedNames, 0),
+                brake: getValue(row, brakeNames, 0),
+                steer: Math.abs(getValue(row, steerNames, 0)),
+                heading: getValue(row, headingNames, 0)
+            });
+        }
+        
+        console.log('Corner detection: sampled', sampledData.length, 'points from', data.length);
+        
+        // Find track length
+        var trackLength = sampledData[sampledData.length - 1].distance || 5000;
+        
+        // Get speed statistics for thresholds
+        var speeds = sampledData.map(function(d) { return d.speed; }).filter(function(s) { return s > 10; });
+        var avgSpeed = speeds.reduce(function(a, b) { return a + b; }, 0) / speeds.length;
+        var maxSpeed = Math.max.apply(null, speeds);
+        var minSpeed = Math.min.apply(null, speeds);
+        
+        // Speed threshold for corner detection: speed drop below this indicates a corner
+        var cornerSpeedThreshold = avgSpeed * 0.85; // 85% of average speed
+        var minCornerSpeed = minSpeed + (avgSpeed - minSpeed) * 0.3; // Don't detect "corners" at near-max speed
+        
+        console.log('Speed stats: avg=' + avgSpeed.toFixed(1) + ', max=' + maxSpeed.toFixed(1) + ', min=' + minSpeed.toFixed(1));
+        console.log('Corner threshold:', cornerSpeedThreshold.toFixed(1), 'km/h');
+        
+        // ALGORITHM 1: Find local speed minima (apex points)
+        var speedMinima = [];
+        var windowSize = Math.max(5, Math.floor(sampledData.length / 100)); // ~1% of lap
+        
+        for (var i = windowSize; i < sampledData.length - windowSize; i++) {
+            var current = sampledData[i];
+            
+            // Skip if speed is too high (not a real corner)
+            if (current.speed > cornerSpeedThreshold) continue;
+            
+            // Check if this is a local minimum
+            var isMinimum = true;
+            for (var j = i - windowSize; j <= i + windowSize; j++) {
+                if (j !== i && sampledData[j].speed < current.speed - 2) {
+                    isMinimum = false;
+                    break;
+                }
+            }
+            
+            if (isMinimum && current.speed < cornerSpeedThreshold) {
+                // Check for brake application before this point
+                var hadBraking = false;
+                for (var k = Math.max(0, i - windowSize * 2); k < i; k++) {
+                    if (sampledData[k].brake > 10) {
+                        hadBraking = true;
+                        break;
+                    }
+                }
+                
+                speedMinima.push({
+                    distance: current.distance,
+                    speed: current.speed,
+                    hadBraking: hadBraking,
+                    steer: current.steer,
+                    index: i
+                });
+            }
+        }
+        
+        console.log('Found', speedMinima.length, 'speed minima');
+        
+        // ALGORITHM 2: Cluster nearby minima (corners can have multiple local minima)
+        var minCornerSpacing = trackLength / 30; // At least 1/30th of track between corners
+        var corners = [];
+        var lastCornerDist = -minCornerSpacing;
+        
+        speedMinima.forEach(function(point) {
+            if (point.distance - lastCornerDist > minCornerSpacing) {
+                corners.push({
+                    distance: point.distance,
+                    speed: point.speed,
+                    type: 'corner',
+                    severity: point.hadBraking ? 'heavy' : 'light',
+                    apex: true
+                });
+                lastCornerDist = point.distance;
+            } else if (corners.length > 0) {
+                // Merge with previous corner - keep the slower speed point
+                var lastCorner = corners[corners.length - 1];
+                if (point.speed < lastCorner.speed) {
+                    lastCorner.distance = point.distance;
+                    lastCorner.speed = point.speed;
+                }
+            }
+        });
+        
+        console.log('Clustered into', corners.length, 'distinct corners');
+        
+        // ALGORITHM 3: If we found too few corners, lower threshold and try again
+        if (corners.length < 10) {
+            console.log('Too few corners detected, trying with lower threshold...');
+            var lowerThreshold = avgSpeed * 0.95;
+            var additionalCorners = [];
+            lastCornerDist = -minCornerSpacing;
+            
+            // Reset and use all existing corners
+            var existingDistances = corners.map(function(c) { return c.distance; });
+            
+            for (var i = windowSize; i < sampledData.length - windowSize; i++) {
+                var current = sampledData[i];
+                if (current.speed > lowerThreshold) continue;
+                
+                // Check if already detected
+                var alreadyDetected = existingDistances.some(function(d) {
+                    return Math.abs(d - current.distance) < minCornerSpacing;
+                });
+                if (alreadyDetected) continue;
+                
+                // Check if local minimum in smaller window
+                var smallWindow = Math.max(3, windowSize / 2);
+                var isMinimum = true;
+                for (var j = Math.max(0, i - smallWindow); j <= Math.min(sampledData.length - 1, i + smallWindow); j++) {
+                    if (j !== i && sampledData[j].speed < current.speed - 3) {
+                        isMinimum = false;
+                        break;
+                    }
+                }
+                
+                if (isMinimum && current.distance - lastCornerDist > minCornerSpacing) {
+                    additionalCorners.push({
+                        distance: current.distance,
+                        speed: current.speed,
+                        type: 'corner',
+                        severity: 'kink',
+                        apex: true
+                    });
+                    lastCornerDist = current.distance;
+                    existingDistances.push(current.distance);
+                }
+            }
+            
+            corners = corners.concat(additionalCorners);
+            corners.sort(function(a, b) { return a.distance - b.distance; });
+            console.log('After second pass:', corners.length, 'corners');
+        }
+        
+        // Number the corners
+        corners.forEach(function(corner, idx) {
+            corner.name = 'T' + (idx + 1);
+            corner.number = idx + 1;
+        });
+        
+        console.log('Final corner detection:', corners.length, 'corners');
+        corners.forEach(function(c) {
+            console.log('  ' + c.name + ': ' + c.distance.toFixed(0) + 'm @ ' + c.speed.toFixed(1) + 'km/h (' + c.severity + ')');
+        });
+        
+        // Store detected corners
+        this.detectedCorners = corners;
+        return corners;
+    }
+    
+    getCorners() {
+        // Return detected corners, or fall back to AI analysis results
+        if (this.detectedCorners && this.detectedCorners.length > 0) {
+            return this.detectedCorners;
+        }
+        
+        // Fall back to AI results if available
+        if (this.analysisResults && this.analysisResults.trackSegments) {
+            return this.analysisResults.trackSegments
+                .filter(function(s) { return s.type === 'corner'; })
+                .sort(function(a, b) { return (a.distance || 0) - (b.distance || 0); });
+        }
+        
+        return [];
     }
     
     setupFileUpload(type) {
@@ -2750,6 +2965,9 @@ class TelemetryAnalysisApp {
     }
     
     generateGraphs(analysis) {
+        // Detect corners from telemetry data (more reliable than AI)
+        this.detectCornersFromTelemetry();
+        
         this.generateTrackMap();
         this.generateTelemetryOverlays();
         this.generateSectorTimeChart(analysis);
@@ -3374,20 +3592,21 @@ class TelemetryAnalysisApp {
         // Add turn markers as vertical lines and annotations
         var shapes = [];
         var annotations = [];
-        if (this.analysisResults && this.analysisResults.trackSegments) {
+        
+        // Use locally detected corners (more reliable than AI truncated results)
+        var corners = this.getCorners();
+        if (corners && corners.length > 0) {
             var allY = refY.concat(currY);
             var yMin = Math.min.apply(null, allY);
             var yMax = Math.max.apply(null, allY);
             
-            // Sort corners by distance before numbering
-            var corners = this.analysisResults.trackSegments
-                .filter(function(s) { return s.type === 'corner'; })
-                .sort(function(a, b) { return (a.distance || 0) - (b.distance || 0); });
-            
-            corners.forEach(function(segment, idx) {
-                var dist = segment.distance || 0;
-                var hasIssues = segment.issues && segment.issues.length > 0;
-                var color = hasIssues ? 'rgba(239, 68, 68, 0.6)' : 'rgba(34, 197, 94, 0.4)';
+            corners.forEach(function(corner, idx) {
+                var dist = corner.distance || 0;
+                var hasIssues = corner.issues && corner.issues.length > 0;
+                var severityColor = corner.severity === 'heavy' ? 'rgba(239, 68, 68, 0.5)' : 
+                                   corner.severity === 'kink' ? 'rgba(251, 191, 36, 0.4)' : 
+                                   'rgba(34, 197, 94, 0.4)';
+                var color = hasIssues ? 'rgba(239, 68, 68, 0.6)' : severityColor;
                 
                 // Vertical line at turn location
                 shapes.push({
@@ -3401,7 +3620,7 @@ class TelemetryAnalysisApp {
                 annotations.push({
                     x: dist,
                     y: yMax,
-                    text: 'T' + (idx + 1),
+                    text: corner.name || ('T' + (idx + 1)),
                     showarrow: false,
                     font: { color: hasIssues ? '#ef4444' : '#22c55e', size: 9, family: 'Arial' },
                     yshift: 10
