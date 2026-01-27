@@ -262,22 +262,19 @@ class TelemetryAnalysisApp {
         console.log('File name:', file.name);
         console.log('File size:', fileSizeMB.toFixed(1), 'MB');
         
-        // Warn about very large files
-        if (fileSizeMB > 200) {
-            this.showNotification('File too large (' + fileSizeMB.toFixed(0) + 'MB). Please export fewer channels from Pi Toolbox (keep only: Time, Lap Distance, Speed, Throttle, Brake, Gear, Heading). Target <50MB.', 'error');
-            return;
-        }
-        
-        if (fileSizeMB > 100) {
-            this.showNotification('Large file (' + fileSizeMB.toFixed(0) + 'MB) - processing may take a while or fail. Consider exporting fewer channels.', 'warning');
-        }
-        
         document.getElementById('session-upload').innerHTML = 
             '<i class="fas fa-spinner fa-spin text-4xl text-blue-400 mb-2"></i>' +
             '<p>Loading session... <span id="load-progress">0%</span></p>' +
-            '<p class="text-xs text-gray-500">' + fileSizeMB.toFixed(1) + ' MB</p>';
+            '<p class="text-xs text-gray-500">' + fileSizeMB.toFixed(1) + ' MB - large files may take a while</p>';
         
-        // Always use standard FileReader
+        // For large files (>50MB), use chunked reading to avoid memory issues
+        if (fileSizeMB > 50) {
+            console.log('Using chunked file reader for large file');
+            this.handleLargeSessionFile(file);
+            return;
+        }
+        
+        // Standard FileReader for smaller files
         var reader = new FileReader();
         reader.onload = function(e) {
             try {
@@ -354,25 +351,22 @@ class TelemetryAnalysisApp {
     
     handleLargeSessionFile(file) {
         var self = this;
-        var CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks
+        var CHUNK_SIZE = 50 * 1024 * 1024; // 50MB chunks for faster reading
         var offset = 0;
         var lineBuffer = '';
-        var parsedRows = [];
-        var headers = null;
-        var channelData = {};
         var isPiToolbox = false;
-        var currentChannel = null;
-        var channelBlocks = [];
         
         // Key channels we need for lap detection (minimal set)
-        var essentialChannels = ['time', 'lap distance', 'lapdist', 'speed', 'elapsed time', 'elapsed lap time', 'distance'];
-        
         function shouldKeepChannel(channelName) {
             var lower = channelName.toLowerCase();
             // Keep essential channels plus a few useful ones
-            var keepPatterns = ['time', 'distance', 'speed', 'throttle', 'brake', 'gear', 'heading', 'steer', 'lap'];
+            var keepPatterns = ['time', 'distance', 'speed', 'throttle', 'brake', 'gear', 'heading', 'steer', 'lap', 'elapsed'];
             return keepPatterns.some(function(p) { return lower.indexOf(p) !== -1; });
         }
+        
+        console.log('=== LARGE FILE HANDLER ===');
+        console.log('File size:', (file.size / 1024 / 1024).toFixed(1), 'MB');
+        console.log('Chunk size:', (CHUNK_SIZE / 1024 / 1024), 'MB');
         
         function processChunk() {
             var slice = file.slice(offset, offset + CHUNK_SIZE);
@@ -383,13 +377,18 @@ class TelemetryAnalysisApp {
                 lineBuffer += chunk;
                 
                 // Update progress
-                var pct = Math.round((offset / file.size) * 100);
+                var pct = Math.round((Math.min(offset + CHUNK_SIZE, file.size) / file.size) * 100);
                 var progressEl = document.getElementById('load-progress');
-                if (progressEl) progressEl.textContent = pct + '% (parsing...)';
+                if (progressEl) progressEl.textContent = pct + '% loading...';
                 
                 // Check if Pi Toolbox format on first chunk
-                if (offset === 0 && lineBuffer.indexOf('PiToolboxVersionedASCIIDataSet') !== -1) {
-                    isPiToolbox = true;
+                if (offset === 0) {
+                    console.log('First chunk loaded, checking format...');
+                    console.log('First 200 chars:', lineBuffer.substring(0, 200));
+                    if (lineBuffer.indexOf('PiToolboxVersionedASCIIDataSet') !== -1) {
+                        isPiToolbox = true;
+                        console.log('Detected Pi Toolbox format');
+                    }
                 }
                 
                 offset += CHUNK_SIZE;
@@ -399,11 +398,13 @@ class TelemetryAnalysisApp {
                     setTimeout(processChunk, 10); // Small delay to not block UI
                 } else {
                     // Done reading, now parse
+                    console.log('All chunks loaded, total buffer size:', lineBuffer.length, 'chars');
                     finalizeParsing();
                 }
             };
             
             reader.onerror = function() {
+                console.error('Chunk read error:', reader.error);
                 self.showNotification('Error reading file chunk', 'error');
                 self.resetSessionUpload();
             };
@@ -415,30 +416,26 @@ class TelemetryAnalysisApp {
             var progressEl = document.getElementById('load-progress');
             if (progressEl) progressEl.textContent = 'Processing data...';
             
-            console.log('Finalizing parsing, isPiToolbox:', isPiToolbox);
+            console.log('=== FINALIZE PARSING ===');
+            console.log('isPiToolbox:', isPiToolbox);
             console.log('Buffer length:', lineBuffer.length, 'chars');
-            console.log('First 500 chars:', lineBuffer.substring(0, 500));
             
             try {
                 var parsedData;
                 if (isPiToolbox) {
-                    console.log('Using Pi Toolbox large file parser');
+                    console.log('Calling parsePiToolboxLargeFile with channel filter');
                     parsedData = self.parsePiToolboxLargeFile(lineBuffer, shouldKeepChannel);
                 } else {
-                    console.log('Using generic CSV large file parser');
+                    console.log('Calling parseGenericCSVLarge');
                     parsedData = self.parseGenericCSVLarge(lineBuffer, shouldKeepChannel);
                 }
                 
-                console.log('Parsed data length:', parsedData ? parsedData.length : 'null');
-                if (parsedData && parsedData.length > 0) {
-                    console.log('First row keys:', Object.keys(parsedData[0]));
-                    console.log('First row:', parsedData[0]);
-                }
+                console.log('Parser returned:', parsedData ? parsedData.length + ' rows' : 'null');
                 
                 lineBuffer = ''; // Free memory
                 
                 if (!parsedData || parsedData.length === 0) {
-                    self.showNotification('No data found in session file', 'error');
+                    self.showNotification('No data found in session file. Check console for details.', 'error');
                     self.resetSessionUpload();
                     return;
                 }
@@ -456,6 +453,7 @@ class TelemetryAnalysisApp {
                     
             } catch(err) {
                 console.error('Large file parsing error:', err);
+                console.error('Stack:', err.stack);
                 self.showNotification('Error parsing large file: ' + err.message, 'error');
                 self.resetSessionUpload();
             }
@@ -465,15 +463,20 @@ class TelemetryAnalysisApp {
     }
     
     parsePiToolboxLargeFile(text, channelFilter) {
-        // Optimized Pi Toolbox parser for large files
-        // Matches the logic of the working parsePiToolbox but with channel filtering
-        var lines = text.split(/\r?\n/);
+        console.log('=== parsePiToolboxLargeFile START ===');
+        
+        // Normalize line endings - handle Windows \r\n
+        text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        
+        var lines = text.split('\n');
         var channelBlocks = [];
         var currentBlock = null;
         var metadata = {};
         var inOuting = false;
+        var debugLineCount = 0;
         
-        console.log('Parsing large Pi Toolbox file:', lines.length, 'lines');
+        console.log('Total lines after split:', lines.length);
+        console.log('First 10 lines:', lines.slice(0, 10));
         
         // Parse the file structure
         for (var i = 0; i < lines.length; i++) {
@@ -482,13 +485,19 @@ class TelemetryAnalysisApp {
             // Skip empty lines
             if (!line) continue;
             
+            // Debug first few interesting lines
+            if (debugLineCount < 20 && (line.indexOf('{') !== -1 || line.indexOf('Time') === 0)) {
+                console.log('Line ' + i + ':', JSON.stringify(line));
+                debugLineCount++;
+            }
+            
             // Parse outing information
             if (line === '{OutingInformation}') {
                 inOuting = true;
                 continue;
             }
             
-            if (inOuting && line.startsWith('{')) {
+            if (inOuting && line.charAt(0) === '{') {
                 inOuting = false;
             }
             
@@ -500,8 +509,8 @@ class TelemetryAnalysisApp {
                 continue;
             }
             
-            // Detect channel block start
-            if (line === '{ChannelBlock}') {
+            // Detect channel block start - be more flexible with matching
+            if (line === '{ChannelBlock}' || line.indexOf('{ChannelBlock}') === 0) {
                 if (currentBlock && currentBlock.data.length > 0) {
                     channelBlocks.push(currentBlock);
                 }
@@ -517,10 +526,12 @@ class TelemetryAnalysisApp {
                     
                     // Apply filter - skip channels we don't need
                     if (channelFilter && !channelFilter(channelName)) {
+                        console.log('Skipping filtered channel:', channelName);
                         currentBlock = null; // Skip this block
                         continue;
                     }
                     
+                    console.log('Keeping channel:', channelName);
                     currentBlock.channelName = channelName;
                 }
                 continue;
@@ -544,8 +555,13 @@ class TelemetryAnalysisApp {
             channelBlocks.push(currentBlock);
         }
         
-        console.log('Pi Toolbox Large: Found', channelBlocks.length, 'channel blocks');
-        console.log('Channels:', channelBlocks.map(function(b) { return b.channelName; }));
+        console.log('Found', channelBlocks.length, 'channel blocks after filtering');
+        console.log('Channel names:', channelBlocks.map(function(b) { return b.channelName + ' (' + b.data.length + ' pts)'; }));
+        
+        if (channelBlocks.length === 0) {
+            console.error('No channel blocks found! Check file format.');
+            return [];
+        }
         
         // Use the standard merge function
         return this.mergeChannelBlocks(channelBlocks, metadata);
