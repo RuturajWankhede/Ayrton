@@ -958,19 +958,24 @@ class TelemetryAnalysisApp {
         var sampleRow = rawData[0];
         var columns = Object.keys(sampleRow);
         
-        var distChannel = null;
-        var timeChannel = null;
-        
-        // Look for distance channel - check multiple possible names
-        var distNames = ['Lap Distance', 'Lap Distance[m]', 'distance', 'Distance', 'Distance[m]'];
-        for (var i = 0; i < distNames.length; i++) {
-            if (sampleRow[distNames[i]] !== undefined) {
-                distChannel = distNames[i];
+        // Find the primary lap distance channel (resets each lap)
+        var lapDistChannel = null;
+        var lapDistNames = ['Lap Distance', 'Lap Distance[m]', 'LapDist[m]', 'LapDist'];
+        for (var i = 0; i < lapDistNames.length; i++) {
+            if (sampleRow[lapDistNames[i]] !== undefined) {
+                lapDistChannel = lapDistNames[i];
                 break;
             }
         }
         
-        // Look for time channel - check multiple possible names
+        // Find ALL distance-type channels that need normalization
+        var allDistChannels = columns.filter(function(col) {
+            var cl = col.toLowerCase();
+            return (cl.indexOf('distance') !== -1 || cl === 'dist') && cl.indexOf('lateral') === -1;
+        });
+        
+        // Find time channel
+        var timeChannel = null;
         var timeNames = ['Time', 'time', 'Elapsed Time', 'Elapsed Time[s]'];
         for (var i = 0; i < timeNames.length; i++) {
             if (sampleRow[timeNames[i]] !== undefined) {
@@ -979,30 +984,24 @@ class TelemetryAnalysisApp {
             }
         }
         
-        // Fallback: search by pattern
-        if (!distChannel) {
-            distChannel = columns.find(function(c) { 
-                var cl = c.toLowerCase();
-                return cl.indexOf('lap dist') !== -1 || (cl.indexOf('distance') !== -1 && cl.indexOf('lateral') === -1); 
-            });
-        }
-        if (!timeChannel) {
-            timeChannel = columns.find(function(c) { 
-                return c.toLowerCase() === 'time' || c === 'Time'; 
-            });
-        }
-        
         console.log('Normalizing lap data:');
-        console.log('  - Distance channel:', distChannel);
+        console.log('  - Lap Distance channel:', lapDistChannel);
+        console.log('  - All distance channels to normalize:', allDistChannels);
         console.log('  - Time channel:', timeChannel);
-        console.log('  - Sample row keys:', columns.slice(0, 10));
         
-        // Get starting values
-        var startDist = distChannel ? (parseFloat(rawData[0][distChannel]) || 0) : 0;
+        // Get starting values for lap distance (this is the canonical one that resets per lap)
+        var startLapDist = lapDistChannel ? (parseFloat(rawData[0][lapDistChannel]) || 0) : 0;
         var startTime = timeChannel ? (parseFloat(rawData[0][timeChannel]) || 0) : 0;
         
-        console.log('  - Start distance:', startDist);
+        // Get starting values for each distance channel
+        var startDistValues = {};
+        allDistChannels.forEach(function(ch) {
+            startDistValues[ch] = parseFloat(rawData[0][ch]) || 0;
+        });
+        
+        console.log('  - Start lap distance:', startLapDist);
         console.log('  - Start time:', startTime);
+        console.log('  - Start values for all dist channels:', startDistValues);
         
         // Create normalized copy of data
         var normalized = rawData.map(function(row) {
@@ -1013,14 +1012,21 @@ class TelemetryAnalysisApp {
                 newRow[col] = row[col];
             });
             
-            // Normalize distance to start from 0
-            if (distChannel && row[distChannel] !== undefined) {
-                var origDist = parseFloat(row[distChannel]) || 0;
-                var normalizedDist = origDist - startDist;
-                newRow[distChannel] = normalizedDist;
-                // Also set standardized 'distance' field for charts
-                newRow.distance = normalizedDist;
-                newRow['Lap Distance'] = normalizedDist;
+            // Normalize ALL distance channels
+            allDistChannels.forEach(function(distCh) {
+                if (row[distCh] !== undefined) {
+                    var origDist = parseFloat(row[distCh]) || 0;
+                    newRow[distCh] = origDist - startDistValues[distCh];
+                }
+            });
+            
+            // Also set standardized 'distance' field using lap distance
+            if (lapDistChannel && row[lapDistChannel] !== undefined) {
+                var normalizedLapDist = (parseFloat(row[lapDistChannel]) || 0) - startLapDist;
+                newRow.distance = normalizedLapDist;
+                newRow['Lap Distance'] = normalizedLapDist;
+                // Also update Distance field to match (for chart compatibility)
+                newRow['Distance'] = normalizedLapDist;
             }
             
             // Normalize time to start from 0
@@ -1028,7 +1034,6 @@ class TelemetryAnalysisApp {
                 var origTime = parseFloat(row[timeChannel]) || 0;
                 var normalizedTime = origTime - startTime;
                 newRow[timeChannel] = normalizedTime;
-                // Also set standardized 'time' field
                 newRow.time = normalizedTime;
                 newRow['Time'] = normalizedTime;
             }
@@ -1039,7 +1044,8 @@ class TelemetryAnalysisApp {
         // Log final range
         if (normalized.length > 0) {
             var lastRow = normalized[normalized.length - 1];
-            console.log('  - Normalized distance range: 0 to', lastRow.distance || lastRow[distChannel] || 'unknown');
+            console.log('  - Normalized lap distance range: 0 to', lastRow['Lap Distance'] || lastRow.distance || 'unknown');
+            console.log('  - Normalized Distance range: 0 to', lastRow['Distance'] || 'unknown');
             console.log('  - Normalized time range: 0 to', lastRow.time || lastRow[timeChannel] || 'unknown');
         }
         
