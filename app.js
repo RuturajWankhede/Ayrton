@@ -256,10 +256,20 @@ class TelemetryAnalysisApp {
             return;
         }
         
-        // Check file size - warn if very large
+        // Check file size
         var fileSizeMB = file.size / (1024 * 1024);
+        console.log('=== SESSION FILE UPLOAD ===');
+        console.log('File name:', file.name);
+        console.log('File size:', fileSizeMB.toFixed(1), 'MB');
+        
+        // Warn about very large files
+        if (fileSizeMB > 200) {
+            this.showNotification('File too large (' + fileSizeMB.toFixed(0) + 'MB). Please export fewer channels from Pi Toolbox (keep only: Time, Lap Distance, Speed, Throttle, Brake, Gear, Heading). Target <50MB.', 'error');
+            return;
+        }
+        
         if (fileSizeMB > 100) {
-            this.showNotification('Large file (' + fileSizeMB.toFixed(0) + 'MB) - processing may take a moment...', 'warning');
+            this.showNotification('Large file (' + fileSizeMB.toFixed(0) + 'MB) - processing may take a while or fail. Consider exporting fewer channels.', 'warning');
         }
         
         document.getElementById('session-upload').innerHTML = 
@@ -267,49 +277,62 @@ class TelemetryAnalysisApp {
             '<p>Loading session... <span id="load-progress">0%</span></p>' +
             '<p class="text-xs text-gray-500">' + fileSizeMB.toFixed(1) + ' MB</p>';
         
-        // For very large files, use chunked reading
-        if (fileSizeMB > 50) {
-            this.handleLargeSessionFile(file);
-            return;
-        }
-        
+        // Always use standard FileReader
         var reader = new FileReader();
         reader.onload = function(e) {
             try {
                 var text = e.target.result;
+                console.log('File loaded successfully');
+                console.log('Text length:', text.length, 'chars');
+                console.log('First 300 chars:', text.substring(0, 300));
+                
                 var format = self.detectCSVFormat(text);
-                console.log('Session format:', format);
+                console.log('Detected format:', format);
                 
                 var parsedData;
                 switch(format) {
                     case 'pitoolbox':
+                        console.log('Calling parsePiToolbox...');
                         parsedData = self.parsePiToolbox(text);
                         break;
                     case 'motec':
+                        console.log('Calling parseMoTeC...');
                         parsedData = self.parseMoTeC(text);
                         break;
                     default:
+                        console.log('Calling parseGenericCSV...');
                         parsedData = self.parseGenericCSV(text);
                 }
                 
+                console.log('Parser returned:', parsedData ? parsedData.length + ' rows' : 'null/undefined');
+                if (parsedData && parsedData.length > 0) {
+                    console.log('Sample row keys:', Object.keys(parsedData[0]));
+                    console.log('Sample row:', JSON.stringify(parsedData[0]).substring(0, 200));
+                }
+                
                 if (!parsedData || parsedData.length === 0) {
-                    self.showNotification('No data found in session file', 'error');
+                    console.error('PARSING FAILED - no data returned');
+                    self.showNotification('No data found in session file. Check browser console (F12) for details.', 'error');
                     self.resetSessionUpload();
                     return;
                 }
                 
                 self.fullSessionData = parsedData;
+                console.log('Starting lap detection...');
                 self.detectLapsInSession();
+                console.log('Laps detected:', self.detectedLaps.length);
+                
                 self.showNotification('Session loaded: ' + self.detectedLaps.length + ' laps detected', 'success');
                 
-                // Update upload area to show success
                 document.getElementById('session-upload').innerHTML = 
                     '<i class="fas fa-check-circle text-4xl text-green-400 mb-2"></i>' +
                     '<p class="text-green-400 font-medium">' + file.name + '</p>' +
-                    '<p class="text-sm text-gray-400">' + self.detectedLaps.length + ' laps • ' + parsedData.length + ' data points</p>';
+                    '<p class="text-sm text-gray-400">' + self.detectedLaps.length + ' laps • ' + parsedData.length.toLocaleString() + ' data points</p>';
                 
             } catch(err) {
-                console.error('Session parsing error:', err);
+                console.error('=== SESSION PARSING ERROR ===');
+                console.error('Error:', err.message);
+                console.error('Stack:', err.stack);
                 self.showNotification('Error parsing session: ' + err.message, 'error');
                 self.resetSessionUpload();
             }
@@ -322,6 +345,7 @@ class TelemetryAnalysisApp {
             }
         };
         reader.onerror = function() { 
+            console.error('FileReader error:', reader.error);
             self.showNotification('Error reading file', 'error'); 
             self.resetSessionUpload();
         };
@@ -391,12 +415,24 @@ class TelemetryAnalysisApp {
             var progressEl = document.getElementById('load-progress');
             if (progressEl) progressEl.textContent = 'Processing data...';
             
+            console.log('Finalizing parsing, isPiToolbox:', isPiToolbox);
+            console.log('Buffer length:', lineBuffer.length, 'chars');
+            console.log('First 500 chars:', lineBuffer.substring(0, 500));
+            
             try {
                 var parsedData;
                 if (isPiToolbox) {
+                    console.log('Using Pi Toolbox large file parser');
                     parsedData = self.parsePiToolboxLargeFile(lineBuffer, shouldKeepChannel);
                 } else {
+                    console.log('Using generic CSV large file parser');
                     parsedData = self.parseGenericCSVLarge(lineBuffer, shouldKeepChannel);
+                }
+                
+                console.log('Parsed data length:', parsedData ? parsedData.length : 'null');
+                if (parsedData && parsedData.length > 0) {
+                    console.log('First row keys:', Object.keys(parsedData[0]));
+                    console.log('First row:', parsedData[0]);
                 }
                 
                 lineBuffer = ''; // Free memory
@@ -430,69 +466,89 @@ class TelemetryAnalysisApp {
     
     parsePiToolboxLargeFile(text, channelFilter) {
         // Optimized Pi Toolbox parser for large files
-        // Only keeps essential channels to reduce memory usage
+        // Matches the logic of the working parsePiToolbox but with channel filtering
         var lines = text.split(/\r?\n/);
         var channelBlocks = [];
         var currentBlock = null;
         var metadata = {};
+        var inOuting = false;
         
         console.log('Parsing large Pi Toolbox file:', lines.length, 'lines');
         
-        // First pass: identify channel blocks
+        // Parse the file structure
         for (var i = 0; i < lines.length; i++) {
             var line = lines[i].trim();
+            
+            // Skip empty lines
             if (!line) continue;
             
-            if (line === '{ChannelBlock}') {
-                currentBlock = { headerLine: i + 1, dataStart: i + 2, data: [], channelName: '' };
+            // Parse outing information
+            if (line === '{OutingInformation}') {
+                inOuting = true;
                 continue;
             }
             
-            if (currentBlock && currentBlock.data.length === 0) {
-                // This is the header line
-                var parts = line.split('\t');
-                currentBlock.channelName = parts[1] || '';
-                
-                // Only keep channels that pass the filter
-                if (channelFilter && !channelFilter(currentBlock.channelName)) {
-                    currentBlock = null;
-                    continue;
-                }
+            if (inOuting && line.startsWith('{')) {
+                inOuting = false;
             }
             
-            if (currentBlock) {
-                if (line.startsWith('{')) {
+            if (inOuting && line.indexOf('\t') !== -1) {
+                var parts = line.split('\t');
+                if (parts.length >= 2) {
+                    metadata[parts[0]] = parts[1];
+                }
+                continue;
+            }
+            
+            // Detect channel block start
+            if (line === '{ChannelBlock}') {
+                if (currentBlock && currentBlock.data.length > 0) {
                     channelBlocks.push(currentBlock);
-                    currentBlock = null;
-                } else {
-                    currentBlock.data.push(line);
+                }
+                currentBlock = { channelName: null, data: [] };
+                continue;
+            }
+            
+            // Parse channel header (Time + ChannelName)
+            if (currentBlock && currentBlock.channelName === null && line.indexOf('Time') === 0) {
+                var headers = line.split('\t');
+                if (headers.length >= 2) {
+                    var channelName = headers[1].trim();
+                    
+                    // Apply filter - skip channels we don't need
+                    if (channelFilter && !channelFilter(channelName)) {
+                        currentBlock = null; // Skip this block
+                        continue;
+                    }
+                    
+                    currentBlock.channelName = channelName;
+                }
+                continue;
+            }
+            
+            // Parse data rows
+            if (currentBlock && currentBlock.channelName) {
+                var values = line.split('\t');
+                if (values.length >= 2) {
+                    var time = parseFloat(values[0]);
+                    var value = parseFloat(values[1]);
+                    if (!isNaN(time) && !isNaN(value)) {
+                        currentBlock.data.push({ time: time, value: value });
+                    }
                 }
             }
         }
         
+        // Don't forget the last block
         if (currentBlock && currentBlock.data.length > 0) {
             channelBlocks.push(currentBlock);
         }
         
-        console.log('Found', channelBlocks.length, 'channel blocks to merge');
+        console.log('Pi Toolbox Large: Found', channelBlocks.length, 'channel blocks');
+        console.log('Channels:', channelBlocks.map(function(b) { return b.channelName; }));
         
-        // Merge channels by time
-        var mergedData = {};
-        channelBlocks.forEach(function(block) {
-            block.data.forEach(function(line) {
-                var parts = line.split('\t');
-                var time = parts[0];
-                var value = parts[1];
-                if (!mergedData[time]) mergedData[time] = { Time: parseFloat(time) };
-                mergedData[time][block.channelName] = parseFloat(value);
-            });
-        });
-        
-        // Convert to array and sort by time
-        var result = Object.values(mergedData).sort(function(a, b) { return a.Time - b.Time; });
-        console.log('Merged into', result.length, 'data points');
-        
-        return result;
+        // Use the standard merge function
+        return this.mergeChannelBlocks(channelBlocks, metadata);
     }
     
     parseGenericCSVLarge(text, channelFilter) {
@@ -982,7 +1038,10 @@ class TelemetryAnalysisApp {
     }
     
     parsePiToolbox(text) {
+        console.log('=== parsePiToolbox START ===');
         var lines = text.split(/\r?\n/);
+        console.log('Total lines:', lines.length);
+        
         var channelBlocks = [];
         var currentBlock = null;
         var metadata = {};
@@ -1073,12 +1132,20 @@ class TelemetryAnalysisApp {
     }
     
     mergeChannelBlocks(channelBlocks, metadata) {
-        if (channelBlocks.length === 0) return [];
+        console.log('=== mergeChannelBlocks START ===');
+        console.log('Input channel blocks:', channelBlocks.length);
+        
+        if (channelBlocks.length === 0) {
+            console.log('No channel blocks to merge - returning empty array');
+            return [];
+        }
         
         // Find the master time channel (use the one with most data points)
         var masterBlock = channelBlocks.reduce(function(max, block) {
             return block.data.length > max.data.length ? block : max;
         }, channelBlocks[0]);
+        
+        console.log('Master block:', masterBlock.channelName, 'with', masterBlock.data.length, 'points');
         
         var masterTimes = masterBlock.data.map(function(d) { return d.time; });
         
@@ -1086,6 +1153,8 @@ class TelemetryAnalysisApp {
         var mergedData = masterTimes.map(function(time) {
             return { 'Time': time };
         });
+        
+        console.log('Created merged array with', mergedData.length, 'rows');
         
         // For each channel, interpolate values to master time base
         var self = this;
@@ -1105,7 +1174,10 @@ class TelemetryAnalysisApp {
         }
         
         console.log('Merged data rows:', mergedData.length);
-        console.log('Sample row:', mergedData[0]);
+        if (mergedData.length > 0) {
+            console.log('Sample row keys:', Object.keys(mergedData[0]));
+            console.log('Sample row:', mergedData[0]);
+        }
         
         // Convert units (mph/m/s to km/h)
         mergedData = this.convertUnits(mergedData);
