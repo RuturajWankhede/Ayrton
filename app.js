@@ -915,9 +915,28 @@ class TelemetryAnalysisApp {
         var refLap = this.detectedLaps[this.selectedRefLap];
         var compLap = this.detectedLaps[this.selectedCompLap];
         
+        console.log('=== LOADING SELECTED LAPS ===');
+        console.log('Reference lap:', refLap.lapNumber, 'indices:', refLap.startIndex, '-', refLap.endIndex);
+        console.log('Comparison lap:', compLap.lapNumber, 'indices:', compLap.startIndex, '-', compLap.endIndex);
+        
         // Extract lap data from full session
-        this.referenceData = this.fullSessionData.slice(refLap.startIndex, refLap.endIndex);
-        this.currentData = this.fullSessionData.slice(compLap.startIndex, compLap.endIndex);
+        var refRawData = this.fullSessionData.slice(refLap.startIndex, refLap.endIndex);
+        var compRawData = this.fullSessionData.slice(compLap.startIndex, compLap.endIndex);
+        
+        console.log('Raw ref data:', refRawData.length, 'rows');
+        console.log('Raw ref first row:', JSON.stringify(refRawData[0]).substring(0, 300));
+        console.log('Raw comp data:', compRawData.length, 'rows');
+        console.log('Raw comp first row:', JSON.stringify(compRawData[0]).substring(0, 300));
+        
+        // Normalize the data - reset distance and time to start from 0
+        this.referenceData = this.normalizeLapData(refRawData);
+        this.currentData = this.normalizeLapData(compRawData);
+        
+        console.log('=== AFTER NORMALIZATION ===');
+        console.log('Ref data first row:', JSON.stringify(this.referenceData[0]).substring(0, 300));
+        console.log('Ref data last row:', JSON.stringify(this.referenceData[this.referenceData.length-1]).substring(0, 300));
+        console.log('Comp data first row:', JSON.stringify(this.currentData[0]).substring(0, 300));
+        console.log('Comp data last row:', JSON.stringify(this.currentData[this.currentData.length-1]).substring(0, 300));
         
         // Update file info displays
         this.displayFileInfo('ref', { name: 'Lap ' + refLap.lapNumber + ' (' + refLap.lapTimeFormatted + ')' });
@@ -930,6 +949,101 @@ class TelemetryAnalysisApp {
         
         // Switch to telemetry tab to show loaded data
         this.switchTab('telemetry');
+    }
+    
+    normalizeLapData(rawData) {
+        if (!rawData || rawData.length === 0) return rawData;
+        
+        // Find distance and time channel names
+        var sampleRow = rawData[0];
+        var columns = Object.keys(sampleRow);
+        
+        var distChannel = null;
+        var timeChannel = null;
+        
+        // Look for distance channel - check multiple possible names
+        var distNames = ['Lap Distance', 'Lap Distance[m]', 'distance', 'Distance', 'Distance[m]'];
+        for (var i = 0; i < distNames.length; i++) {
+            if (sampleRow[distNames[i]] !== undefined) {
+                distChannel = distNames[i];
+                break;
+            }
+        }
+        
+        // Look for time channel - check multiple possible names
+        var timeNames = ['Time', 'time', 'Elapsed Time', 'Elapsed Time[s]'];
+        for (var i = 0; i < timeNames.length; i++) {
+            if (sampleRow[timeNames[i]] !== undefined) {
+                timeChannel = timeNames[i];
+                break;
+            }
+        }
+        
+        // Fallback: search by pattern
+        if (!distChannel) {
+            distChannel = columns.find(function(c) { 
+                var cl = c.toLowerCase();
+                return cl.indexOf('lap dist') !== -1 || (cl.indexOf('distance') !== -1 && cl.indexOf('lateral') === -1); 
+            });
+        }
+        if (!timeChannel) {
+            timeChannel = columns.find(function(c) { 
+                return c.toLowerCase() === 'time' || c === 'Time'; 
+            });
+        }
+        
+        console.log('Normalizing lap data:');
+        console.log('  - Distance channel:', distChannel);
+        console.log('  - Time channel:', timeChannel);
+        console.log('  - Sample row keys:', columns.slice(0, 10));
+        
+        // Get starting values
+        var startDist = distChannel ? (parseFloat(rawData[0][distChannel]) || 0) : 0;
+        var startTime = timeChannel ? (parseFloat(rawData[0][timeChannel]) || 0) : 0;
+        
+        console.log('  - Start distance:', startDist);
+        console.log('  - Start time:', startTime);
+        
+        // Create normalized copy of data
+        var normalized = rawData.map(function(row) {
+            var newRow = {};
+            
+            // Copy all fields
+            columns.forEach(function(col) {
+                newRow[col] = row[col];
+            });
+            
+            // Normalize distance to start from 0
+            if (distChannel && row[distChannel] !== undefined) {
+                var origDist = parseFloat(row[distChannel]) || 0;
+                var normalizedDist = origDist - startDist;
+                newRow[distChannel] = normalizedDist;
+                // Also set standardized 'distance' field for charts
+                newRow.distance = normalizedDist;
+                newRow['Lap Distance'] = normalizedDist;
+            }
+            
+            // Normalize time to start from 0
+            if (timeChannel && row[timeChannel] !== undefined) {
+                var origTime = parseFloat(row[timeChannel]) || 0;
+                var normalizedTime = origTime - startTime;
+                newRow[timeChannel] = normalizedTime;
+                // Also set standardized 'time' field
+                newRow.time = normalizedTime;
+                newRow['Time'] = normalizedTime;
+            }
+            
+            return newRow;
+        });
+        
+        // Log final range
+        if (normalized.length > 0) {
+            var lastRow = normalized[normalized.length - 1];
+            console.log('  - Normalized distance range: 0 to', lastRow.distance || lastRow[distChannel] || 'unknown');
+            console.log('  - Normalized time range: 0 to', lastRow.time || lastRow[timeChannel] || 'unknown');
+        }
+        
+        return normalized;
     }
     
     setupFileUpload(type) {
