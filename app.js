@@ -1175,8 +1175,8 @@ class TelemetryAnalysisApp {
         // A corner is where speed drops significantly and then rises again
         
         var corners = [];
-        var windowSize = Math.max(2, Math.floor(sampledData.length / 400)); // ~0.25% of lap
-        var minCornerSpacing = trackLength / 80; // ~67m for 5.3km track - allows for chicanes
+        var windowSize = Math.max(3, Math.floor(sampledData.length / 300)); // Larger window for stability
+        var minCornerSpacing = trackLength / 40; // ~133m for 5.3km track - very conservative
         
         console.log('Window size:', windowSize, '| Min corner spacing:', minCornerSpacing.toFixed(0) + 'm');
         
@@ -1252,14 +1252,16 @@ class TelemetryAnalysisApp {
             }));
         }
         
-        // Filter and cluster candidates - be more permissive
+        // Filter and cluster candidates - be more selective
         var lastCornerDist = -minCornerSpacing;
         var rejectedTooClose = 0, rejectedLowLoss = 0, keptCount = 0;
         
         apexCandidates.forEach(function(candidate) {
-            // Keep corners with any speed loss > 0.5% OR braking OR low absolute speed
-            var isLowSpeed = candidate.speed < avgSpeed * speedMultiplier * 0.90;
-            if (candidate.speedLossPct < 0.5 && !candidate.hadBraking && !isLowSpeed) {
+            // Require significant speed loss (>5%) AND braking, OR very low speed
+            var isSlowCorner = candidate.speed < avgSpeed * speedMultiplier * 0.70; // Below 70% of avg
+            var isSignificantCorner = candidate.speedLossPct > 5 && candidate.hadBraking;
+            
+            if (!isSlowCorner && !isSignificantCorner) {
                 rejectedLowLoss++;
                 return;
             }
@@ -1326,9 +1328,10 @@ class TelemetryAnalysisApp {
         console.log('First pass: kept=' + keptCount + ', rejectedTooClose=' + rejectedTooClose + ', rejectedLowLoss=' + rejectedLowLoss);
         console.log('After filtering:', corners.length, 'corners');
         
-        // SECOND PASS: If still not enough corners, look for ANY significant speed drops
-        if (corners.length < 18) {
-            console.log('Running second pass with lower threshold... (have', corners.length, 'need ~18+)');
+        // SECOND PASS: Disabled - was causing too many false positives
+        // Only enable if we have very few corners detected
+        if (corners.length < 8) {
+            console.log('Running second pass with lower threshold... (have', corners.length, 'need ~8+)');
             var existingDistances = corners.map(function(c) { return c.distance; });
             
             // Look for points where speed is below 99% of average - very sensitive
@@ -1336,7 +1339,7 @@ class TelemetryAnalysisApp {
             console.log('Second pass threshold:', (lowSpeedThreshold * speedMultiplier).toFixed(1), 'km/h');
             
             // Also reduce minimum spacing for second pass
-            var secondPassSpacing = trackLength / 80; // ~67m
+            var secondPassSpacing = trackLength / 50; // ~107m
             var lastSecondPassDist = -secondPassSpacing;
             
             for (var i = windowSize; i < sampledData.length - windowSize; i++) {
@@ -1376,11 +1379,11 @@ class TelemetryAnalysisApp {
             console.log('After second pass:', corners.length, 'corners');
         }
         
-        // THIRD PASS: Still need more? Look at ALL local minima regardless of threshold
-        if (corners.length < 18) {
+        // THIRD PASS: Disabled - was causing too many false positives
+        if (corners.length < 8) {
             console.log('Running third pass - scanning all local minima...');
             var existingDistances = corners.map(function(c) { return c.distance; });
-            var thirdPassSpacing = trackLength / 80; // ~67m
+            var thirdPassSpacing = trackLength / 50; // ~107m
             var lastThirdPassDist = -thirdPassSpacing;
             var smallWindow = Math.max(1, Math.floor(windowSize / 2));
             
@@ -1425,7 +1428,9 @@ class TelemetryAnalysisApp {
             console.log('After third pass:', corners.length, 'corners');
         }
         
-        // FOURTH PASS: Gap analysis - find corners in suspiciously large gaps
+        // FOURTH PASS: Gap analysis - DISABLED (was causing false positives on straights)
+        // Only run if we have very few corners
+        if (corners.length < 8) {
         var maxGap = trackLength / 10; // Gaps > 500m on a 5km track are suspicious
         var gapsFound = [];
         
@@ -1465,7 +1470,7 @@ class TelemetryAnalysisApp {
         if (gapsFound.length > 0) {
             console.log('Found', gapsFound.length, 'large gaps:', gapsFound.map(function(g) { return g.start.toFixed(0) + '-' + g.end.toFixed(0) + 'm (' + g.gap.toFixed(0) + 'm)'; }));
             
-            var gapSpacing = trackLength / 80; // ~67m minimum spacing in gaps
+            var gapSpacing = trackLength / 50; // ~107m minimum spacing in gaps
             
             gapsFound.forEach(function(gapInfo) {
                 var gapCorners = [];
@@ -1522,16 +1527,17 @@ class TelemetryAnalysisApp {
             
             corners.sort(function(a, b) { return a.distance - b.distance; });
         }
+        } // End of gap analysis if block
         
-        // STEERING-BASED DETECTION: Find direction changes (chicanes) that speed alone misses
-        // A chicane has multiple direction changes even if speed stays relatively constant
+        // STEERING-BASED DETECTION: DISABLED - was causing too many false positives
+        // Direction changes at high speed on straights were being detected as corners
+        /*
         var steeringCorners = [];
-        var steerWindow = Math.max(3, Math.floor(sampledData.length / 500)); // Small window for quick direction changes
-        var minSteeringForCorner = 15; // Minimum steering angle to consider (degrees)
-        var directionChangeSpacing = trackLength / 120; // ~44m between direction changes (tight chicanes)
+        var steerWindow = Math.max(3, Math.floor(sampledData.length / 500));
+        var minSteeringForCorner = 15;
+        var directionChangeSpacing = trackLength / 120;
         var lastDirectionChangeDist = -directionChangeSpacing;
         
-        // Check if we have valid steering data
         var hasSteeringData = sampledData.some(function(p) { return Math.abs(p.steering) > 5; });
         
         if (hasSteeringData) {
@@ -1579,9 +1585,10 @@ class TelemetryAnalysisApp {
                 corners.sort(function(a, b) { return a.distance - b.distance; });
             }
         }
+        */ // End of disabled steering detection
         
-        // FINAL MERGE PASS: Combine any corners within 50m of each other, keeping the slowest
-        var mergeDistance = trackLength / 130; // ~41m merge threshold (preserve chicanes)
+        // FINAL MERGE PASS: Combine any corners within reasonable distance
+        var mergeDistance = trackLength / 50; // ~107m merge threshold - combine duplicates
         var mergedCorners = [];
         var i = 0;
         while (i < corners.length) {
