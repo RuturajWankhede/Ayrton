@@ -1172,7 +1172,6 @@ class TelemetryAnalysisApp {
         var speeds = sampledData.map(function(d) { return d.speed; }).filter(function(s) { return s > 1; });
         var avgSpeed = speeds.reduce(function(a, b) { return a + b; }, 0) / speeds.length;
         var maxSpeed = Math.max.apply(null, speeds);
-        var minSpeed = Math.min.apply(null, speeds);
         
         // Detect if speed is in m/s or km/h
         var speedUnit = maxSpeed < 100 ? 'm/s' : 'km/h';
@@ -1250,10 +1249,9 @@ class TelemetryAnalysisApp {
         console.log('Curvature stats: avg=' + avgCurvature.toFixed(6) + ', max=' + maxCurvature.toFixed(6));
         
         // STEP 3: Find peaks in curvature (these are corners)
-        // A corner is a local maximum in curvature that exceeds a threshold
         var curvatureThreshold = avgCurvature + (maxCurvature - avgCurvature) * 0.15; // Top 85% of curvature range
         var minCornerSpacing = trackLength / 100; // ~53m minimum between corners
-        var peakWindow = Math.max(5, Math.floor(sampledData.length / 400)); // Window for peak detection
+        var peakWindow = Math.max(5, Math.floor(sampledData.length / 400));
         
         console.log('Curvature threshold:', curvatureThreshold.toFixed(6), '| Min spacing:', minCornerSpacing.toFixed(0) + 'm');
         
@@ -1325,27 +1323,22 @@ class TelemetryAnalysisApp {
         console.log('Found', corners.length, 'corners from curvature peaks');
         
         // STEP 4: Also check for speed-based corners that curvature might miss
-        // (useful when lateral G data is noisy or unavailable)
-        var speedThreshold = avgSpeed * 0.75; // Below 75% of average speed
+        var speedThreshold = avgSpeed * 0.75;
         lastCornerDist = -minCornerSpacing;
         var additionalCorners = [];
         
         for (var i = peakWindow; i < sampledData.length - peakWindow; i++) {
             var curr = sampledData[i];
             
-            // Skip if above speed threshold (not slow enough to be a corner)
             if (curr.speed > speedThreshold) continue;
             
-            // Skip if too close to existing corner
             var nearExisting = corners.some(function(c) {
                 return Math.abs(c.distance - curr.distance) < minCornerSpacing * 0.7;
             });
             if (nearExisting) continue;
             
-            // Skip if too close to last additional corner
             if (curr.distance - lastCornerDist < minCornerSpacing) continue;
             
-            // Check if this is a local minimum in speed
             var isLocalMin = true;
             for (var j = -peakWindow; j <= peakWindow; j++) {
                 if (j === 0) continue;
@@ -1398,10 +1391,10 @@ class TelemetryAnalysisApp {
             
             // Keep the corner with highest curvature (or slowest speed if curvature is similar)
             var best = cluster.reduce(function(a, b) {
-                if (Math.abs(a.curvature - b.curvature) < 0.001) {
+                if (Math.abs((a.curvature || 0) - (b.curvature || 0)) < 0.001) {
                     return a.speed < b.speed ? a : b;
                 }
-                return a.curvature > b.curvature ? a : b;
+                return (a.curvature || 0) > (b.curvature || 0) ? a : b;
             });
             
             mergedCorners.push(best);
