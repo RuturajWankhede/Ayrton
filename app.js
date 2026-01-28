@@ -19,6 +19,7 @@ class TelemetryAnalysisApp {
         this.selectedRefLap = null;
         this.selectedCompLap = null;
         this.detectedCorners = [];
+        this.trackRotation = 0; // Track map rotation in degrees
         this.init();
     }
     
@@ -243,6 +244,40 @@ class TelemetryAnalysisApp {
                     '<i class="fas fa-chevron-up mr-1"></i> Collapse' : 
                     '<i class="fas fa-chevron-down mr-1"></i> Expand';
             });
+        }
+        
+        // Track map rotation controls
+        var rotateCW = document.getElementById('rotate-cw');
+        var rotateCCW = document.getElementById('rotate-ccw');
+        var rotateReset = document.getElementById('rotate-reset');
+        
+        if (rotateCW) {
+            rotateCW.addEventListener('click', function() {
+                self.trackRotation = (self.trackRotation + 15) % 360;
+                self.updateRotationDisplay();
+                self.generateTrackMap();
+            });
+        }
+        if (rotateCCW) {
+            rotateCCW.addEventListener('click', function() {
+                self.trackRotation = (self.trackRotation - 15 + 360) % 360;
+                self.updateRotationDisplay();
+                self.generateTrackMap();
+            });
+        }
+        if (rotateReset) {
+            rotateReset.addEventListener('click', function() {
+                self.trackRotation = 0;
+                self.updateRotationDisplay();
+                self.generateTrackMap();
+            });
+        }
+    }
+    
+    updateRotationDisplay() {
+        var display = document.getElementById('rotation-display');
+        if (display) {
+            display.textContent = this.trackRotation + '°';
         }
     }
     
@@ -3634,6 +3669,29 @@ class TelemetryAnalysisApp {
         
         var refNorm = normalize(refTrack);
         var currNorm = normalize(currTrack);
+        
+        // Apply rotation transformation
+        var rotationRad = (self.trackRotation || 0) * Math.PI / 180;
+        var rotatePoint = function(x, y) {
+            var cos = Math.cos(rotationRad);
+            var sin = Math.sin(rotationRad);
+            return {
+                x: x * cos - y * sin,
+                y: x * sin + y * cos
+            };
+        };
+        
+        if (rotationRad !== 0) {
+            refNorm = refNorm.map(function(p) {
+                var rotated = rotatePoint(p.x, p.y);
+                return { x: rotated.x, y: rotated.y, speed: p.speed, heading: p.heading + rotationRad, distance: p.distance };
+            });
+            currNorm = currNorm.map(function(p) {
+                var rotated = rotatePoint(p.x, p.y);
+                return { x: rotated.x, y: rotated.y, speed: p.speed, heading: p.heading + rotationRad, distance: p.distance };
+            });
+        }
+        
         var allTraces = [];
         var trackName = this.selectedTrack ? this.selectedTrack.name : 'Track';
         var sourceLabel = positionSource === 'prebuilt' ? ' (' + (prebuiltTrack?.name || 'Track Map') + ')' : positionSource === 'GPS' ? ' (GPS)' : positionSource === 'iRacing' ? ' (iRacing)' : positionSource === 'heading' ? ' (Heading)' : '';
