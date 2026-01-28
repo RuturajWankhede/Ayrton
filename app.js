@@ -1069,9 +1069,9 @@ class TelemetryAnalysisApp {
         var self = this;
         var data = this.referenceData;
         
-        // Find channel names
+        // Find channel names - prefer Corrected Distance over plain Distance
         var speedNames = ['Speed', 'Speed[kph]', 'Ground Speed', 'Ground Speed_ms', 'speed', 'Speed_ms'];
-        var distNames = ['Distance', 'Lap Distance', 'distance', 'Dist'];
+        var distNames = ['Corrected Distance', 'Corrected Distance[m]', 'Lap Distance', 'Lap Distance[m]', 'Distance', 'distance', 'Dist'];
         var brakeNames = ['Brake', 'Brake[%]', 'brake'];
         
         function getValue(row, names, def) {
@@ -1087,11 +1087,25 @@ class TelemetryAnalysisApp {
         // Sample data at reasonable rate
         var sampleRate = Math.max(1, Math.floor(data.length / 3000));
         var sampledData = [];
+        var usedDistChannel = null;
+        
         for (var i = 0; i < data.length; i += sampleRate) {
             var row = data[i];
+            var dist = getValue(row, distNames, 0);
+            
+            // Log which channel we're using on first iteration
+            if (i === 0) {
+                for (var d = 0; d < distNames.length; d++) {
+                    if (row[distNames[d]] !== undefined) {
+                        usedDistChannel = distNames[d];
+                        break;
+                    }
+                }
+            }
+            
             sampledData.push({
                 index: i,
-                distance: getValue(row, distNames, 0),
+                distance: dist,
                 speed: getValue(row, speedNames, 0),
                 brake: getValue(row, brakeNames, 0)
             });
@@ -1099,6 +1113,7 @@ class TelemetryAnalysisApp {
         
         console.log('=== CORNER DETECTION ===');
         console.log('Sampled', sampledData.length, 'points from', data.length);
+        console.log('Using distance channel:', usedDistChannel, '| Range: 0 to', sampledData[sampledData.length-1].distance.toFixed(0) + 'm');
         
         // Find track length
         var trackLength = sampledData[sampledData.length - 1].distance || 5000;
@@ -1345,6 +1360,95 @@ class TelemetryAnalysisApp {
             
             corners.sort(function(a, b) { return a.distance - b.distance; });
             console.log('After third pass:', corners.length, 'corners');
+        }
+        
+        // FOURTH PASS: Gap analysis - find corners in suspiciously large gaps
+        var maxGap = trackLength / 10; // Gaps > 500m on a 5km track are suspicious
+        var gapsFound = [];
+        
+        // Check gap at start of lap
+        if (corners.length > 0 && corners[0].distance > maxGap) {
+            gapsFound.push({
+                start: 0,
+                end: corners[0].distance,
+                gap: corners[0].distance,
+                afterCorner: 0
+            });
+        }
+        
+        // Check gaps between corners
+        for (var g = 0; g < corners.length - 1; g++) {
+            var gap = corners[g + 1].distance - corners[g].distance;
+            if (gap > maxGap) {
+                gapsFound.push({
+                    start: corners[g].distance,
+                    end: corners[g + 1].distance,
+                    gap: gap,
+                    afterCorner: g + 1
+                });
+            }
+        }
+        
+        // Check gap at end of lap
+        if (corners.length > 0 && (trackLength - corners[corners.length - 1].distance) > maxGap) {
+            gapsFound.push({
+                start: corners[corners.length - 1].distance,
+                end: trackLength,
+                gap: trackLength - corners[corners.length - 1].distance,
+                afterCorner: corners.length
+            });
+        }
+        
+        if (gapsFound.length > 0) {
+            console.log('Found', gapsFound.length, 'large gaps:', gapsFound.map(function(g) { return g.start.toFixed(0) + '-' + g.end.toFixed(0) + 'm (' + g.gap.toFixed(0) + 'm)'; }));
+            
+            var gapSpacing = trackLength / 500; // ~10m for tight detection in gaps
+            
+            gapsFound.forEach(function(gapInfo) {
+                var gapCorners = [];
+                var lastGapCornerDist = gapInfo.start;
+                
+                // Scan the gap for any speed reductions
+                for (var i = 0; i < sampledData.length; i++) {
+                    var current = sampledData[i];
+                    if (current.distance <= gapInfo.start + 50 || current.distance >= gapInfo.end - 50) continue;
+                    
+                    // Very sensitive local minimum check
+                    var isMinimum = true;
+                    var checkWindow = Math.max(1, Math.floor(windowSize / 3));
+                    for (var j = Math.max(0, i - checkWindow); j <= Math.min(sampledData.length - 1, i + checkWindow); j++) {
+                        if (j !== i && sampledData[j].speed < current.speed - 0.2) {
+                            isMinimum = false;
+                            break;
+                        }
+                    }
+                    
+                    // Check for any speed drop from surrounding area
+                    var maxNearby = 0;
+                    for (var k = Math.max(0, i - checkWindow * 3); k <= Math.min(sampledData.length - 1, i + checkWindow * 3); k++) {
+                        if (Math.abs(k - i) > checkWindow) {
+                            maxNearby = Math.max(maxNearby, sampledData[k].speed);
+                        }
+                    }
+                    var hasSpeedDrop = maxNearby > current.speed + 0.5;
+                    
+                    if (isMinimum && hasSpeedDrop && current.distance - lastGapCornerDist > gapSpacing) {
+                        gapCorners.push({
+                            distance: current.distance,
+                            speed: Math.round(current.speed * speedMultiplier),
+                            type: 'corner',
+                            severity: 'kink',
+                            apex: true
+                        });
+                        lastGapCornerDist = current.distance;
+                    }
+                }
+                
+                console.log('Found', gapCorners.length, 'corners in gap', gapInfo.start.toFixed(0) + '-' + gapInfo.end.toFixed(0) + 'm');
+                corners = corners.concat(gapCorners);
+            });
+            
+            corners.sort(function(a, b) { return a.distance - b.distance; });
         }
         
         // Number the corners
@@ -3352,7 +3456,7 @@ class TelemetryAnalysisApp {
         var yawNames = ['Gyro Yaw Velocity', 'Yaw Rate'];
         var latNames = ['GPS Latitude', 'Latitude', 'Lat'];
         var lonNames = ['GPS Longitude', 'Longitude', 'Lon'];
-        var distNames = ['Distance', 'Dist', 'Lap Distance', 'LapDist', 'Corrected Distance'];
+        var distNames = ['Corrected Distance', 'Corrected Distance[m]', 'Distance', 'Dist', 'Lap Distance', 'LapDist'];
         var distPctNames = ['LapDistPct', 'Lap Distance Pct', 'DistPct'];
         var headingNames = ['Heading', 'Heading[°]', 'Car Heading', 'Yaw', 'Yaw[°]', 'YawRate[°/s]'];
         var iRacingPosXNames = ['CarPosX', 'PosX', 'Car Pos X'];
@@ -3689,7 +3793,7 @@ class TelemetryAnalysisApp {
     generateTelemetryOverlays() {
         var self = this;
         if (!this.referenceData || !this.currentData) return;
-        var distNames = ['Distance', 'Dist', 'Lap Distance', 'LapDist', 'Corrected Distance'];
+        var distNames = ['Corrected Distance', 'Corrected Distance[m]', 'Distance', 'Dist', 'Lap Distance', 'LapDist'];
         var channels = this.getOverlayChannels();
         var sampleRate = Math.max(1, Math.floor(this.referenceData.length / 500));
         var refData = this.referenceData.filter(function(_, i) { return i % sampleRate === 0; });
@@ -3814,7 +3918,7 @@ class TelemetryAnalysisApp {
         var self = this;
         var container = document.getElementById('custom-overlays-container');
         if (!container) return;
-        var distNames = ['Distance', 'Dist', 'Lap Distance', 'LapDist', 'Corrected Distance'];
+        var distNames = ['Corrected Distance', 'Corrected Distance[m]', 'Distance', 'Dist', 'Lap Distance', 'LapDist'];
         var sampleRate = Math.max(1, Math.floor(this.referenceData.length / 500));
         var refData = this.referenceData.filter(function(_, i) { return i % sampleRate === 0; });
         var currData = this.currentData.filter(function(_, i) { return i % sampleRate === 0; });
