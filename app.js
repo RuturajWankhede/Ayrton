@@ -2477,11 +2477,29 @@ class TelemetryAnalysisApp {
             
             console.log('Sending ' + refDataFiltered.length + ' rows with ' + columnsToKeep.length + ' channels');
             
+            // Get detected corners to pass to AI
+            var detectedCorners = this.detectedCorners || [];
+            console.log('Including ' + detectedCorners.length + ' detected corners in analysis request');
+            
+            // Format corners for AI consumption
+            var cornersForAI = detectedCorners.map(function(c) {
+                return {
+                    number: c.number,
+                    name: c.name,
+                    distance_m: Math.round(c.distance),
+                    apex_speed_kmh: c.speed,
+                    severity: c.severity,
+                    curvature: c.curvature ? c.curvature.toFixed(6) : null
+                };
+            });
+            
             var payload = {
                 reference_lap: refDataFiltered, current_lap: currDataFiltered,
                 driver_name: document.getElementById('driver-name').value || 'Driver',
                 track_name: document.getElementById('track-name').value || 'Track',
                 channel_mappings: channelMappings,
+                detected_corners: cornersForAI,
+                corner_count: cornersForAI.length,
                 session_id: sessionId, timestamp: new Date().toISOString()
             };
             
@@ -3996,13 +4014,28 @@ class TelemetryAnalysisApp {
                 };
             }
             
+            // Include detected corners in chat context
+            var cornersForChat = (this.detectedCorners || []).map(function(c) {
+                return {
+                    number: c.number,
+                    name: c.name,
+                    distance_m: Math.round(c.distance),
+                    apex_speed_kmh: c.speed,
+                    severity: c.severity
+                };
+            });
+            
             var response = await fetch(this.webhookUrl + '/webhook/ayrton-chat', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     session_id: this.sessionId, 
                     message: message, 
                     session_data: this.sessionData, 
-                    context: { analysis: this.analysisResults },
+                    context: { 
+                        analysis: this.analysisResults,
+                        detected_corners: cornersForChat,
+                        corner_count: cornersForChat.length
+                    },
                     telemetry_data: telemetrySummary
                 })
             });
