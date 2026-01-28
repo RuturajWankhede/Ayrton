@@ -544,6 +544,20 @@
                             <div class="flex items-center justify-between mb-4">
                                 <h3 class="font-display text-sm font-semibold text-white tracking-wide">TRACK MAP</h3>
                                 <div class="flex items-center gap-6 text-xs">
+                                    <!-- Rotation Controls -->
+                                    <div class="flex items-center gap-2">
+                                        <button id="rotate-ccw" class="w-6 h-6 flex items-center justify-center rounded bg-[var(--bg-tertiary)] hover:bg-[var(--bg-quaternary)] text-[var(--text-secondary)] hover:text-white transition-colors" title="Rotate counter-clockwise">
+                                            ↺
+                                        </button>
+                                        <span class="text-[var(--text-secondary)] w-8 text-center" id="rotation-display">0°</span>
+                                        <button id="rotate-cw" class="w-6 h-6 flex items-center justify-center rounded bg-[var(--bg-tertiary)] hover:bg-[var(--bg-quaternary)] text-[var(--text-secondary)] hover:text-white transition-colors" title="Rotate clockwise">
+                                            ↻
+                                        </button>
+                                        <button id="rotate-reset" class="px-2 h-6 flex items-center justify-center rounded bg-[var(--bg-tertiary)] hover:bg-[var(--bg-quaternary)] text-[var(--text-secondary)] hover:text-white transition-colors text-[10px]" title="Reset rotation">
+                                            Reset
+                                        </button>
+                                    </div>
+                                    <span class="text-[var(--text-quaternary)]">|</span>
                                     <span class="flex items-center gap-2">
                                         <span class="w-3 h-3 rounded-sm bg-[var(--accent-cyan)]"></span>
                                         <span class="text-[var(--text-secondary)]">Reference</span>
