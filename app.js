@@ -1092,7 +1092,9 @@ class TelemetryAnalysisApp {
     }
     
     // =====================================================
-    // LOCAL CORNER DETECTION - Analyzes telemetry directly
+    // LOCAL CORNER DETECTION - Curvature-based algorithm
+    // Uses lateral G and heading to calculate track curvature
+    // Corners are detected as peaks in curvature, not just speed minima
     // =====================================================
     
     detectCornersFromTelemetry() {
@@ -1104,12 +1106,13 @@ class TelemetryAnalysisApp {
         var self = this;
         var data = this.referenceData;
         
-        // Find channel names - prefer Corrected Distance over plain Distance
+        // Find channel names
         var speedNames = ['Speed', 'Speed[kph]', 'Ground Speed', 'Ground Speed_ms', 'speed', 'Speed_ms'];
         var distNames = ['Corrected Distance', 'Corrected Distance[m]', 'Lap Distance', 'Lap Distance[m]', 'Distance', 'distance', 'Dist'];
         var brakeNames = ['Brake', 'Brake[%]', 'brake'];
+        var gLatNames = ['G-Force Lat', 'G-Force Lat[G]', 'Lateral G', 'LatG', 'Lat Accel', 'LateralAcceleration', 'G Lat[G]', 'G Lat'];
+        var headingNames = ['Yaw[°]', 'Yaw', 'Heading', 'Heading[°]', 'Car Heading'];
         var steerNames = ['Steering Wheel Angle[°]', 'SteeringWheelAngle[°]', 'Steered Angle', 'Steering (Filtered)[°]', 'Steering', 'steer'];
-        var headingNames = ['Yaw[°]', 'Yaw', 'Heading', 'Heading[°]'];
         
         function getValue(row, names, def) {
             for (var i = 0; i < names.length; i++) {
@@ -1121,16 +1124,20 @@ class TelemetryAnalysisApp {
             return def;
         }
         
-        // Sample data at reasonable rate - higher for better chicane detection
-        var sampleRate = Math.max(1, Math.floor(data.length / 4000));
+        // Sample data at reasonable rate
+        var sampleRate = Math.max(1, Math.floor(data.length / 3000));
         var sampledData = [];
         var usedDistChannel = null;
+        var hasGLat = false;
+        var hasHeading = false;
         
         for (var i = 0; i < data.length; i += sampleRate) {
             var row = data[i];
             var dist = getValue(row, distNames, 0);
+            var gLat = getValue(row, gLatNames, null);
+            var heading = getValue(row, headingNames, null);
             
-            // Log which channel we're using on first iteration
+            // Log which channels we're using on first iteration
             if (i === 0) {
                 for (var d = 0; d < distNames.length; d++) {
                     if (row[distNames[d]] !== undefined) {
@@ -1138,6 +1145,8 @@ class TelemetryAnalysisApp {
                         break;
                     }
                 }
+                hasGLat = gLat !== null;
+                hasHeading = heading !== null;
             }
             
             sampledData.push({
@@ -1145,14 +1154,16 @@ class TelemetryAnalysisApp {
                 distance: dist,
                 speed: getValue(row, speedNames, 0),
                 brake: getValue(row, brakeNames, 0),
-                steering: getValue(row, steerNames, 0),
-                heading: getValue(row, headingNames, 0)
+                gLat: gLat || 0,
+                heading: heading || 0,
+                steering: getValue(row, steerNames, 0)
             });
         }
         
-        console.log('=== CORNER DETECTION ===');
+        console.log('=== CURVATURE-BASED CORNER DETECTION ===');
         console.log('Sampled', sampledData.length, 'points from', data.length);
         console.log('Using distance channel:', usedDistChannel, '| Range: 0 to', sampledData[sampledData.length-1].distance.toFixed(0) + 'm');
+        console.log('Has lateral G:', hasGLat, '| Has heading:', hasHeading);
         
         // Find track length
         var trackLength = sampledData[sampledData.length - 1].distance || 5000;
@@ -1163,454 +1174,237 @@ class TelemetryAnalysisApp {
         var maxSpeed = Math.max.apply(null, speeds);
         var minSpeed = Math.min.apply(null, speeds);
         
-        // Detect if speed is in m/s or km/h (m/s will be < 100, km/h will be > 100)
+        // Detect if speed is in m/s or km/h
         var speedUnit = maxSpeed < 100 ? 'm/s' : 'km/h';
-        var speedMultiplier = speedUnit === 'm/s' ? 3.6 : 1; // Convert to km/h for display
+        var speedMultiplier = speedUnit === 'm/s' ? 3.6 : 1;
+        var speedToMs = speedUnit === 'm/s' ? 1 : 1/3.6; // Convert to m/s for curvature calc
         
         console.log('Speed unit detected:', speedUnit);
-        console.log('Speed stats (raw): avg=' + avgSpeed.toFixed(1) + ', max=' + maxSpeed.toFixed(1) + ', min=' + minSpeed.toFixed(1));
-        console.log('Speed stats (km/h): avg=' + (avgSpeed * speedMultiplier).toFixed(1) + ', max=' + (maxSpeed * speedMultiplier).toFixed(1) + ', min=' + (minSpeed * speedMultiplier).toFixed(1));
+        console.log('Speed stats (km/h): avg=' + (avgSpeed * speedMultiplier).toFixed(1) + ', max=' + (maxSpeed * speedMultiplier).toFixed(1));
         
-        // ALGORITHM: Find all local speed minima using derivative analysis
-        // A corner is where speed drops significantly and then rises again
+        // STEP 1: Calculate curvature at each point
+        // Curvature κ = lateral_accel / velocity² (from physics)
+        // Or from heading: κ = dθ/ds (rate of heading change per distance)
         
-        var corners = [];
-        var windowSize = Math.max(3, Math.floor(sampledData.length / 300)); // Larger window for stability
-        var minCornerSpacing = trackLength / 40; // ~133m for 5.3km track - very conservative
-        
-        console.log('Window size:', windowSize, '| Min corner spacing:', minCornerSpacing.toFixed(0) + 'm');
-        
-        // Calculate speed derivative (rate of change)
-        var speedDerivative = [];
         for (var i = 1; i < sampledData.length - 1; i++) {
-            var distDelta = sampledData[i + 1].distance - sampledData[i - 1].distance;
-            var speedDelta = sampledData[i + 1].speed - sampledData[i - 1].speed;
-            speedDerivative.push({
-                index: i,
-                distance: sampledData[i].distance,
-                speed: sampledData[i].speed,
-                derivative: distDelta > 0 ? speedDelta / distDelta : 0,
-                brake: sampledData[i].brake
-            });
+            var curr = sampledData[i];
+            var prev = sampledData[i - 1];
+            var next = sampledData[i + 1];
+            
+            var speedMs = curr.speed * speedToMs;
+            if (speedMs < 5) speedMs = 5; // Avoid division by near-zero
+            
+            // Method 1: From lateral G (preferred if available)
+            // κ = g_lat * 9.81 / v²
+            if (hasGLat && Math.abs(curr.gLat) > 0.05) {
+                curr.curvature = Math.abs(curr.gLat) * 9.81 / (speedMs * speedMs);
+            }
+            // Method 2: From heading change (if no lateral G)
+            else if (hasHeading) {
+                var dHeading = next.heading - prev.heading;
+                // Handle wraparound (e.g., 359° to 1°)
+                if (dHeading > 180) dHeading -= 360;
+                if (dHeading < -180) dHeading += 360;
+                var dDist = next.distance - prev.distance;
+                if (dDist > 0.1) {
+                    // Convert to radians and calculate curvature
+                    curr.curvature = Math.abs(dHeading * Math.PI / 180) / dDist;
+                } else {
+                    curr.curvature = 0;
+                }
+            }
+            // Method 3: Fallback - estimate from steering angle
+            else if (Math.abs(curr.steering) > 1) {
+                // Rough estimate: more steering = more curvature
+                curr.curvature = Math.abs(curr.steering) / (speedMs * 50);
+            }
+            else {
+                curr.curvature = 0;
+            }
         }
         
-        // Find zero-crossings in derivative (where decel turns to accel = apex)
-        var apexCandidates = [];
-        for (var i = windowSize; i < speedDerivative.length - windowSize; i++) {
-            var prev = speedDerivative[i - 1].derivative;
-            var curr = speedDerivative[i].derivative;
-            var next = speedDerivative[i + 1].derivative;
+        // First and last points
+        sampledData[0].curvature = sampledData[1].curvature || 0;
+        sampledData[sampledData.length - 1].curvature = sampledData[sampledData.length - 2].curvature || 0;
+        
+        // STEP 2: Smooth the curvature to reduce noise
+        var smoothWindow = Math.max(3, Math.floor(sampledData.length / 500));
+        for (var i = smoothWindow; i < sampledData.length - smoothWindow; i++) {
+            var sum = 0;
+            for (var j = -smoothWindow; j <= smoothWindow; j++) {
+                sum += sampledData[i + j].curvature;
+            }
+            sampledData[i].smoothCurvature = sum / (smoothWindow * 2 + 1);
+        }
+        // Fill edges
+        for (var i = 0; i < smoothWindow; i++) {
+            sampledData[i].smoothCurvature = sampledData[i].curvature;
+            sampledData[sampledData.length - 1 - i].smoothCurvature = sampledData[sampledData.length - 1 - i].curvature;
+        }
+        
+        // Get curvature statistics
+        var curvatures = sampledData.map(function(d) { return d.smoothCurvature || 0; });
+        var avgCurvature = curvatures.reduce(function(a, b) { return a + b; }, 0) / curvatures.length;
+        var maxCurvature = Math.max.apply(null, curvatures);
+        
+        console.log('Curvature stats: avg=' + avgCurvature.toFixed(6) + ', max=' + maxCurvature.toFixed(6));
+        
+        // STEP 3: Find peaks in curvature (these are corners)
+        // A corner is a local maximum in curvature that exceeds a threshold
+        var curvatureThreshold = avgCurvature + (maxCurvature - avgCurvature) * 0.15; // Top 85% of curvature range
+        var minCornerSpacing = trackLength / 100; // ~53m minimum between corners
+        var peakWindow = Math.max(5, Math.floor(sampledData.length / 400)); // Window for peak detection
+        
+        console.log('Curvature threshold:', curvatureThreshold.toFixed(6), '| Min spacing:', minCornerSpacing.toFixed(0) + 'm');
+        
+        var corners = [];
+        var lastCornerDist = -minCornerSpacing;
+        
+        for (var i = peakWindow; i < sampledData.length - peakWindow; i++) {
+            var curr = sampledData[i];
+            var curv = curr.smoothCurvature || 0;
             
-            // Look for negative-to-positive transition (braking -> accelerating)
-            if (prev < 0 && next > 0) {
-                // Verify this is actually a local speed minimum
-                var isMinimum = true;
-                var localMinSpeed = speedDerivative[i].speed;
-                for (var j = i - windowSize; j <= i + windowSize; j++) {
-                    if (speedDerivative[j].speed < localMinSpeed - 0.5) {
-                        isMinimum = false;
-                        break;
+            // Skip if below threshold
+            if (curv < curvatureThreshold) continue;
+            
+            // Skip if too close to last corner
+            if (curr.distance - lastCornerDist < minCornerSpacing) continue;
+            
+            // Check if this is a local maximum in curvature
+            var isLocalMax = true;
+            for (var j = -peakWindow; j <= peakWindow; j++) {
+                if (j === 0) continue;
+                if ((sampledData[i + j].smoothCurvature || 0) > curv) {
+                    isLocalMax = false;
+                    break;
+                }
+            }
+            
+            if (isLocalMax) {
+                // Find the actual apex (minimum speed) near this curvature peak
+                var apexIdx = i;
+                var apexSpeed = curr.speed;
+                var searchRange = Math.floor(peakWindow * 2);
+                
+                for (var j = -searchRange; j <= searchRange; j++) {
+                    var idx = i + j;
+                    if (idx >= 0 && idx < sampledData.length) {
+                        if (sampledData[idx].speed < apexSpeed) {
+                            apexSpeed = sampledData[idx].speed;
+                            apexIdx = idx;
+                        }
                     }
                 }
                 
-                if (isMinimum) {
-                    // Calculate how much speed was lost approaching this point
-                    var maxSpeedBefore = speedDerivative[i].speed;
-                    for (var k = Math.max(0, i - windowSize * 3); k < i; k++) {
-                        if (speedDerivative[k].speed > maxSpeedBefore) {
-                            maxSpeedBefore = speedDerivative[k].speed;
-                        }
-                    }
-                    var speedLoss = maxSpeedBefore - speedDerivative[i].speed;
-                    var speedLossPct = maxSpeedBefore > 0 ? (speedLoss / maxSpeedBefore) * 100 : 0;
-                    
-                    // Check for braking before this point
-                    var hadBraking = false;
-                    for (var k = Math.max(0, i - windowSize * 2); k < i; k++) {
-                        if (speedDerivative[k].brake > 5) {
-                            hadBraking = true;
-                            break;
-                        }
-                    }
-                    
-                    apexCandidates.push({
-                        distance: speedDerivative[i].distance,
-                        speed: speedDerivative[i].speed * speedMultiplier,
-                        speedLoss: speedLoss * speedMultiplier,
-                        speedLossPct: speedLossPct,
-                        hadBraking: hadBraking,
-                        index: i
-                    });
+                var apexPoint = sampledData[apexIdx];
+                
+                // Determine corner severity based on curvature and speed
+                var severity = 'kink';
+                var speedKmh = apexPoint.speed * speedMultiplier;
+                if (curv > avgCurvature * 4 || speedKmh < avgSpeed * speedMultiplier * 0.5) {
+                    severity = 'heavy';
+                } else if (curv > avgCurvature * 2 || speedKmh < avgSpeed * speedMultiplier * 0.7) {
+                    severity = 'medium';
+                } else if (curv > avgCurvature * 1.3) {
+                    severity = 'light';
                 }
-            }
-        }
-        
-        console.log('Found', apexCandidates.length, 'apex candidates');
-        if (apexCandidates.length > 0) {
-            console.log('Sample candidates:', apexCandidates.slice(0, 5).map(function(c) {
-                return c.distance.toFixed(0) + 'm @ ' + c.speed.toFixed(1) + 'km/h (loss:' + c.speedLossPct.toFixed(1) + '%, brake:' + c.hadBraking + ')';
-            }));
-        }
-        
-        // Filter and cluster candidates - be more selective
-        var lastCornerDist = -minCornerSpacing;
-        var rejectedTooClose = 0, rejectedLowLoss = 0, keptCount = 0;
-        
-        apexCandidates.forEach(function(candidate) {
-            // Require significant speed loss (>5%) AND braking, OR very low speed
-            var isSlowCorner = candidate.speed < avgSpeed * speedMultiplier * 0.70; // Below 70% of avg
-            var isSignificantCorner = candidate.speedLossPct > 5 && candidate.hadBraking;
-            
-            if (!isSlowCorner && !isSignificantCorner) {
-                rejectedLowLoss++;
-                return;
-            }
-            
-            // Determine corner severity
-            var severity = 'kink';
-            if (candidate.hadBraking && candidate.speedLossPct > 20) {
-                severity = 'heavy';
-            } else if (candidate.hadBraking || candidate.speedLossPct > 10) {
-                severity = 'medium';
-            } else if (candidate.speedLossPct > 5) {
-                severity = 'light';
-            }
-            
-            if (candidate.distance - lastCornerDist > minCornerSpacing) {
-                // Far enough apart - add as new corner
+                
                 corners.push({
-                    distance: candidate.distance,
-                    speed: Math.round(candidate.speed),
-                    speedLoss: Math.round(candidate.speedLoss),
+                    distance: apexPoint.distance,
+                    speed: Math.round(speedKmh),
+                    curvature: curv,
                     type: 'corner',
                     severity: severity,
                     apex: true
                 });
-                lastCornerDist = candidate.distance;
-                keptCount++;
-            } else if (corners.length > 0) {
-                // Close to previous corner - check if this is a chicane (distinct apex)
-                var lastCorner = corners[corners.length - 1];
-                var distBetween = candidate.distance - lastCorner.distance;
                 
-                // If both have significant characteristics, keep as separate corners (chicane)
-                var bothSignificant = (candidate.hadBraking || candidate.speedLossPct > 3) && 
-                                      (lastCorner.speedLoss > 3 || severity !== 'kink');
-                var isChicane = distBetween > 8 && bothSignificant; // At least 8m apart and both meaningful
-                
-                if (isChicane) {
-                    // This is a chicane - keep both corners
-                    corners.push({
-                        distance: candidate.distance,
-                        speed: Math.round(candidate.speed),
-                        speedLoss: Math.round(candidate.speedLoss),
-                        type: 'corner',
-                        severity: severity,
-                        apex: true
-                    });
-                    lastCornerDist = candidate.distance;
-                    keptCount++;
-                } else {
-                    // Too close and similar - merge with previous, keep slower one
-                    rejectedTooClose++;
-                    if (candidate.speed < lastCorner.speed) {
-                        lastCorner.distance = candidate.distance;
-                        lastCorner.speed = Math.round(candidate.speed);
-                        lastCorner.speedLoss = Math.round(candidate.speedLoss);
-                        if (severity !== 'kink') lastCorner.severity = severity;
-                    }
-                }
-            } else {
-                rejectedTooClose++;
+                lastCornerDist = apexPoint.distance;
             }
-        });
-        
-        console.log('First pass: kept=' + keptCount + ', rejectedTooClose=' + rejectedTooClose + ', rejectedLowLoss=' + rejectedLowLoss);
-        console.log('After filtering:', corners.length, 'corners');
-        
-        // SECOND PASS: Disabled - was causing too many false positives
-        // Only enable if we have very few corners detected
-        if (corners.length < 8) {
-            console.log('Running second pass with lower threshold... (have', corners.length, 'need ~8+)');
-            var existingDistances = corners.map(function(c) { return c.distance; });
-            
-            // Look for points where speed is below 99% of average - very sensitive
-            var lowSpeedThreshold = avgSpeed * 0.99;
-            console.log('Second pass threshold:', (lowSpeedThreshold * speedMultiplier).toFixed(1), 'km/h');
-            
-            // Also reduce minimum spacing for second pass
-            var secondPassSpacing = trackLength / 50; // ~107m
-            var lastSecondPassDist = -secondPassSpacing;
-            
-            for (var i = windowSize; i < sampledData.length - windowSize; i++) {
-                var current = sampledData[i];
-                if (current.speed > lowSpeedThreshold) continue;
-                
-                // Check if already detected (use tighter spacing for second pass)
-                var alreadyDetected = existingDistances.some(function(d) {
-                    return Math.abs(d - current.distance) < secondPassSpacing;
-                });
-                if (alreadyDetected) continue;
-                
-                // Check if this is a local minimum
-                var isMinimum = true;
-                for (var j = Math.max(0, i - windowSize); j <= Math.min(sampledData.length - 1, i + windowSize); j++) {
-                    if (j !== i && sampledData[j].speed < current.speed - 0.5) {
-                        isMinimum = false;
-                        break;
-                    }
-                }
-                
-                if (isMinimum && current.distance - lastSecondPassDist > secondPassSpacing) {
-                    corners.push({
-                        distance: current.distance,
-                        speed: Math.round(current.speed * speedMultiplier),
-                        type: 'corner',
-                        severity: 'kink',
-                        apex: true
-                    });
-                    lastSecondPassDist = current.distance;
-                    existingDistances.push(current.distance);
-                }
-            }
-            
-            // Sort by distance
-            corners.sort(function(a, b) { return a.distance - b.distance; });
-            console.log('After second pass:', corners.length, 'corners');
         }
         
-        // THIRD PASS: Disabled - was causing too many false positives
-        if (corners.length < 8) {
-            console.log('Running third pass - scanning all local minima...');
-            var existingDistances = corners.map(function(c) { return c.distance; });
-            var thirdPassSpacing = trackLength / 50; // ~107m
-            var lastThirdPassDist = -thirdPassSpacing;
-            var smallWindow = Math.max(1, Math.floor(windowSize / 2));
-            
-            for (var i = smallWindow; i < sampledData.length - smallWindow; i++) {
-                var current = sampledData[i];
-                
-                // Skip if too close to existing corner
-                var tooClose = existingDistances.some(function(d) {
-                    return Math.abs(d - current.distance) < thirdPassSpacing;
-                });
-                if (tooClose) continue;
-                
-                // Check if this is a local minimum in small window
-                var isMinimum = true;
-                var beforeSpeed = 0, afterSpeed = 0;
-                for (var j = i - smallWindow; j <= i + smallWindow; j++) {
-                    if (j < i) beforeSpeed = Math.max(beforeSpeed, sampledData[j].speed);
-                    if (j > i) afterSpeed = Math.max(afterSpeed, sampledData[j].speed);
-                    if (j !== i && sampledData[j].speed < current.speed - 0.3) {
-                        isMinimum = false;
-                        break;
-                    }
-                }
-                
-                // Must have some speed drop before and rise after (characteristic of apex)
-                var hasSpeedDrop = beforeSpeed > current.speed + 1 || afterSpeed > current.speed + 1;
-                
-                if (isMinimum && hasSpeedDrop && current.distance - lastThirdPassDist > thirdPassSpacing) {
-                    corners.push({
-                        distance: current.distance,
-                        speed: Math.round(current.speed * speedMultiplier),
-                        type: 'corner',
-                        severity: 'kink',
-                        apex: true
-                    });
-                    lastThirdPassDist = current.distance;
-                    existingDistances.push(current.distance);
-                }
-            }
-            
-            corners.sort(function(a, b) { return a.distance - b.distance; });
-            console.log('After third pass:', corners.length, 'corners');
-        }
+        console.log('Found', corners.length, 'corners from curvature peaks');
         
-        // FOURTH PASS: Gap analysis - DISABLED (was causing false positives on straights)
-        // Only run if we have very few corners
-        if (corners.length < 8) {
-        var maxGap = trackLength / 10; // Gaps > 500m on a 5km track are suspicious
-        var gapsFound = [];
+        // STEP 4: Also check for speed-based corners that curvature might miss
+        // (useful when lateral G data is noisy or unavailable)
+        var speedThreshold = avgSpeed * 0.75; // Below 75% of average speed
+        lastCornerDist = -minCornerSpacing;
+        var additionalCorners = [];
         
-        // Check gap at start of lap
-        if (corners.length > 0 && corners[0].distance > maxGap) {
-            gapsFound.push({
-                start: 0,
-                end: corners[0].distance,
-                gap: corners[0].distance,
-                afterCorner: 0
+        for (var i = peakWindow; i < sampledData.length - peakWindow; i++) {
+            var curr = sampledData[i];
+            
+            // Skip if above speed threshold (not slow enough to be a corner)
+            if (curr.speed > speedThreshold) continue;
+            
+            // Skip if too close to existing corner
+            var nearExisting = corners.some(function(c) {
+                return Math.abs(c.distance - curr.distance) < minCornerSpacing * 0.7;
             });
-        }
-        
-        // Check gaps between corners
-        for (var g = 0; g < corners.length - 1; g++) {
-            var gap = corners[g + 1].distance - corners[g].distance;
-            if (gap > maxGap) {
-                gapsFound.push({
-                    start: corners[g].distance,
-                    end: corners[g + 1].distance,
-                    gap: gap,
-                    afterCorner: g + 1
+            if (nearExisting) continue;
+            
+            // Skip if too close to last additional corner
+            if (curr.distance - lastCornerDist < minCornerSpacing) continue;
+            
+            // Check if this is a local minimum in speed
+            var isLocalMin = true;
+            for (var j = -peakWindow; j <= peakWindow; j++) {
+                if (j === 0) continue;
+                if (sampledData[i + j].speed < curr.speed) {
+                    isLocalMin = false;
+                    break;
+                }
+            }
+            
+            if (isLocalMin) {
+                var speedKmh = curr.speed * speedMultiplier;
+                var severity = speedKmh < avgSpeed * speedMultiplier * 0.5 ? 'heavy' : 
+                               speedKmh < avgSpeed * speedMultiplier * 0.65 ? 'medium' : 'light';
+                
+                additionalCorners.push({
+                    distance: curr.distance,
+                    speed: Math.round(speedKmh),
+                    curvature: curr.smoothCurvature || 0,
+                    type: 'corner',
+                    severity: severity,
+                    apex: true,
+                    source: 'speed'
                 });
+                
+                lastCornerDist = curr.distance;
             }
         }
         
-        // Check gap at end of lap
-        if (corners.length > 0 && (trackLength - corners[corners.length - 1].distance) > maxGap) {
-            gapsFound.push({
-                start: corners[corners.length - 1].distance,
-                end: trackLength,
-                gap: trackLength - corners[corners.length - 1].distance,
-                afterCorner: corners.length
-            });
+        if (additionalCorners.length > 0) {
+            console.log('Found', additionalCorners.length, 'additional corners from speed minima');
+            corners = corners.concat(additionalCorners);
         }
         
-        if (gapsFound.length > 0) {
-            console.log('Found', gapsFound.length, 'large gaps:', gapsFound.map(function(g) { return g.start.toFixed(0) + '-' + g.end.toFixed(0) + 'm (' + g.gap.toFixed(0) + 'm)'; }));
-            
-            var gapSpacing = trackLength / 50; // ~107m minimum spacing in gaps
-            
-            gapsFound.forEach(function(gapInfo) {
-                var gapCorners = [];
-                var lastGapCornerDist = gapInfo.start;
-                
-                // For gap analysis, only count as corner if speed is below 85% of max speed
-                // This prevents detecting tiny wobbles on straights as corners
-                var maxSpeedThreshold = maxSpeed * 0.85; // ~200 km/h for 230 km/h max
-                console.log('Gap analysis speed threshold:', (maxSpeedThreshold * speedMultiplier).toFixed(0), 'km/h');
-                
-                // Scan the gap for any speed reductions
-                for (var i = 0; i < sampledData.length; i++) {
-                    var current = sampledData[i];
-                    if (current.distance <= gapInfo.start + 50 || current.distance >= gapInfo.end - 50) continue;
-                    
-                    // Skip if speed is too high (we're on a straight)
-                    if (current.speed > maxSpeedThreshold) continue;
-                    
-                    // Less sensitive local minimum check for gaps
-                    var isMinimum = true;
-                    var checkWindow = Math.max(2, Math.floor(windowSize / 2));
-                    for (var j = Math.max(0, i - checkWindow); j <= Math.min(sampledData.length - 1, i + checkWindow); j++) {
-                        if (j !== i && sampledData[j].speed < current.speed - 1) {
-                            isMinimum = false;
-                            break;
-                        }
-                    }
-                    
-                    // Check for meaningful speed drop from surrounding area (at least 3 km/h)
-                    var maxNearby = 0;
-                    for (var k = Math.max(0, i - checkWindow * 3); k <= Math.min(sampledData.length - 1, i + checkWindow * 3); k++) {
-                        if (Math.abs(k - i) > checkWindow) {
-                            maxNearby = Math.max(maxNearby, sampledData[k].speed);
-                        }
-                    }
-                    var speedDrop = maxNearby - current.speed;
-                    var hasSpeedDrop = speedDrop > 3; // At least 3 km/h drop
-                    
-                    if (isMinimum && hasSpeedDrop && current.distance - lastGapCornerDist > gapSpacing) {
-                        gapCorners.push({
-                            distance: current.distance,
-                            speed: Math.round(current.speed * speedMultiplier),
-                            type: 'corner',
-                            severity: 'kink',
-                            apex: true
-                        });
-                        lastGapCornerDist = current.distance;
-                    }
-                }
-                
-                console.log('Found', gapCorners.length, 'corners in gap', gapInfo.start.toFixed(0) + '-' + gapInfo.end.toFixed(0) + 'm');
-                corners = corners.concat(gapCorners);
-            });
-            
-            corners.sort(function(a, b) { return a.distance - b.distance; });
-        }
-        } // End of gap analysis if block
+        // Sort by distance
+        corners.sort(function(a, b) { return a.distance - b.distance; });
         
-        // STEERING-BASED DETECTION: DISABLED - was causing too many false positives
-        // Direction changes at high speed on straights were being detected as corners
-        /*
-        var steeringCorners = [];
-        var steerWindow = Math.max(3, Math.floor(sampledData.length / 500));
-        var minSteeringForCorner = 15;
-        var directionChangeSpacing = trackLength / 120;
-        var lastDirectionChangeDist = -directionChangeSpacing;
-        
-        var hasSteeringData = sampledData.some(function(p) { return Math.abs(p.steering) > 5; });
-        
-        if (hasSteeringData) {
-            console.log('Analyzing steering for direction changes...');
-            
-            for (var i = steerWindow; i < sampledData.length - steerWindow; i++) {
-                var current = sampledData[i];
-                var prevSteer = sampledData[i - steerWindow].steering;
-                var nextSteer = sampledData[i + steerWindow].steering;
-                var currentSteer = current.steering;
-                
-                // Detect steering zero-crossing (direction change)
-                // Sign change from positive to negative or vice versa
-                var isZeroCrossing = (prevSteer > minSteeringForCorner && nextSteer < -minSteeringForCorner) ||
-                                     (prevSteer < -minSteeringForCorner && nextSteer > minSteeringForCorner);
-                
-                // Also detect when steering reaches a local extremum (peak left or peak right turn)
-                var isSteeringPeak = Math.abs(currentSteer) > minSteeringForCorner &&
-                                     Math.abs(currentSteer) > Math.abs(prevSteer) &&
-                                     Math.abs(currentSteer) > Math.abs(nextSteer);
-                
-                if ((isZeroCrossing || isSteeringPeak) && current.distance - lastDirectionChangeDist > directionChangeSpacing) {
-                    // Check if there's already a speed-based corner nearby
-                    var nearbySpeedCorner = corners.some(function(c) {
-                        return Math.abs(c.distance - current.distance) < directionChangeSpacing * 0.7;
-                    });
-                    
-                    if (!nearbySpeedCorner) {
-                        steeringCorners.push({
-                            distance: current.distance,
-                            speed: Math.round(current.speed * speedMultiplier),
-                            type: 'corner',
-                            severity: 'kink',
-                            apex: true,
-                            source: 'steering'
-                        });
-                        lastDirectionChangeDist = current.distance;
-                    }
-                }
-            }
-            
-            if (steeringCorners.length > 0) {
-                console.log('Found', steeringCorners.length, 'additional corners from steering direction changes');
-                corners = corners.concat(steeringCorners);
-                corners.sort(function(a, b) { return a.distance - b.distance; });
-            }
-        }
-        */ // End of disabled steering detection
-        
-        // FINAL MERGE PASS: Combine any corners within reasonable distance
-        var mergeDistance = trackLength / 50; // ~107m merge threshold - combine duplicates
+        // STEP 5: Final merge - combine corners that are very close together
+        var mergeDistance = trackLength / 120; // ~44m merge threshold
         var mergedCorners = [];
         var i = 0;
+        
         while (i < corners.length) {
             var cluster = [corners[i]];
             var j = i + 1;
             
-            // Collect all corners within merge distance
             while (j < corners.length && corners[j].distance - corners[i].distance < mergeDistance) {
                 cluster.push(corners[j]);
                 j++;
             }
             
-            // Keep the slowest corner in the cluster (that's the true apex)
-            var slowest = cluster.reduce(function(a, b) { return a.speed < b.speed ? a : b; });
+            // Keep the corner with highest curvature (or slowest speed if curvature is similar)
+            var best = cluster.reduce(function(a, b) {
+                if (Math.abs(a.curvature - b.curvature) < 0.001) {
+                    return a.speed < b.speed ? a : b;
+                }
+                return a.curvature > b.curvature ? a : b;
+            });
             
-            // Use average distance if cluster is large, otherwise use slowest point's distance
-            if (cluster.length > 2) {
-                var avgDist = cluster.reduce(function(sum, c) { return sum + c.distance; }, 0) / cluster.length;
-                slowest.distance = avgDist;
-            }
-            
-            mergedCorners.push(slowest);
+            mergedCorners.push(best);
             i = j;
         }
         
@@ -1627,8 +1421,8 @@ class TelemetryAnalysisApp {
         
         console.log('=== FINAL CORNER DETECTION: ' + corners.length + ' corners ===');
         corners.forEach(function(c) {
-            var sourceTag = c.source === 'steering' ? ' [dir]' : '';
-            console.log('  ' + c.name + ': ' + c.distance.toFixed(0) + 'm @ ' + c.speed + 'km/h (' + c.severity + ')' + sourceTag);
+            var sourceTag = c.source === 'speed' ? ' [spd]' : '';
+            console.log('  ' + c.name + ': ' + c.distance.toFixed(0) + 'm @ ' + c.speed + 'km/h (' + c.severity + ', κ=' + (c.curvature || 0).toFixed(5) + ')' + sourceTag);
         });
         
         // Store detected corners
