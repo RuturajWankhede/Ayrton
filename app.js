@@ -1402,35 +1402,44 @@ class TelemetryAnalysisApp {
         if (gapsFound.length > 0) {
             console.log('Found', gapsFound.length, 'large gaps:', gapsFound.map(function(g) { return g.start.toFixed(0) + '-' + g.end.toFixed(0) + 'm (' + g.gap.toFixed(0) + 'm)'; }));
             
-            var gapSpacing = trackLength / 500; // ~10m for tight detection in gaps
+            var gapSpacing = trackLength / 100; // ~50m minimum spacing in gaps
             
             gapsFound.forEach(function(gapInfo) {
                 var gapCorners = [];
                 var lastGapCornerDist = gapInfo.start;
+                
+                // For gap analysis, only count as corner if speed is below 85% of max speed
+                // This prevents detecting tiny wobbles on straights as corners
+                var maxSpeedThreshold = maxSpeed * 0.85; // ~200 km/h for 230 km/h max
+                console.log('Gap analysis speed threshold:', (maxSpeedThreshold * speedMultiplier).toFixed(0), 'km/h');
                 
                 // Scan the gap for any speed reductions
                 for (var i = 0; i < sampledData.length; i++) {
                     var current = sampledData[i];
                     if (current.distance <= gapInfo.start + 50 || current.distance >= gapInfo.end - 50) continue;
                     
-                    // Very sensitive local minimum check
+                    // Skip if speed is too high (we're on a straight)
+                    if (current.speed > maxSpeedThreshold) continue;
+                    
+                    // Less sensitive local minimum check for gaps
                     var isMinimum = true;
-                    var checkWindow = Math.max(1, Math.floor(windowSize / 3));
+                    var checkWindow = Math.max(2, Math.floor(windowSize / 2));
                     for (var j = Math.max(0, i - checkWindow); j <= Math.min(sampledData.length - 1, i + checkWindow); j++) {
-                        if (j !== i && sampledData[j].speed < current.speed - 0.2) {
+                        if (j !== i && sampledData[j].speed < current.speed - 1) {
                             isMinimum = false;
                             break;
                         }
                     }
                     
-                    // Check for any speed drop from surrounding area
+                    // Check for meaningful speed drop from surrounding area (at least 3 km/h)
                     var maxNearby = 0;
                     for (var k = Math.max(0, i - checkWindow * 3); k <= Math.min(sampledData.length - 1, i + checkWindow * 3); k++) {
                         if (Math.abs(k - i) > checkWindow) {
                             maxNearby = Math.max(maxNearby, sampledData[k].speed);
                         }
                     }
-                    var hasSpeedDrop = maxNearby > current.speed + 0.5;
+                    var speedDrop = maxNearby - current.speed;
+                    var hasSpeedDrop = speedDrop > 3; // At least 3 km/h drop
                     
                     if (isMinimum && hasSpeedDrop && current.distance - lastGapCornerDist > gapSpacing) {
                         gapCorners.push({
