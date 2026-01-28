@@ -361,7 +361,7 @@ class TelemetryAnalysisApp {
         function shouldKeepChannel(channelName) {
             var lower = channelName.toLowerCase();
             // Keep essential channels plus a few useful ones
-            var keepPatterns = ['time', 'distance', 'speed', 'throttle', 'brake', 'gear', 'heading', 'steer', 'lap', 'elapsed'];
+            var keepPatterns = ['time', 'distance', 'speed', 'throttle', 'brake', 'gear', 'heading', 'steer', 'lap', 'elapsed', 'yaw', 'lat', 'lon', 'gps'];
             return keepPatterns.some(function(p) { return lower.indexOf(p) !== -1; });
         }
         
@@ -1121,8 +1121,8 @@ class TelemetryAnalysisApp {
         // A corner is where speed drops significantly and then rises again
         
         var corners = [];
-        var windowSize = Math.max(3, Math.floor(sampledData.length / 300)); // ~0.33% of lap - smaller window
-        var minCornerSpacing = trackLength / 100; // ~53m for 5.3km track - tighter spacing for chicanes
+        var windowSize = Math.max(2, Math.floor(sampledData.length / 400)); // ~0.25% of lap - smaller window
+        var minCornerSpacing = trackLength / 250; // ~21m for 5.3km track - very tight for chicanes
         
         console.log('Window size:', windowSize, '| Min corner spacing:', minCornerSpacing.toFixed(0) + 'm');
         
@@ -1203,9 +1203,9 @@ class TelemetryAnalysisApp {
         var rejectedTooClose = 0, rejectedLowLoss = 0, keptCount = 0;
         
         apexCandidates.forEach(function(candidate) {
-            // Keep corners with any speed loss > 1.5% OR braking OR low absolute speed
-            var isLowSpeed = candidate.speed < avgSpeed * speedMultiplier * 0.85;
-            if (candidate.speedLossPct < 1.5 && !candidate.hadBraking && !isLowSpeed) {
+            // Keep corners with any speed loss > 0.5% OR braking OR low absolute speed
+            var isLowSpeed = candidate.speed < avgSpeed * speedMultiplier * 0.90;
+            if (candidate.speedLossPct < 0.5 && !candidate.hadBraking && !isLowSpeed) {
                 rejectedLowLoss++;
                 return;
             }
@@ -1249,16 +1249,16 @@ class TelemetryAnalysisApp {
         console.log('After filtering:', corners.length, 'corners');
         
         // SECOND PASS: If still not enough corners, look for ANY significant speed drops
-        if (corners.length < 15) {
-            console.log('Running second pass with lower threshold... (have', corners.length, 'need ~15+)');
+        if (corners.length < 18) {
+            console.log('Running second pass with lower threshold... (have', corners.length, 'need ~18+)');
             var existingDistances = corners.map(function(c) { return c.distance; });
             
-            // Look for points where speed is below 97% of average - much more sensitive
-            var lowSpeedThreshold = avgSpeed * 0.97;
+            // Look for points where speed is below 99% of average - very sensitive
+            var lowSpeedThreshold = avgSpeed * 0.99;
             console.log('Second pass threshold:', (lowSpeedThreshold * speedMultiplier).toFixed(1), 'km/h');
             
             // Also reduce minimum spacing for second pass
-            var secondPassSpacing = trackLength / 150; // ~35m - even tighter for chicanes
+            var secondPassSpacing = trackLength / 300; // ~18m - even tighter for chicanes
             var lastSecondPassDist = -secondPassSpacing;
             
             for (var i = windowSize; i < sampledData.length - windowSize; i++) {
@@ -1299,12 +1299,12 @@ class TelemetryAnalysisApp {
         }
         
         // THIRD PASS: Still need more? Look at ALL local minima regardless of threshold
-        if (corners.length < 15) {
+        if (corners.length < 18) {
             console.log('Running third pass - scanning all local minima...');
             var existingDistances = corners.map(function(c) { return c.distance; });
-            var thirdPassSpacing = trackLength / 200; // ~27m
+            var thirdPassSpacing = trackLength / 400; // ~13m
             var lastThirdPassDist = -thirdPassSpacing;
-            var smallWindow = Math.max(2, Math.floor(windowSize / 2));
+            var smallWindow = Math.max(1, Math.floor(windowSize / 2));
             
             for (var i = smallWindow; i < sampledData.length - smallWindow; i++) {
                 var current = sampledData[i];
@@ -3354,7 +3354,7 @@ class TelemetryAnalysisApp {
         var lonNames = ['GPS Longitude', 'Longitude', 'Lon'];
         var distNames = ['Distance', 'Dist', 'Lap Distance', 'LapDist', 'Corrected Distance'];
         var distPctNames = ['LapDistPct', 'Lap Distance Pct', 'DistPct'];
-        var headingNames = ['Heading', 'Heading[°]', 'Car Heading', 'Yaw'];
+        var headingNames = ['Heading', 'Heading[°]', 'Car Heading', 'Yaw', 'Yaw[°]', 'YawRate[°/s]'];
         var iRacingPosXNames = ['CarPosX', 'PosX', 'Car Pos X'];
         var iRacingPosZNames = ['CarPosZ', 'PosZ', 'Car Pos Z'];
         var sampleRate = Math.max(1, Math.floor(this.referenceData.length / 500));
@@ -3365,6 +3365,16 @@ class TelemetryAnalysisApp {
         var hasHeading = getValue(sampleRow, headingNames, null) !== null;
         var hasDistance = getValue(sampleRow, distNames, null) !== null;
         var hasDistPct = getValue(sampleRow, distPctNames, null) !== null;
+        
+        // Debug: which heading channel was found?
+        var foundHeadingChannel = null;
+        for (var h = 0; h < headingNames.length; h++) {
+            if (sampleRow[headingNames[h]] !== undefined) {
+                foundHeadingChannel = headingNames[h];
+                break;
+            }
+        }
+        console.log('Heading channel search:', foundHeadingChannel || 'none found', '| Sample keys:', Object.keys(sampleRow).filter(function(k) { return k.toLowerCase().indexOf('yaw') !== -1 || k.toLowerCase().indexOf('heading') !== -1; }));
         
         // Check for pre-built track map
         var trackName = document.getElementById('track-name').value || this.selectedTrack?.name || '';
@@ -3394,6 +3404,10 @@ class TelemetryAnalysisApp {
         }
         
         console.log('Track map source:', positionSource, '| prebuiltTrack:', prebuiltTrack?.name || 'none', '| hasHeading:', hasHeading, '| hasDistance:', hasDistance, '| hasValidSteering:', hasValidSteering);
+        if (hasHeading) {
+            var sampleHeading = getValue(sampleRow, headingNames, 0);
+            console.log('Sample heading value:', sampleHeading, '(should be 0-360 for degrees)');
+        }
         
         var buildTrack = function(data, source) {
             var positions = [];
