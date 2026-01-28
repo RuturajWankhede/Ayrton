@@ -3726,40 +3726,8 @@ class TelemetryAnalysisApp {
             });
         }
         
-        // Also add straights from AI analysis if available (local detection doesn't find straights)
-        if (this.analysisResults && this.analysisResults.trackSegments) {
-            var segments = this.analysisResults.trackSegments;
-            
-            // Sort straights by startDistance (not midpoint) so S1 = start/finish straight
-            var straights = segments.filter(function(s) { return s.type === 'straight'; })
-                .sort(function(a, b) { return (a.startDistance || a.distance || 0) - (b.startDistance || b.distance || 0); });
-            
-            straights.forEach(function(segment, idx) {
-                var dist = segment.distance || 0;
-                // Use S1 for all straights since they're already ordered correctly
-                var label = 'S' + (idx + 1);
-                var hasIssues = segment.issues && segment.issues.length > 0;
-                var pos = findPositionAtDistance(dist);
-                
-                segmentMarkers.x.push(pos.x);
-                segmentMarkers.y.push(pos.y);
-                segmentMarkers.text.push(label);
-                segmentMarkers.colors.push(hasIssues ? '#f59e0b' : '#3b82f6');
-                
-                annotations.push({
-                    x: pos.x,
-                    y: pos.y,
-                    text: label,
-                    showarrow: false,
-                    font: { color: '#ffffff', size: 10, family: 'Arial Black' },
-                    bgcolor: hasIssues ? '#f59e0b' : '#3b82f6',
-                    bordercolor: '#ffffff',
-                    borderwidth: 1,
-                    borderpad: 3,
-                    opacity: 0.9
-                });
-            });
-        }
+        // NOTE: Straights are NOT shown on track map - they're just the spaces between corners
+        // The AI analysis results show straights in the analysis panel, but not on the map
         
         var layout = { 
             showlegend: true, legend: { x: 0, y: 1, bgcolor: 'rgba(0,0,0,0.7)', font: { color: '#fff', size: 11 } }, 
