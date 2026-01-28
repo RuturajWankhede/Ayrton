@@ -1121,8 +1121,10 @@ class TelemetryAnalysisApp {
         // A corner is where speed drops significantly and then rises again
         
         var corners = [];
-        var windowSize = Math.max(3, Math.floor(sampledData.length / 200)); // ~0.5% of lap
-        var minCornerSpacing = trackLength / 50; // At least 1/50th of track between corners (~100m for 5km track)
+        var windowSize = Math.max(3, Math.floor(sampledData.length / 300)); // ~0.33% of lap - smaller window
+        var minCornerSpacing = trackLength / 100; // ~53m for 5.3km track - tighter spacing for chicanes
+        
+        console.log('Window size:', windowSize, '| Min corner spacing:', minCornerSpacing.toFixed(0) + 'm');
         
         // Calculate speed derivative (rate of change)
         var speedDerivative = [];
@@ -1190,12 +1192,23 @@ class TelemetryAnalysisApp {
         }
         
         console.log('Found', apexCandidates.length, 'apex candidates');
+        if (apexCandidates.length > 0) {
+            console.log('Sample candidates:', apexCandidates.slice(0, 5).map(function(c) {
+                return c.distance.toFixed(0) + 'm @ ' + c.speed.toFixed(1) + 'km/h (loss:' + c.speedLossPct.toFixed(1) + '%, brake:' + c.hadBraking + ')';
+            }));
+        }
         
-        // Filter and cluster candidates
+        // Filter and cluster candidates - be more permissive
         var lastCornerDist = -minCornerSpacing;
+        var rejectedTooClose = 0, rejectedLowLoss = 0, keptCount = 0;
+        
         apexCandidates.forEach(function(candidate) {
-            // Must have lost at least 3% speed or had braking
-            if (candidate.speedLossPct < 3 && !candidate.hadBraking) return;
+            // Keep corners with any speed loss > 1.5% OR braking OR low absolute speed
+            var isLowSpeed = candidate.speed < avgSpeed * speedMultiplier * 0.85;
+            if (candidate.speedLossPct < 1.5 && !candidate.hadBraking && !isLowSpeed) {
+                rejectedLowLoss++;
+                return;
+            }
             
             if (candidate.distance - lastCornerDist > minCornerSpacing) {
                 // Determine corner severity
@@ -1217,47 +1230,57 @@ class TelemetryAnalysisApp {
                     apex: true
                 });
                 lastCornerDist = candidate.distance;
-            } else if (corners.length > 0) {
-                // Merge with previous corner - keep the slower one
-                var lastCorner = corners[corners.length - 1];
-                if (candidate.speed < lastCorner.speed) {
-                    lastCorner.distance = candidate.distance;
-                    lastCorner.speed = Math.round(candidate.speed);
-                    lastCorner.speedLoss = Math.round(candidate.speedLoss);
+                keptCount++;
+            } else {
+                rejectedTooClose++;
+                if (corners.length > 0) {
+                    // Merge with previous corner - keep the slower one
+                    var lastCorner = corners[corners.length - 1];
+                    if (candidate.speed < lastCorner.speed) {
+                        lastCorner.distance = candidate.distance;
+                        lastCorner.speed = Math.round(candidate.speed);
+                        lastCorner.speedLoss = Math.round(candidate.speedLoss);
+                    }
                 }
             }
         });
         
+        console.log('First pass: kept=' + keptCount + ', rejectedTooClose=' + rejectedTooClose + ', rejectedLowLoss=' + rejectedLowLoss);
         console.log('After filtering:', corners.length, 'corners');
         
         // SECOND PASS: If still not enough corners, look for ANY significant speed drops
         if (corners.length < 15) {
-            console.log('Running second pass with lower threshold...');
+            console.log('Running second pass with lower threshold... (have', corners.length, 'need ~15+)');
             var existingDistances = corners.map(function(c) { return c.distance; });
             
-            // Look for points where speed is below 90% of average
-            var lowSpeedThreshold = avgSpeed * 0.92;
+            // Look for points where speed is below 97% of average - much more sensitive
+            var lowSpeedThreshold = avgSpeed * 0.97;
+            console.log('Second pass threshold:', (lowSpeedThreshold * speedMultiplier).toFixed(1), 'km/h');
+            
+            // Also reduce minimum spacing for second pass
+            var secondPassSpacing = trackLength / 150; // ~35m - even tighter for chicanes
+            var lastSecondPassDist = -secondPassSpacing;
             
             for (var i = windowSize; i < sampledData.length - windowSize; i++) {
                 var current = sampledData[i];
                 if (current.speed > lowSpeedThreshold) continue;
                 
-                // Check if already detected
+                // Check if already detected (use tighter spacing for second pass)
                 var alreadyDetected = existingDistances.some(function(d) {
-                    return Math.abs(d - current.distance) < minCornerSpacing;
+                    return Math.abs(d - current.distance) < secondPassSpacing;
                 });
                 if (alreadyDetected) continue;
                 
                 // Check if this is a local minimum
                 var isMinimum = true;
                 for (var j = Math.max(0, i - windowSize); j <= Math.min(sampledData.length - 1, i + windowSize); j++) {
-                    if (j !== i && sampledData[j].speed < current.speed - 1) {
+                    if (j !== i && sampledData[j].speed < current.speed - 0.5) {
                         isMinimum = false;
                         break;
                     }
                 }
                 
-                if (isMinimum && current.distance - lastCornerDist > minCornerSpacing) {
+                if (isMinimum && current.distance - lastSecondPassDist > secondPassSpacing) {
                     corners.push({
                         distance: current.distance,
                         speed: Math.round(current.speed * speedMultiplier),
@@ -1265,13 +1288,63 @@ class TelemetryAnalysisApp {
                         severity: 'kink',
                         apex: true
                     });
-                    lastCornerDist = current.distance;
+                    lastSecondPassDist = current.distance;
                     existingDistances.push(current.distance);
                 }
             }
             
             // Sort by distance
             corners.sort(function(a, b) { return a.distance - b.distance; });
+            console.log('After second pass:', corners.length, 'corners');
+        }
+        
+        // THIRD PASS: Still need more? Look at ALL local minima regardless of threshold
+        if (corners.length < 15) {
+            console.log('Running third pass - scanning all local minima...');
+            var existingDistances = corners.map(function(c) { return c.distance; });
+            var thirdPassSpacing = trackLength / 200; // ~27m
+            var lastThirdPassDist = -thirdPassSpacing;
+            var smallWindow = Math.max(2, Math.floor(windowSize / 2));
+            
+            for (var i = smallWindow; i < sampledData.length - smallWindow; i++) {
+                var current = sampledData[i];
+                
+                // Skip if too close to existing corner
+                var tooClose = existingDistances.some(function(d) {
+                    return Math.abs(d - current.distance) < thirdPassSpacing;
+                });
+                if (tooClose) continue;
+                
+                // Check if this is a local minimum in small window
+                var isMinimum = true;
+                var beforeSpeed = 0, afterSpeed = 0;
+                for (var j = i - smallWindow; j <= i + smallWindow; j++) {
+                    if (j < i) beforeSpeed = Math.max(beforeSpeed, sampledData[j].speed);
+                    if (j > i) afterSpeed = Math.max(afterSpeed, sampledData[j].speed);
+                    if (j !== i && sampledData[j].speed < current.speed - 0.3) {
+                        isMinimum = false;
+                        break;
+                    }
+                }
+                
+                // Must have some speed drop before and rise after (characteristic of apex)
+                var hasSpeedDrop = beforeSpeed > current.speed + 1 || afterSpeed > current.speed + 1;
+                
+                if (isMinimum && hasSpeedDrop && current.distance - lastThirdPassDist > thirdPassSpacing) {
+                    corners.push({
+                        distance: current.distance,
+                        speed: Math.round(current.speed * speedMultiplier),
+                        type: 'corner',
+                        severity: 'kink',
+                        apex: true
+                    });
+                    lastThirdPassDist = current.distance;
+                    existingDistances.push(current.distance);
+                }
+            }
+            
+            corners.sort(function(a, b) { return a.distance - b.distance; });
+            console.log('After third pass:', corners.length, 'corners');
         }
         
         // Number the corners
