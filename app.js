@@ -1108,6 +1108,8 @@ class TelemetryAnalysisApp {
         var speedNames = ['Speed', 'Speed[kph]', 'Ground Speed', 'Ground Speed_ms', 'speed', 'Speed_ms'];
         var distNames = ['Corrected Distance', 'Corrected Distance[m]', 'Lap Distance', 'Lap Distance[m]', 'Distance', 'distance', 'Dist'];
         var brakeNames = ['Brake', 'Brake[%]', 'brake'];
+        var steerNames = ['Steering Wheel Angle[°]', 'SteeringWheelAngle[°]', 'Steered Angle', 'Steering (Filtered)[°]', 'Steering', 'steer'];
+        var headingNames = ['Yaw[°]', 'Yaw', 'Heading', 'Heading[°]'];
         
         function getValue(row, names, def) {
             for (var i = 0; i < names.length; i++) {
@@ -1119,8 +1121,8 @@ class TelemetryAnalysisApp {
             return def;
         }
         
-        // Sample data at reasonable rate
-        var sampleRate = Math.max(1, Math.floor(data.length / 3000));
+        // Sample data at reasonable rate - higher for better chicane detection
+        var sampleRate = Math.max(1, Math.floor(data.length / 4000));
         var sampledData = [];
         var usedDistChannel = null;
         
@@ -1142,7 +1144,9 @@ class TelemetryAnalysisApp {
                 index: i,
                 distance: dist,
                 speed: getValue(row, speedNames, 0),
-                brake: getValue(row, brakeNames, 0)
+                brake: getValue(row, brakeNames, 0),
+                steering: getValue(row, steerNames, 0),
+                heading: getValue(row, headingNames, 0)
             });
         }
         
@@ -1171,8 +1175,8 @@ class TelemetryAnalysisApp {
         // A corner is where speed drops significantly and then rises again
         
         var corners = [];
-        var windowSize = Math.max(2, Math.floor(sampledData.length / 400)); // ~0.25% of lap - smaller window
-        var minCornerSpacing = trackLength / 250; // ~21m for 5.3km track - very tight for chicanes
+        var windowSize = Math.max(2, Math.floor(sampledData.length / 400)); // ~0.25% of lap
+        var minCornerSpacing = trackLength / 80; // ~67m for 5.3km track - allows for chicanes
         
         console.log('Window size:', windowSize, '| Min corner spacing:', minCornerSpacing.toFixed(0) + 'm');
         
@@ -1260,17 +1264,18 @@ class TelemetryAnalysisApp {
                 return;
             }
             
+            // Determine corner severity
+            var severity = 'kink';
+            if (candidate.hadBraking && candidate.speedLossPct > 20) {
+                severity = 'heavy';
+            } else if (candidate.hadBraking || candidate.speedLossPct > 10) {
+                severity = 'medium';
+            } else if (candidate.speedLossPct > 5) {
+                severity = 'light';
+            }
+            
             if (candidate.distance - lastCornerDist > minCornerSpacing) {
-                // Determine corner severity
-                var severity = 'kink';
-                if (candidate.hadBraking && candidate.speedLossPct > 20) {
-                    severity = 'heavy';
-                } else if (candidate.hadBraking || candidate.speedLossPct > 10) {
-                    severity = 'medium';
-                } else if (candidate.speedLossPct > 5) {
-                    severity = 'light';
-                }
-                
+                // Far enough apart - add as new corner
                 corners.push({
                     distance: candidate.distance,
                     speed: Math.round(candidate.speed),
@@ -1281,17 +1286,40 @@ class TelemetryAnalysisApp {
                 });
                 lastCornerDist = candidate.distance;
                 keptCount++;
-            } else {
-                rejectedTooClose++;
-                if (corners.length > 0) {
-                    // Merge with previous corner - keep the slower one
-                    var lastCorner = corners[corners.length - 1];
+            } else if (corners.length > 0) {
+                // Close to previous corner - check if this is a chicane (distinct apex)
+                var lastCorner = corners[corners.length - 1];
+                var distBetween = candidate.distance - lastCorner.distance;
+                
+                // If both have significant characteristics, keep as separate corners (chicane)
+                var bothSignificant = (candidate.hadBraking || candidate.speedLossPct > 3) && 
+                                      (lastCorner.speedLoss > 3 || severity !== 'kink');
+                var isChicane = distBetween > 8 && bothSignificant; // At least 8m apart and both meaningful
+                
+                if (isChicane) {
+                    // This is a chicane - keep both corners
+                    corners.push({
+                        distance: candidate.distance,
+                        speed: Math.round(candidate.speed),
+                        speedLoss: Math.round(candidate.speedLoss),
+                        type: 'corner',
+                        severity: severity,
+                        apex: true
+                    });
+                    lastCornerDist = candidate.distance;
+                    keptCount++;
+                } else {
+                    // Too close and similar - merge with previous, keep slower one
+                    rejectedTooClose++;
                     if (candidate.speed < lastCorner.speed) {
                         lastCorner.distance = candidate.distance;
                         lastCorner.speed = Math.round(candidate.speed);
                         lastCorner.speedLoss = Math.round(candidate.speedLoss);
+                        if (severity !== 'kink') lastCorner.severity = severity;
                     }
                 }
+            } else {
+                rejectedTooClose++;
             }
         });
         
@@ -1308,7 +1336,7 @@ class TelemetryAnalysisApp {
             console.log('Second pass threshold:', (lowSpeedThreshold * speedMultiplier).toFixed(1), 'km/h');
             
             // Also reduce minimum spacing for second pass
-            var secondPassSpacing = trackLength / 300; // ~18m - even tighter for chicanes
+            var secondPassSpacing = trackLength / 80; // ~67m
             var lastSecondPassDist = -secondPassSpacing;
             
             for (var i = windowSize; i < sampledData.length - windowSize; i++) {
@@ -1352,7 +1380,7 @@ class TelemetryAnalysisApp {
         if (corners.length < 18) {
             console.log('Running third pass - scanning all local minima...');
             var existingDistances = corners.map(function(c) { return c.distance; });
-            var thirdPassSpacing = trackLength / 400; // ~13m
+            var thirdPassSpacing = trackLength / 80; // ~67m
             var lastThirdPassDist = -thirdPassSpacing;
             var smallWindow = Math.max(1, Math.floor(windowSize / 2));
             
@@ -1437,7 +1465,7 @@ class TelemetryAnalysisApp {
         if (gapsFound.length > 0) {
             console.log('Found', gapsFound.length, 'large gaps:', gapsFound.map(function(g) { return g.start.toFixed(0) + '-' + g.end.toFixed(0) + 'm (' + g.gap.toFixed(0) + 'm)'; }));
             
-            var gapSpacing = trackLength / 100; // ~50m minimum spacing in gaps
+            var gapSpacing = trackLength / 80; // ~67m minimum spacing in gaps
             
             gapsFound.forEach(function(gapInfo) {
                 var gapCorners = [];
@@ -1495,6 +1523,95 @@ class TelemetryAnalysisApp {
             corners.sort(function(a, b) { return a.distance - b.distance; });
         }
         
+        // STEERING-BASED DETECTION: Find direction changes (chicanes) that speed alone misses
+        // A chicane has multiple direction changes even if speed stays relatively constant
+        var steeringCorners = [];
+        var steerWindow = Math.max(3, Math.floor(sampledData.length / 500)); // Small window for quick direction changes
+        var minSteeringForCorner = 15; // Minimum steering angle to consider (degrees)
+        var directionChangeSpacing = trackLength / 120; // ~44m between direction changes (tight chicanes)
+        var lastDirectionChangeDist = -directionChangeSpacing;
+        
+        // Check if we have valid steering data
+        var hasSteeringData = sampledData.some(function(p) { return Math.abs(p.steering) > 5; });
+        
+        if (hasSteeringData) {
+            console.log('Analyzing steering for direction changes...');
+            
+            for (var i = steerWindow; i < sampledData.length - steerWindow; i++) {
+                var current = sampledData[i];
+                var prevSteer = sampledData[i - steerWindow].steering;
+                var nextSteer = sampledData[i + steerWindow].steering;
+                var currentSteer = current.steering;
+                
+                // Detect steering zero-crossing (direction change)
+                // Sign change from positive to negative or vice versa
+                var isZeroCrossing = (prevSteer > minSteeringForCorner && nextSteer < -minSteeringForCorner) ||
+                                     (prevSteer < -minSteeringForCorner && nextSteer > minSteeringForCorner);
+                
+                // Also detect when steering reaches a local extremum (peak left or peak right turn)
+                var isSteeringPeak = Math.abs(currentSteer) > minSteeringForCorner &&
+                                     Math.abs(currentSteer) > Math.abs(prevSteer) &&
+                                     Math.abs(currentSteer) > Math.abs(nextSteer);
+                
+                if ((isZeroCrossing || isSteeringPeak) && current.distance - lastDirectionChangeDist > directionChangeSpacing) {
+                    // Check if there's already a speed-based corner nearby
+                    var nearbySpeedCorner = corners.some(function(c) {
+                        return Math.abs(c.distance - current.distance) < directionChangeSpacing * 0.7;
+                    });
+                    
+                    if (!nearbySpeedCorner) {
+                        steeringCorners.push({
+                            distance: current.distance,
+                            speed: Math.round(current.speed * speedMultiplier),
+                            type: 'corner',
+                            severity: 'kink',
+                            apex: true,
+                            source: 'steering'
+                        });
+                        lastDirectionChangeDist = current.distance;
+                    }
+                }
+            }
+            
+            if (steeringCorners.length > 0) {
+                console.log('Found', steeringCorners.length, 'additional corners from steering direction changes');
+                corners = corners.concat(steeringCorners);
+                corners.sort(function(a, b) { return a.distance - b.distance; });
+            }
+        }
+        
+        // FINAL MERGE PASS: Combine any corners within 50m of each other, keeping the slowest
+        var mergeDistance = trackLength / 130; // ~41m merge threshold (preserve chicanes)
+        var mergedCorners = [];
+        var i = 0;
+        while (i < corners.length) {
+            var cluster = [corners[i]];
+            var j = i + 1;
+            
+            // Collect all corners within merge distance
+            while (j < corners.length && corners[j].distance - corners[i].distance < mergeDistance) {
+                cluster.push(corners[j]);
+                j++;
+            }
+            
+            // Keep the slowest corner in the cluster (that's the true apex)
+            var slowest = cluster.reduce(function(a, b) { return a.speed < b.speed ? a : b; });
+            
+            // Use average distance if cluster is large, otherwise use slowest point's distance
+            if (cluster.length > 2) {
+                var avgDist = cluster.reduce(function(sum, c) { return sum + c.distance; }, 0) / cluster.length;
+                slowest.distance = avgDist;
+            }
+            
+            mergedCorners.push(slowest);
+            i = j;
+        }
+        
+        if (corners.length !== mergedCorners.length) {
+            console.log('Merged', corners.length, 'corners down to', mergedCorners.length);
+        }
+        corners = mergedCorners;
+        
         // Number the corners
         corners.forEach(function(corner, idx) {
             corner.name = 'T' + (idx + 1);
@@ -1503,7 +1620,8 @@ class TelemetryAnalysisApp {
         
         console.log('=== FINAL CORNER DETECTION: ' + corners.length + ' corners ===');
         corners.forEach(function(c) {
-            console.log('  ' + c.name + ': ' + c.distance.toFixed(0) + 'm @ ' + c.speed + 'km/h (' + c.severity + ')');
+            var sourceTag = c.source === 'steering' ? ' [dir]' : '';
+            console.log('  ' + c.name + ': ' + c.distance.toFixed(0) + 'm @ ' + c.speed + 'km/h (' + c.severity + ')' + sourceTag);
         });
         
         // Store detected corners
