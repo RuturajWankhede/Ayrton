@@ -1111,7 +1111,7 @@ class TelemetryAnalysisApp {
         var distNames = ['Corrected Distance', 'Corrected Distance[m]', 'Lap Distance', 'Lap Distance[m]', 'Distance', 'distance', 'Dist'];
         var brakeNames = ['Brake', 'Brake[%]', 'brake'];
         var gLatNames = ['G-Force Lat', 'G-Force Lat[G]', 'Lateral G', 'LatG', 'Lat Accel', 'LateralAcceleration', 'G Lat[G]', 'G Lat'];
-        var headingNames = ['Yaw[°]', 'Yaw', 'Heading', 'Heading[°]', 'Car Heading'];
+        var headingNames = ['Yaw[°]', 'Yaw', 'Heading', 'Heading[°]', 'Car Heading', 'YawNorth[°]', 'YawNorth'];
         var steerNames = ['Steering Wheel Angle[°]', 'SteeringWheelAngle[°]', 'Steered Angle', 'Steering (Filtered)[°]', 'Steering', 'steer'];
         
         function getValue(row, names, def) {
@@ -3432,7 +3432,7 @@ class TelemetryAnalysisApp {
         var lonNames = ['GPS Longitude', 'Longitude', 'Lon'];
         var distNames = ['Corrected Distance', 'Corrected Distance[m]', 'Distance', 'Dist', 'Lap Distance', 'LapDist'];
         var distPctNames = ['LapDistPct', 'Lap Distance Pct', 'DistPct'];
-        var headingNames = ['Heading', 'Heading[°]', 'Car Heading', 'Yaw', 'Yaw[°]', 'YawRate[°/s]'];
+        var headingNames = ['Heading', 'Heading[°]', 'Car Heading', 'Yaw', 'Yaw[°]', 'YawNorth[°]', 'YawNorth', 'YawRate[°/s]'];
         var iRacingPosXNames = ['CarPosX', 'PosX', 'Car Pos X'];
         var iRacingPosZNames = ['CarPosZ', 'PosZ', 'Car Pos Z'];
         var sampleRate = Math.max(1, Math.floor(this.referenceData.length / 500));
@@ -3770,8 +3770,121 @@ class TelemetryAnalysisApp {
         this.generateSingleOverlay('throttle-overlay', refData, currData, refDist, currDist, channels.throttle);
         this.generateSingleOverlay('brake-overlay', refData, currData, refDist, currDist, channels.brake);
         this.generateSingleOverlay('steering-overlay', refData, currData, refDist, currDist, channels.steering);
-        this.generateSingleOverlay('glat-overlay', refData, currData, refDist, currDist, channels.gLat);
-        this.generateSingleOverlay('glong-overlay', refData, currData, refDist, currDist, channels.gLong);
+        
+        // Check if we have direct G-force data, otherwise try to derive it
+        var hasDirectGLat = refData.some(function(row) { return self.getValue(row, channels.gLat.names, null) !== null; });
+        var hasDirectGLong = refData.some(function(row) { return self.getValue(row, channels.gLong.names, null) !== null; });
+        
+        if (hasDirectGLat) {
+            this.generateSingleOverlay('glat-overlay', refData, currData, refDist, currDist, channels.gLat);
+        } else {
+            // Try to derive lateral G from yaw rate and speed
+            var yawNames = ['Yaw[°]', 'Yaw', 'Heading', 'Heading[°]', 'Car Heading', 'YawNorth[°]'];
+            var hasYaw = refData.some(function(row) { return self.getValue(row, yawNames, null) !== null; });
+            
+            if (hasYaw) {
+                console.log('Deriving Lateral G from Yaw/Heading data');
+                var derivedGLatChannel = { names: ['_derivedGLat'], label: 'Lateral G (from Yaw)', unit: 'G', color: channels.gLat.color };
+                
+                // Calculate derived lateral G: gLat = v * (dYaw/dt) / 9.81
+                // Or equivalently: gLat = v² * curvature / 9.81 where curvature = dYaw/ds
+                var timeNames = ['Time', 'Time[s]', 'Lap Time', 'Session Time'];
+                
+                [refData, currData].forEach(function(dataSet) {
+                    for (var i = 1; i < dataSet.length - 1; i++) {
+                        var prev = dataSet[i - 1];
+                        var curr = dataSet[i];
+                        var next = dataSet[i + 1];
+                        
+                        var yawPrev = self.getValue(prev, yawNames, null);
+                        var yawNext = self.getValue(next, yawNames, null);
+                        var speed = self.getValue(curr, channels.speed.names, null);
+                        var distPrev = self.getValue(prev, distNames, null);
+                        var distNext = self.getValue(next, distNames, null);
+                        
+                        if (yawPrev !== null && yawNext !== null && speed !== null && distPrev !== null && distNext !== null) {
+                            var dYaw = yawNext - yawPrev;
+                            // Handle angle wraparound
+                            if (dYaw > 180) dYaw -= 360;
+                            if (dYaw < -180) dYaw += 360;
+                            
+                            var dDist = distNext - distPrev;
+                            if (dDist > 0.1) {
+                                // Convert speed to m/s if needed (check if km/h or m/s)
+                                var speedMs = speed < 100 ? speed : speed / 3.6;
+                                // Curvature = dYaw(radians) / dDistance
+                                var curvature = (dYaw * Math.PI / 180) / dDist;
+                                // Lateral G = v² × curvature / g
+                                var gLat = (speedMs * speedMs * curvature) / 9.81;
+                                curr['_derivedGLat'] = gLat;
+                            }
+                        }
+                    }
+                    // Fill first and last points
+                    if (dataSet.length > 2) {
+                        dataSet[0]['_derivedGLat'] = dataSet[1]['_derivedGLat'] || 0;
+                        dataSet[dataSet.length - 1]['_derivedGLat'] = dataSet[dataSet.length - 2]['_derivedGLat'] || 0;
+                    }
+                });
+                
+                this.generateSingleOverlay('glat-overlay', refData, currData, refDist, currDist, derivedGLatChannel);
+            } else {
+                this.generateSingleOverlay('glat-overlay', refData, currData, refDist, currDist, channels.gLat);
+            }
+        }
+        
+        if (hasDirectGLong) {
+            this.generateSingleOverlay('glong-overlay', refData, currData, refDist, currDist, channels.gLong);
+        } else {
+            // Derive longitudinal G from speed change
+            var hasSpeed = refData.some(function(row) { return self.getValue(row, channels.speed.names, null) !== null; });
+            
+            if (hasSpeed) {
+                console.log('Deriving Longitudinal G from Speed data');
+                var derivedGLongChannel = { names: ['_derivedGLong'], label: 'Long G (from Speed)', unit: 'G', color: channels.gLong.color };
+                
+                // Calculate derived long G: gLong = dv/dt / 9.81
+                // Using distance: gLong = v * (dv/ds) / 9.81
+                [refData, currData].forEach(function(dataSet) {
+                    for (var i = 1; i < dataSet.length - 1; i++) {
+                        var prev = dataSet[i - 1];
+                        var curr = dataSet[i];
+                        var next = dataSet[i + 1];
+                        
+                        var speedPrev = self.getValue(prev, channels.speed.names, null);
+                        var speedCurr = self.getValue(curr, channels.speed.names, null);
+                        var speedNext = self.getValue(next, channels.speed.names, null);
+                        var distPrev = self.getValue(prev, distNames, null);
+                        var distNext = self.getValue(next, distNames, null);
+                        
+                        if (speedPrev !== null && speedNext !== null && distPrev !== null && distNext !== null) {
+                            // Convert speeds to m/s if needed
+                            var speedPrevMs = speedPrev < 100 ? speedPrev : speedPrev / 3.6;
+                            var speedCurrMs = speedCurr < 100 ? speedCurr : speedCurr / 3.6;
+                            var speedNextMs = speedNext < 100 ? speedNext : speedNext / 3.6;
+                            
+                            var dSpeed = speedNextMs - speedPrevMs;
+                            var dDist = distNext - distPrev;
+                            
+                            if (dDist > 0.1 && speedCurrMs > 1) {
+                                // gLong = v * (dv/ds) / g
+                                var gLong = (speedCurrMs * dSpeed / dDist) / 9.81;
+                                curr['_derivedGLong'] = gLong;
+                            }
+                        }
+                    }
+                    // Fill first and last points
+                    if (dataSet.length > 2) {
+                        dataSet[0]['_derivedGLong'] = dataSet[1]['_derivedGLong'] || 0;
+                        dataSet[dataSet.length - 1]['_derivedGLong'] = dataSet[dataSet.length - 2]['_derivedGLong'] || 0;
+                    }
+                });
+                
+                this.generateSingleOverlay('glong-overlay', refData, currData, refDist, currDist, derivedGLongChannel);
+            } else {
+                this.generateSingleOverlay('glong-overlay', refData, currData, refDist, currDist, channels.gLong);
+            }
+        }
         
         var hasGear = refData.some(function(row) { return self.getValue(row, channels.gear.names, null) !== null; });
         var gearContainer = document.getElementById('gear-overlay');
