@@ -3480,43 +3480,80 @@ class TelemetryAnalysisApp {
         
         if (!this.referenceData || this.referenceData.length < 10) return 'corner';
         
-        // Channel names
-        var yawNames = ['Yaw[°]', 'Yaw', 'Heading', 'Heading[°]', 'Car Heading', 'YawNorth[°]', 'YawNorth'];
-        var distNames = ['Corrected Distance', 'Corrected Distance[m]', 'Lap Distance', 'Distance', 'Dist'];
-        var gLatNames = ['G Force Lat', 'G-Force Lat', 'G-Force Lat[G]', 'gLat', 'Lateral G', 'LateralAccel', 'G_Lat', 'LatG'];
-        var speedNames = ['Ground Speed', 'Speed', 'Speed[kph]', 'Ground Speed_ms', 'speed', 'Speed_ms'];
-        var steerNames = ['Steering Angle', 'Steer', 'Steering', 'SteerAngle', 'Steer Angle[°]', 'Steer Angle', 'SteeringAngle'];
-        
         var self = this;
         
-        function getValue(row, names) {
-            for (var i = 0; i < names.length; i++) {
-                if (row && row[names[i]] !== undefined && row[names[i]] !== null) {
-                    var val = parseFloat(row[names[i]]);
-                    if (!isNaN(val)) return val;
+        // Get channel mappings from LLM-detected channels
+        var channels = this.detectedChannels || {};
+        var required = channels.required || {};
+        var optional = channels.optional || {};
+        
+        // Helper to get the actual CSV column name from detected channels
+        function getChannelColumn(channelObj) {
+            if (!channelObj) return null;
+            if (typeof channelObj === 'string') return channelObj;
+            return channelObj.csvColumn || channelObj.name || null;
+        }
+        
+        // Get mapped channel names
+        var distChannel = getChannelColumn(required.distance);
+        var steerChannel = getChannelColumn(optional.steer);
+        var gLatChannel = getChannelColumn(optional.gLat);
+        var speedChannel = getChannelColumn(required.speed);
+        var yawChannel = getChannelColumn(optional.heading); // Use heading for yaw angle
+        
+        // Fallback channel name arrays if not in detectedChannels
+        var distNames = ['Corrected Distance', 'Corrected Distance[m]', 'Lap Distance', 'Distance', 'Dist'];
+        var yawNames = ['Heading', 'Heading[°]', 'Car Heading', 'Yaw Angle', 'Yaw[°]', 'Yaw', 'YawNorth[°]', 'YawNorth'];
+        var gLatNames = ['G Force Lat', 'G-Force Lat', 'G-Force Lat[G]', 'gLat', 'Lateral G', 'LateralAccel', 'G_Lat', 'LatG', 'G Lat[G]', 'G Lat', 'Lat Accel', 'LateralAcceleration'];
+        var speedNames = ['Ground Speed', 'Speed', 'Speed[kph]', 'Ground Speed_ms', 'speed', 'Speed_ms'];
+        var steerNames = ['Steered Angle', 'Steering Angle', 'Steer', 'steer', 'STEER', 'SteerAngle', 'Steering', 'Steering Wheel Angle', 'Steering Wheel Angle[°]', 'SteeringWheelAngle[°]', 'Steering (Filtered)[°]', 'Steer Angle[°]', 'Steer Angle'];
+        
+        function getValue(row, channelName, fallbackNames) {
+            // First try the specific channel name
+            if (channelName && row[channelName] !== undefined && row[channelName] !== null) {
+                var val = parseFloat(row[channelName]);
+                if (!isNaN(val)) return val;
+            }
+            // Fallback to searching through possible names
+            if (fallbackNames) {
+                for (var i = 0; i < fallbackNames.length; i++) {
+                    if (row[fallbackNames[i]] !== undefined && row[fallbackNames[i]] !== null) {
+                        var val = parseFloat(row[fallbackNames[i]]);
+                        if (!isNaN(val)) return val;
+                    }
                 }
             }
             return null;
         }
         
-        function findChannel(names) {
+        // Find channel if not mapped
+        function findChannel(channelName, fallbackNames) {
+            if (channelName) return channelName;
             var sampleRow = self.referenceData[0];
-            for (var i = 0; i < names.length; i++) {
-                if (sampleRow && sampleRow[names[i]] !== undefined) {
-                    return names[i];
+            for (var i = 0; i < fallbackNames.length; i++) {
+                if (sampleRow && sampleRow[fallbackNames[i]] !== undefined) {
+                    return fallbackNames[i];
                 }
             }
             return null;
         }
         
-        // Find available channels
-        var distChannel = findChannel(distNames);
-        var yawChannel = findChannel(yawNames);
-        var gLatChannel = findChannel(gLatNames);
-        var speedChannel = findChannel(speedNames);
-        var steerChannel = findChannel(steerNames);
-        
+        // Ensure we have distance channel
+        distChannel = findChannel(distChannel, distNames);
         if (!distChannel) return 'corner';
+        
+        // Find other channels
+        steerChannel = findChannel(steerChannel, steerNames);
+        gLatChannel = findChannel(gLatChannel, gLatNames);
+        speedChannel = findChannel(speedChannel, speedNames);
+        yawChannel = findChannel(yawChannel, yawNames);
+        
+        console.log('Corner type detection - detectedChannels:', JSON.stringify({
+            steer: optional.steer,
+            gLat: optional.gLat,
+            heading: optional.heading
+        }));
+        console.log('Corner type detection - resolved channels - steer: ' + steerChannel + ', gLat: ' + gLatChannel + ', heading: ' + yawChannel);
         
         // Define corner zone (75m before and after apex)
         var zoneRadius = 75;
@@ -3525,7 +3562,7 @@ class TelemetryAnalysisApp {
         
         // Get data points within corner zone
         var cornerData = this.referenceData.filter(function(row) {
-            var dist = getValue(row, distNames);
+            var dist = getValue(row, distChannel, distNames);
             return dist !== null && dist >= startDist && dist <= endDist;
         });
         
@@ -3538,8 +3575,8 @@ class TelemetryAnalysisApp {
         // Steering is independent of circuit direction (CW vs CCW)
         if (steerChannel) {
             var steerAngles = cornerData.map(function(row) {
-                return getValue(row, steerNames);
-            }).filter(function(s) { return s !== null; });
+                return getValue(row, steerChannel, steerNames);
+            }).filter(function(s) { return s !== null && Math.abs(s) > 1; });
             
             if (steerAngles.length > 3) {
                 // Find peak steering angle (largest absolute value)
@@ -3550,17 +3587,19 @@ class TelemetryAnalysisApp {
                     }
                 }
                 
-                // Positive steering = right turn, negative = left turn
-                // (This is the convention for most racing sims and data loggers)
-                direction = peakSteer > 0 ? 'right' : 'left';
+                if (Math.abs(peakSteer) > 5) {
+                    // Positive steering = right turn, negative = left turn
+                    direction = peakSteer > 0 ? 'right' : 'left';
+                    console.log('Corner at ' + cornerDistance + 'm: direction from steering = ' + direction + ' (peak: ' + peakSteer.toFixed(1) + '°)');
+                }
             }
         }
         
         // If no steering data, try lateral G for direction
         if (!direction && gLatChannel) {
             var gLatValues = cornerData.map(function(row) {
-                return getValue(row, gLatNames);
-            }).filter(function(g) { return g !== null; });
+                return getValue(row, gLatChannel, gLatNames);
+            }).filter(function(g) { return g !== null && Math.abs(g) > 0.1; });
             
             if (gLatValues.length > 3) {
                 var sumGLat = 0;
@@ -3568,15 +3607,21 @@ class TelemetryAnalysisApp {
                     sumGLat += gLatValues[i];
                 }
                 var avgGLat = sumGLat / gLatValues.length;
-                // Positive lateral G = right turn (convention varies, but consistent within dataset)
-                direction = avgGLat > 0 ? 'right' : 'left';
+                if (Math.abs(avgGLat) > 0.2) {
+                    direction = avgGLat > 0 ? 'right' : 'left';
+                    console.log('Corner at ' + cornerDistance + 'm: direction from lateral G = ' + direction + ' (avg: ' + avgGLat.toFixed(2) + 'G)');
+                }
             }
+        }
+        
+        if (!direction) {
+            console.log('Corner at ' + cornerDistance + 'm: could not determine direction');
         }
         
         // METHOD 1: Heading/Yaw change for severity (most accurate for corner type)
         if (yawChannel) {
-            var startYaw = getValue(cornerData[0], yawNames);
-            var endYaw = getValue(cornerData[cornerData.length - 1], yawNames);
+            var startYaw = getValue(cornerData[0], yawChannel, yawNames);
+            var endYaw = getValue(cornerData[cornerData.length - 1], yawChannel, yawNames);
             
             if (startYaw !== null && endYaw !== null) {
                 var headingChange = endYaw - startYaw;
@@ -3609,7 +3654,7 @@ class TelemetryAnalysisApp {
         // METHOD 2: Lateral G for severity (fallback)
         if (gLatChannel) {
             var gLatValues = cornerData.map(function(row) {
-                return getValue(row, gLatNames);
+                return getValue(row, gLatChannel, gLatNames);
             }).filter(function(g) { return g !== null; });
             
             if (gLatValues.length > 3) {
@@ -3644,7 +3689,7 @@ class TelemetryAnalysisApp {
         // METHOD 3: Speed reduction for severity (last resort)
         if (speedChannel) {
             var speeds = cornerData.map(function(row) {
-                return getValue(row, speedNames);
+                return getValue(row, speedChannel, speedNames);
             }).filter(function(s) { return s !== null && s > 0; });
             
             if (speeds.length > 3) {
