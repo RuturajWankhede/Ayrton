@@ -2524,8 +2524,11 @@ class TelemetryAnalysisApp {
         // Try to get lap delta from multiple sources
         var lapDelta = sessionData.timeDelta || sessionData.lapDelta || analysis.timeDelta || 0;
         
-        // If lap delta is 0, calculate it from the telemetry data
-        if (lapDelta === 0 && this.referenceData && this.currentData) {
+        // Always calculate lap times from telemetry for grip efficiency
+        var refEndTime = null;
+        var currEndTime = null;
+        
+        if (this.referenceData && this.currentData) {
             var timeNames = ['Time', 'Elapsed Time', 'Session Time', 'time'];
             var getValue = function(row, names) {
                 for (var i = 0; i < names.length; i++) {
@@ -2537,26 +2540,29 @@ class TelemetryAnalysisApp {
                 return null;
             };
             
-            var refEndTime = getValue(this.referenceData[this.referenceData.length - 1], timeNames);
-            var currEndTime = getValue(this.currentData[this.currentData.length - 1], timeNames);
+            refEndTime = getValue(this.referenceData[this.referenceData.length - 1], timeNames);
+            currEndTime = getValue(this.currentData[this.currentData.length - 1], timeNames);
             
-            if (refEndTime !== null && currEndTime !== null) {
+            // If lap delta is 0, calculate it from the telemetry data
+            if (lapDelta === 0 && refEndTime !== null && currEndTime !== null) {
                 lapDelta = currEndTime - refEndTime;
                 console.log('Calculated lap delta from telemetry:', lapDelta);
             }
         }
         
-        // Store the lap delta for use in the analysis tab
+        // Store the lap delta and lap times for use in the analysis tab
         this.sessionData.lapDelta = lapDelta;
         this.sessionData.timeDelta = lapDelta;
+        this.sessionData.refLapTime = refEndTime;
+        this.sessionData.currLapTime = currEndTime;
         this.sessionData.driver = sessionData.driver || document.getElementById('driver-name').value || 'Driver';
         this.sessionData.track = sessionData.track || document.getElementById('track-name').value || 'Track';
         
         document.getElementById('lap-delta').textContent = (lapDelta > 0 ? '+' : '') + lapDelta.toFixed(3) + 's';
         
-        var gripUsage = this.calculateGripUsage();
-        if (gripUsage !== null) {
-            document.getElementById('g-force-usage').textContent = gripUsage.toFixed(0) + '%';
+        var gripEfficiency = this.calculateGripEfficiency();
+        if (gripEfficiency !== null) {
+            document.getElementById('g-force-usage').textContent = gripEfficiency.toFixed(0) + '%';
         } else {
             document.getElementById('g-force-usage').textContent = '--';
         }
@@ -3109,9 +3115,29 @@ class TelemetryAnalysisApp {
         return html;
     }
     
-    calculateGripUsage() {
+    calculateGripEfficiency() {
         var self = this;
         if (!this.referenceData || !this.currentData) return null;
+        
+        // Get lap times from telemetry
+        var timeNames = ['Time', 'Time[s]', 'Lap Time', 'Session Time', 'time'];
+        function getValue(row, names) {
+            for (var i = 0; i < names.length; i++) {
+                if (row && row[names[i]] !== undefined && row[names[i]] !== null) {
+                    var val = parseFloat(row[names[i]]);
+                    if (!isNaN(val)) return val;
+                }
+            }
+            return null;
+        }
+        
+        var refEndTime = getValue(this.referenceData[this.referenceData.length - 1], timeNames);
+        var currEndTime = getValue(this.currentData[this.currentData.length - 1], timeNames);
+        
+        if (!refEndTime || !currEndTime || refEndTime <= 0 || currEndTime <= 0) {
+            console.log('Grip efficiency: no lap time data available');
+            return null;
+        }
         
         // Look for direct lateral G channel
         var gLatChannel = null;
@@ -3134,7 +3160,7 @@ class TelemetryAnalysisApp {
         
         if (gLatChannel) {
             // Use direct lateral G data
-            console.log('Grip usage: using direct lateral G channel:', gLatChannel);
+            console.log('Grip efficiency: using direct lateral G channel:', gLatChannel);
             refGLat = this.referenceData.map(function(row) {
                 var val = parseFloat(row[gLatChannel]);
                 return isNaN(val) ? 0 : Math.abs(val);
@@ -3175,11 +3201,11 @@ class TelemetryAnalysisApp {
             }
             
             if (!yawChannel || !speedChannel || !distChannel) {
-                console.log('Grip usage: insufficient data (no lateral G, yaw, speed, or distance)');
+                console.log('Grip efficiency: insufficient data (no lateral G, yaw, speed, or distance)');
                 return null;
             }
             
-            console.log('Grip usage: deriving lateral G from yaw/speed');
+            console.log('Grip efficiency: deriving lateral G from yaw/speed');
             
             // Calculate derived lateral G for reference lap
             for (var i = 1; i < this.referenceData.length - 1; i++) {
@@ -3241,11 +3267,11 @@ class TelemetryAnalysisApp {
         }
         
         if (refGLat.length < 10 || currGLat.length < 10) {
-            console.log('Grip usage: insufficient G data points (ref:', refGLat.length, ', curr:', currGLat.length, ')');
+            console.log('Grip efficiency: insufficient G data points (ref:', refGLat.length, ', curr:', currGLat.length, ')');
             return null;
         }
         
-        // Sort and take top 10%
+        // Sort and take top 10% (peak cornering G)
         refGLat.sort(function(a, b) { return b - a; });
         currGLat.sort(function(a, b) { return b - a; });
         
@@ -3255,14 +3281,25 @@ class TelemetryAnalysisApp {
         var avgTopRefG = top10PercentRef.reduce(function(a, b) { return a + b; }, 0) / top10PercentRef.length;
         var avgTopCurrG = top10PercentCurr.reduce(function(a, b) { return a + b; }, 0) / top10PercentCurr.length;
         
-        console.log('Grip usage: ref top 10% avg G =', avgTopRefG.toFixed(3), ', curr top 10% avg G =', avgTopCurrG.toFixed(3));
-        
-        if (avgTopRefG > 0.1) {
-            var gripUsage = (avgTopCurrG / avgTopRefG) * 100;
-            return Math.min(Math.max(gripUsage, 0), 120);
+        if (avgTopRefG < 0.1 || avgTopCurrG < 0.1) {
+            console.log('Grip efficiency: G values too low');
+            return null;
         }
         
-        return null;
+        // Calculate efficiency
+        // Efficiency = (RefTime / YourTime) × (RefG / YourG) × 100
+        // Faster lap (lower time) + less G = higher efficiency
+        // Slower lap (higher time) + more G = lower efficiency
+        var timeRatio = refEndTime / currEndTime;  // >1 if you're faster
+        var gRatio = avgTopRefG / avgTopCurrG;      // >1 if you use less G
+        
+        var efficiency = timeRatio * gRatio * 100;
+        
+        console.log('Grip efficiency: refTime=' + refEndTime.toFixed(3) + 's, currTime=' + currEndTime.toFixed(3) + 's');
+        console.log('Grip efficiency: refG=' + avgTopRefG.toFixed(3) + ', currG=' + avgTopCurrG.toFixed(3));
+        console.log('Grip efficiency: timeRatio=' + timeRatio.toFixed(3) + ', gRatio=' + gRatio.toFixed(3) + ', efficiency=' + efficiency.toFixed(1) + '%');
+        
+        return Math.min(Math.max(efficiency, 0), 150);
     }
     
     generateGraphs(analysis) {
