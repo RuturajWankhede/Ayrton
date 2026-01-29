@@ -221,11 +221,11 @@ class TelemetryAnalysisApp {
         var sessionFile = document.getElementById('session-file');
         if (sessionUpload && sessionFile) {
             sessionUpload.addEventListener('click', function() { sessionFile.click(); });
-            sessionUpload.addEventListener('dragover', function(e) { e.preventDefault(); sessionUpload.classList.add('border-blue-500', 'bg-blue-900/20'); });
-            sessionUpload.addEventListener('dragleave', function() { sessionUpload.classList.remove('border-blue-500', 'bg-blue-900/20'); });
+            sessionUpload.addEventListener('dragover', function(e) { e.preventDefault(); sessionUpload.classList.add('border-b border-[#30363d]lue-500', 'bg-blue-900/20'); });
+            sessionUpload.addEventListener('dragleave', function() { sessionUpload.classList.remove('border-b border-[#30363d]lue-500', 'bg-blue-900/20'); });
             sessionUpload.addEventListener('drop', function(e) {
                 e.preventDefault();
-                sessionUpload.classList.remove('border-blue-500', 'bg-blue-900/20');
+                sessionUpload.classList.remove('border-b border-[#30363d]lue-500', 'bg-blue-900/20');
                 if (e.dataTransfer.files.length > 0) self.handleSessionFile(e.dataTransfer.files[0]);
             });
             sessionFile.addEventListener('change', function(e) {
@@ -301,7 +301,7 @@ class TelemetryAnalysisApp {
         document.getElementById('session-upload').innerHTML = 
             '<i class="fas fa-spinner fa-spin text-4xl text-blue-400 mb-2"></i>' +
             '<p>Loading session... <span id="load-progress">0%</span></p>' +
-            '<p class="text-xs text-gray-500">' + fileSizeMB.toFixed(1) + ' MB - large files may take a while</p>';
+            '<p class="text-xs text-[#8b949e]">' + fileSizeMB.toFixed(1) + ' MB - large files may take a while</p>';
         
         // For large files (>50MB), use chunked reading to avoid memory issues
         if (fileSizeMB > 50) {
@@ -360,7 +360,7 @@ class TelemetryAnalysisApp {
                 document.getElementById('session-upload').innerHTML = 
                     '<i class="fas fa-check-circle text-4xl text-green-400 mb-2"></i>' +
                     '<p class="text-green-400 font-medium">' + file.name + '</p>' +
-                    '<p class="text-sm text-gray-400">' + self.detectedLaps.length + ' laps • ' + parsedData.length.toLocaleString() + ' data points</p>';
+                    '<p class="text-sm text-[#6e7681]">' + self.detectedLaps.length + ' laps • ' + parsedData.length.toLocaleString() + ' data points</p>';
                 
             } catch(err) {
                 console.error('=== SESSION PARSING ERROR ===');
@@ -485,7 +485,7 @@ class TelemetryAnalysisApp {
                 document.getElementById('session-upload').innerHTML = 
                     '<i class="fas fa-check-circle text-4xl text-green-400 mb-2"></i>' +
                     '<p class="text-green-400 font-medium">' + file.name + '</p>' +
-                    '<p class="text-sm text-gray-400">' + self.detectedLaps.length + ' laps • ' + parsedData.length.toLocaleString() + ' points • ' + fileSizeMB.toFixed(0) + 'MB</p>';
+                    '<p class="text-sm text-[#6e7681]">' + self.detectedLaps.length + ' laps • ' + parsedData.length.toLocaleString() + ' points • ' + fileSizeMB.toFixed(0) + 'MB</p>';
                     
             } catch(err) {
                 console.error('Large file parsing error:', err);
@@ -641,7 +641,7 @@ class TelemetryAnalysisApp {
         document.getElementById('session-upload').innerHTML = 
             '<i class="fas fa-folder-open text-4xl text-blue-400 mb-2"></i>' +
             '<p>Drop full session CSV here</p>' +
-            '<p class="text-sm text-gray-500">or click to browse</p>';
+            '<p class="text-sm text-[#8b949e]">or click to browse</p>';
     }
     
     detectLapsInSession() {
@@ -815,12 +815,12 @@ class TelemetryAnalysisApp {
         if (!container) return;
         
         if (this.detectedLaps.length === 0) {
-            container.innerHTML = '<p class="text-gray-400 text-center py-8">No laps detected. Upload a session file above.</p>';
+            container.innerHTML = '<p class="text-[#6e7681] text-center py-8">No laps detected. Upload a session file above.</p>';
             return;
         }
         
         var html = '<div class="mb-4 flex items-center justify-between">';
-        html += '<div class="text-sm text-gray-400">' + this.detectedLaps.length + ' laps detected</div>';
+        html += '<div class="text-sm text-[#6e7681]">' + this.detectedLaps.length + ' laps detected</div>';
         html += '<div class="flex gap-2">';
         html += '<button id="auto-select-best" class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm">Auto-select Best</button>';
         html += '<button id="clear-selection" class="px-3 py-1 bg-gray-600 hover:bg-gray-700 rounded text-sm">Clear</button>';
@@ -845,7 +845,7 @@ class TelemetryAnalysisApp {
             var rowClass = lap.isFastest ? 'bg-green-900/30' : (lap.isComplete ? '' : 'bg-yellow-900/20 opacity-60');
             var timeClass = lap.isFastest ? 'text-green-400 font-bold' : '';
             
-            html += '<tr class="border-b border-gray-700 hover:bg-gray-700/50 ' + rowClass + '">';
+            html += '<tr class="border-b border-[#30363d] border-gray-700 hover:bg-gray-700/50 ' + rowClass + '">';
             html += '<td class="px-3 py-2">';
             html += '<span class="font-mono">' + lap.lapNumber + '</span>';
             if (lap.isFastest) html += ' <span class="text-green-400 text-xs">★ FASTEST</span>';
@@ -855,7 +855,7 @@ class TelemetryAnalysisApp {
             html += '<td class="px-3 py-2 text-center font-mono">' + Math.round(lap.minSpeed) + '</td>';
             html += '<td class="px-3 py-2 text-center font-mono">' + Math.round(lap.maxSpeed) + '</td>';
             html += '<td class="px-3 py-2 text-center font-mono">' + Math.round(lap.avgSpeed) + '</td>';
-            html += '<td class="px-3 py-2 text-center text-gray-400">' + lap.dataPoints + '</td>';
+            html += '<td class="px-3 py-2 text-center text-[#6e7681]">' + lap.dataPoints + '</td>';
             html += '<td class="px-3 py-2 text-center">';
             html += '<input type="radio" name="ref-lap" value="' + idx + '" class="ref-lap-radio w-4 h-4 accent-cyan-500" ' + (self.selectedRefLap === idx ? 'checked' : '') + '>';
             html += '</td>';
@@ -2117,49 +2117,49 @@ class TelemetryAnalysisApp {
         html += '</div><button id="toggle-channel-details" class="text-xs px-3 py-1.5 rounded border border-[#30363d] bg-[#21262d] text-[#8b949e] hover:bg-[#30363d] hover:text-white transition" style="font-family: Rajdhani, sans-serif;"><i class="fas fa-chevron-down mr-1"></i>Details</button></div></div>';
         
         if (detected.capabilities.length > 0) {
-            html += '<div class="p-4 bg-white border-b"><h4 class="font-semibold text-gray-700 mb-2"><i class="fas fa-bolt text-yellow-500 mr-2"></i>Analysis Capabilities</h4><div class="flex flex-wrap gap-2">';
+            html += '<div class="p-4 bg-[#161b22] border-b border-[#30363d]"><h4 class="font-semibold text-[#c9d1d9] mb-2"><i class="fas fa-bolt text-yellow-500 mr-2"></i>Analysis Capabilities</h4><div class="flex flex-wrap gap-2">';
             detected.capabilities.forEach(function(cap) { html += '<span class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-' + cap.color + '-100 text-' + cap.color + '-800"><i class="fas ' + cap.icon + ' mr-1"></i>' + cap.name + '</span>'; });
             html += '</div></div>';
         }
         
-        html += '<div class="p-4 border-b" id="required-channels-section"><h4 class="font-semibold text-gray-700 mb-2"><i class="fas fa-star text-yellow-500 mr-2"></i>Required Channels (' + requiredCount + '/3)</h4><div class="grid md:grid-cols-3 gap-2">';
+        html += '<div class="p-4 border-b border-[#30363d]" id="required-channels-section"><h4 class="font-semibold text-[#c9d1d9] mb-2"><i class="fas fa-star text-yellow-500 mr-2"></i>Required Channels (' + requiredCount + '/3)</h4><div class="grid md:grid-cols-3 gap-2">';
         ['time', 'distance', 'speed'].forEach(function(key) {
             if (detected.required[key]) {
                 var ch = detected.required[key];
-                html += '<div class="bg-green-50 border border-green-200 rounded p-2"><div class="flex items-center justify-between"><span class="font-medium text-green-800"><i class="fas ' + ch.icon + ' mr-1"></i>' + key + '</span><i class="fas fa-check-circle text-green-500"></i></div><code class="text-xs text-gray-500">' + ch.csvColumn + '</code></div>';
+                html += '<div class="bg-green-900/20 border border-green-700 rounded p-2"><div class="flex items-center justify-between"><span class="font-medium text-green-800"><i class="fas ' + ch.icon + ' mr-1"></i>' + key + '</span><i class="fas fa-check-circle text-green-500"></i></div><code class="text-xs text-[#8b949e]">' + ch.csvColumn + '</code></div>';
             } else {
-                html += '<div class="bg-red-50 border border-red-200 rounded p-2"><div class="flex items-center justify-between"><span class="font-medium text-red-800">' + key + '</span><i class="fas fa-times-circle text-red-500"></i></div><span class="text-xs text-red-500">Missing</span></div>';
+                html += '<div class="bg-red-900/20 border border-red-700 rounded p-2"><div class="flex items-center justify-between"><span class="font-medium text-red-800">' + key + '</span><i class="fas fa-times-circle text-red-500"></i></div><span class="text-xs text-red-500">Missing</span></div>';
             }
         });
         html += '</div></div>';
         
-        html += '<div class="p-4 border-b" id="optional-channels-section" style="display:none;"><h4 class="font-semibold text-gray-700 mb-2"><i class="fas fa-plus-circle text-blue-500 mr-2"></i>Optional Channels (' + optionalCount + ' found)</h4>';
+        html += '<div class="p-4 border-b border-[#30363d]" id="optional-channels-section" style="display:none;"><h4 class="font-semibold text-[#c9d1d9] mb-2"><i class="fas fa-plus-circle text-blue-500 mr-2"></i>Optional Channels (' + optionalCount + ' found)</h4>';
         var categories = {};
         Object.keys(detected.optional).forEach(function(key) { var ch = detected.optional[key]; if (!categories[ch.category]) categories[ch.category] = []; categories[ch.category].push({ key: key, data: ch }); });
         Object.keys(categories).forEach(function(cat) {
-            html += '<div class="mb-3"><h5 class="text-sm font-medium text-gray-600 mb-1">' + cat + '</h5><div class="flex flex-wrap gap-1">';
-            categories[cat].forEach(function(item) { html += '<span class="inline-flex items-center px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs"><i class="fas ' + item.data.icon + ' mr-1"></i>' + item.key + '</span>'; });
+            html += '<div class="mb-3"><h5 class="text-sm font-medium text-[#8b949e] mb-1">' + cat + '</h5><div class="flex flex-wrap gap-1">';
+            categories[cat].forEach(function(item) { html += '<span class="inline-flex items-center px-2 py-1 bg-blue-900/20 text-blue-700 rounded text-xs"><i class="fas ' + item.data.icon + ' mr-1"></i>' + item.key + '</span>'; });
             html += '</div></div>';
         });
         html += '</div>';
         
         if (detected.unrecognized.length > 0) {
-            html += '<div class="p-4 bg-gray-50" id="unrecognized-section" style="display:none;">';
-            html += '<div class="flex items-center justify-between mb-3"><h4 class="font-semibold text-gray-600"><i class="fas fa-question-circle text-gray-400 mr-2"></i>Unrecognized Columns (' + detected.unrecognized.length + ')</h4>';
-            html += '<button id="expand-all-columns" class="text-sm bg-white px-3 py-1 rounded border hover:bg-gray-100"><i class="fas fa-expand-alt mr-1"></i>Show All</button></div>';
-            html += '<p class="text-xs text-blue-600 mb-3"><i class="fas fa-info-circle mr-1"></i>Click on any column to manually assign it to a telemetry channel</p>';
+            html += '<div class="p-4 bg-[#21262d]" id="unrecognized-section" style="display:none;">';
+            html += '<div class="flex items-center justify-between mb-3"><h4 class="font-semibold text-[#8b949e]"><i class="fas fa-question-circle text-[#6e7681] mr-2"></i>Unrecognized Columns (' + detected.unrecognized.length + ')</h4>';
+            html += '<button id="expand-all-columns" class="text-sm bg-[#161b22] px-3 py-1 rounded border hover:bg-[#30363d]"><i class="fas fa-expand-alt mr-1"></i>Show All</button></div>';
+            html += '<p class="text-xs text-blue-400 mb-3"><i class="fas fa-info-circle mr-1"></i>Click on any column to manually assign it to a telemetry channel</p>';
             html += '<div id="unrecognized-columns-list" class="flex flex-wrap gap-1">';
             detected.unrecognized.forEach(function(col, index) {
                 var hiddenClass = index >= 20 ? ' hidden-column' : '';
                 var displayStyle = index >= 20 ? ' style="display:none;"' : '';
-                html += '<button class="unrecognized-col-btn' + hiddenClass + ' bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded hover:bg-blue-200 hover:text-blue-800 cursor-pointer transition" data-column="' + self.escapeHtml(col) + '"' + displayStyle + '>' + self.escapeHtml(col) + '</button>';
+                html += '<button class="unrecognized-col-btn' + hiddenClass + ' bg-[#30363d] text-[#c9d1d9] text-xs px-2 py-1 rounded hover:bg-blue-200 hover:text-blue-800 cursor-pointer transition" data-column="' + self.escapeHtml(col) + '"' + displayStyle + '>' + self.escapeHtml(col) + '</button>';
             });
             html += '</div>';
-            if (detected.unrecognized.length > 20) html += '<p id="columns-count-text" class="text-gray-500 text-xs mt-2">Showing 20 of ' + detected.unrecognized.length + ' columns</p>';
+            if (detected.unrecognized.length > 20) html += '<p id="columns-count-text" class="text-[#8b949e] text-xs mt-2">Showing 20 of ' + detected.unrecognized.length + ' columns</p>';
             html += '</div>';
         }
         
-        html += '<div class="p-4 bg-blue-50 border-t" id="custom-mappings-section" style="display:none;"><h4 class="font-semibold text-gray-700 mb-2"><i class="fas fa-link text-blue-500 mr-2"></i>Custom Channel Mappings</h4>';
+        html += '<div class="p-4 bg-blue-900/20 border-t" id="custom-mappings-section" style="display:none;"><h4 class="font-semibold text-[#c9d1d9] mb-2"><i class="fas fa-link text-blue-500 mr-2"></i>Custom Channel Mappings</h4>';
         html += '<div id="custom-mappings-list" class="space-y-1"></div>';
         html += '<button id="apply-mappings-btn" class="mt-3 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"><i class="fas fa-check mr-2"></i>Save Mappings</button></div>';
         
@@ -2192,19 +2192,19 @@ class TelemetryAnalysisApp {
             { category: 'Position', channels: [{ key: 'gpsLat', name: 'GPS Lat', icon: 'fa-map-marker-alt' }, { key: 'gpsLon', name: 'GPS Lon', icon: 'fa-map-marker-alt' }]}
         ];
         
-        var modalHtml = '<div class="bg-white rounded-lg p-6 max-w-lg w-full mx-4 max-h-screen overflow-y-auto">';
+        var modalHtml = '<div class="bg-[#161b22] rounded-lg p-6 max-w-lg w-full mx-4 max-h-screen overflow-y-auto">';
         modalHtml += '<div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold"><i class="fas fa-link text-blue-500 mr-2"></i>Map Column to Channel</h3>';
-        modalHtml += '<button id="close-mapping-modal" class="text-gray-500 hover:text-gray-700 text-xl"><i class="fas fa-times"></i></button></div>';
-        modalHtml += '<div class="mb-4 p-3 bg-blue-50 rounded"><p class="text-sm text-gray-600">CSV Column:</p><p id="mapping-column-name" class="font-bold text-blue-700 text-lg"></p></div>';
-        modalHtml += '<p class="text-sm text-gray-500 mb-4">Select the telemetry channel:</p>';
+        modalHtml += '<button id="close-mapping-modal" class="text-[#8b949e] hover:text-[#c9d1d9] text-xl"><i class="fas fa-times"></i></button></div>';
+        modalHtml += '<div class="mb-4 p-3 bg-blue-900/20 rounded"><p class="text-sm text-[#8b949e]">CSV Column:</p><p id="mapping-column-name" class="font-bold text-blue-700 text-lg"></p></div>';
+        modalHtml += '<p class="text-sm text-[#8b949e] mb-4">Select the telemetry channel:</p>';
         
         channelOptions.forEach(function(group) {
-            modalHtml += '<div class="mb-4"><h4 class="text-sm font-semibold text-gray-600 mb-2">' + group.category + '</h4><div class="grid grid-cols-2 gap-2">';
-            group.channels.forEach(function(ch) { modalHtml += '<button class="channel-option-btn text-left p-2 border rounded hover:bg-blue-50 hover:border-blue-300 transition text-sm" data-channel="' + ch.key + '"><i class="fas ' + ch.icon + ' text-gray-400 mr-2"></i>' + ch.name + '</button>'; });
+            modalHtml += '<div class="mb-4"><h4 class="text-sm font-semibold text-[#8b949e] mb-2">' + group.category + '</h4><div class="grid grid-cols-2 gap-2">';
+            group.channels.forEach(function(ch) { modalHtml += '<button class="channel-option-btn text-left p-2 border rounded hover:bg-blue-900/20 hover:border-b border-[#30363d]lue-300 transition text-sm" data-channel="' + ch.key + '"><i class="fas ' + ch.icon + ' text-[#6e7681] mr-2"></i>' + ch.name + '</button>'; });
             modalHtml += '</div></div>';
         });
         
-        modalHtml += '<div class="mt-4 pt-4 border-t"><button id="remove-mapping-btn" class="w-full p-2 border border-red-300 text-red-600 rounded hover:bg-red-50 transition text-sm"><i class="fas fa-trash mr-2"></i>Remove Mapping</button></div></div>';
+        modalHtml += '<div class="mt-4 pt-4 border-t"><button id="remove-mapping-btn" class="w-full p-2 border border-red-300 text-red-400 rounded hover:bg-red-900/20 transition text-sm"><i class="fas fa-trash mr-2"></i>Remove Mapping</button></div></div>';
         
         modal.innerHTML = modalHtml;
         document.body.appendChild(modal);
@@ -2263,7 +2263,7 @@ class TelemetryAnalysisApp {
                     if (confirm('"' + channelKey + '" is mapped to "' + existingColumnForChannel + '". Replace?')) {
                         delete self.customMappings[existingColumnForChannel];
                         var oldBtn = document.querySelector('.unrecognized-col-btn[data-column="' + existingColumnForChannel.replace(/"/g, '\\"') + '"]');
-                        if (oldBtn) { oldBtn.classList.remove('bg-green-200', 'text-green-800'); oldBtn.classList.add('bg-gray-200', 'text-gray-700'); }
+                        if (oldBtn) { oldBtn.classList.remove('bg-green-200', 'text-green-800'); oldBtn.classList.add('bg-[#30363d]', 'text-[#c9d1d9]'); }
                         self.addCustomMapping(columnName, channelKey);
                         self.closeMappingModal();
                     }
@@ -2314,7 +2314,7 @@ class TelemetryAnalysisApp {
                 var channelKey = btn.getAttribute('data-channel');
                 var mappedColumn = channelToColumn[channelKey];
                 
-                btn.classList.remove('bg-green-100', 'border-green-500', 'bg-yellow-50', 'border-yellow-400', 'opacity-60');
+                btn.classList.remove('bg-green-100', 'border-green-500', 'bg-yellow-900/20', 'border-yellow-400', 'opacity-60');
                 btn.style.position = 'relative';
                 
                 var oldBadge = btn.querySelector('.mapping-badge');
@@ -2323,13 +2323,13 @@ class TelemetryAnalysisApp {
                 if (existingMapping && channelKey === existingMapping) {
                     btn.classList.add('bg-green-100', 'border-green-500');
                     var badge = document.createElement('span');
-                    badge.className = 'mapping-badge absolute top-1 right-1 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded';
+                    badge.className = 'mapping-badge absolute top-1 right-1 bg-green-900/200 text-white text-xs px-1.5 py-0.5 rounded';
                     badge.innerHTML = '<i class="fas fa-check"></i> Current';
                     btn.appendChild(badge);
                 } else if (mappedColumn) {
-                    btn.classList.add('bg-yellow-50', 'border-yellow-400', 'opacity-60');
+                    btn.classList.add('bg-yellow-900/20', 'border-yellow-400', 'opacity-60');
                     var badge = document.createElement('span');
-                    badge.className = 'mapping-badge absolute top-1 right-1 bg-yellow-500 text-white text-xs px-1.5 py-0.5 rounded max-w-24 truncate';
+                    badge.className = 'mapping-badge absolute top-1 right-1 bg-yellow-900/200 text-white text-xs px-1.5 py-0.5 rounded max-w-24 truncate';
                     badge.title = 'Mapped to: ' + mappedColumn;
                     badge.innerHTML = '<i class="fas fa-link"></i> ' + (mappedColumn.length > 10 ? mappedColumn.substring(0, 10) + '...' : mappedColumn);
                     btn.appendChild(badge);
@@ -2348,7 +2348,7 @@ class TelemetryAnalysisApp {
         this.updateCustomMappingsDisplay();
         this.showNotification('Mapped "' + columnName + '" to ' + channelKey, 'success');
         var colBtn = document.querySelector('.unrecognized-col-btn[data-column="' + columnName.replace(/"/g, '\\"') + '"]');
-        if (colBtn) { colBtn.classList.remove('bg-gray-200', 'text-gray-700'); colBtn.classList.add('bg-green-200', 'text-green-800'); }
+        if (colBtn) { colBtn.classList.remove('bg-[#30363d]', 'text-[#c9d1d9]'); colBtn.classList.add('bg-green-200', 'text-green-800'); }
     }
     
     removeCustomMapping(columnName) {
@@ -2357,7 +2357,7 @@ class TelemetryAnalysisApp {
             this.updateCustomMappingsDisplay();
             this.showNotification('Removed mapping for "' + columnName + '"', 'info');
             var colBtn = document.querySelector('.unrecognized-col-btn[data-column="' + columnName.replace(/"/g, '\\"') + '"]');
-            if (colBtn) { colBtn.classList.remove('bg-green-200', 'text-green-800'); colBtn.classList.add('bg-gray-200', 'text-gray-700'); }
+            if (colBtn) { colBtn.classList.remove('bg-green-200', 'text-green-800'); colBtn.classList.add('bg-[#30363d]', 'text-[#c9d1d9]'); }
         }
     }
     
@@ -2371,8 +2371,8 @@ class TelemetryAnalysisApp {
             mappingsSection.style.display = 'block';
             var html = '';
             mappingKeys.forEach(function(col) {
-                html += '<div class="flex items-center justify-between bg-white p-2 rounded border"><div><code class="text-sm text-gray-600">' + self.escapeHtml(col) + '</code>';
-                html += '<span class="text-gray-400 mx-2"><i class="fas fa-arrow-right"></i></span><span class="text-blue-600 font-medium">' + self.customMappings[col] + '</span></div>';
+                html += '<div class="flex items-center justify-between bg-[#161b22] p-2 rounded border"><div><code class="text-sm text-[#8b949e]">' + self.escapeHtml(col) + '</code>';
+                html += '<span class="text-[#6e7681] mx-2"><i class="fas fa-arrow-right"></i></span><span class="text-blue-400 font-medium">' + self.customMappings[col] + '</span></div>';
                 html += '<button class="remove-single-mapping text-red-500 hover:text-red-700" data-column="' + self.escapeHtml(col) + '"><i class="fas fa-times"></i></button></div>';
             });
             mappingsList.innerHTML = html;
@@ -2601,7 +2601,7 @@ class TelemetryAnalysisApp {
             if (tabContainer) tabContainer.appendChild(analysisTab);
             
             // Add tab button
-            var tabBtnContainer = document.querySelector('.flex.border-b') || document.querySelector('[class*="tab-btn"]').parentElement;
+            var tabBtnContainer = document.querySelector('.flex.border-b border-[#30363d]') || document.querySelector('[class*="tab-btn"]').parentElement;
             if (tabBtnContainer && !document.querySelector('[data-tab="analysis"]')) {
                 var analysisBtn = document.createElement('button');
                 analysisBtn.className = 'tab-btn';
@@ -2628,9 +2628,9 @@ class TelemetryAnalysisApp {
         html += '</div>';
         
         // Sub-tabs
-        html += '<div class="flex space-x-4 mb-6 border-b border-gray-200 pb-4">';
-        html += '<button id="driving-tab-btn" onclick="document.getElementById(\'driving-section\').classList.remove(\'hidden\');document.getElementById(\'setup-section\').classList.add(\'hidden\');this.classList.add(\'bg-red-600\',\'text-white\');this.classList.remove(\'bg-gray-200\',\'text-gray-700\');document.getElementById(\'setup-tab-btn\').classList.remove(\'bg-red-600\',\'text-white\');document.getElementById(\'setup-tab-btn\').classList.add(\'bg-gray-200\',\'text-gray-700\')" class="px-6 py-3 rounded-lg font-semibold bg-red-600 text-white transition"><i class="fas fa-steering-wheel mr-2"></i>Driving Analysis</button>';
-        html += '<button id="setup-tab-btn" onclick="document.getElementById(\'setup-section\').classList.remove(\'hidden\');document.getElementById(\'driving-section\').classList.add(\'hidden\');this.classList.add(\'bg-red-600\',\'text-white\');this.classList.remove(\'bg-gray-200\',\'text-gray-700\');document.getElementById(\'driving-tab-btn\').classList.remove(\'bg-red-600\',\'text-white\');document.getElementById(\'driving-tab-btn\').classList.add(\'bg-gray-200\',\'text-gray-700\')" class="px-6 py-3 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition"><i class="fas fa-wrench mr-2"></i>Setup Recommendations</button>';
+        html += '<div class="flex space-x-4 mb-6 border-b border-[#30363d] pb-4">';
+        html += '<button id="driving-tab-btn" onclick="document.getElementById(\'driving-section\').classList.remove(\'hidden\');document.getElementById(\'setup-section\').classList.add(\'hidden\');this.classList.add(\'bg-red-600\',\'text-white\');this.classList.remove(\'bg-[#30363d]\',\'text-[#c9d1d9]\');document.getElementById(\'setup-tab-btn\').classList.remove(\'bg-red-600\',\'text-white\');document.getElementById(\'setup-tab-btn\').classList.add(\'bg-[#30363d]\',\'text-[#c9d1d9]\')" class="px-6 py-3 rounded-lg font-semibold bg-red-600 text-white transition"><i class="fas fa-steering-wheel mr-2"></i>Driving Analysis</button>';
+        html += '<button id="setup-tab-btn" onclick="document.getElementById(\'setup-section\').classList.remove(\'hidden\');document.getElementById(\'driving-section\').classList.add(\'hidden\');this.classList.add(\'bg-red-600\',\'text-white\');this.classList.remove(\'bg-[#30363d]\',\'text-[#c9d1d9]\');document.getElementById(\'driving-tab-btn\').classList.remove(\'bg-red-600\',\'text-white\');document.getElementById(\'driving-tab-btn\').classList.add(\'bg-[#30363d]\',\'text-[#c9d1d9]\')" class="px-6 py-3 rounded-lg font-semibold bg-[#30363d] text-[#c9d1d9] hover:bg-[#484f58] transition"><i class="fas fa-wrench mr-2"></i>Setup Recommendations</button>';
         html += '</div>';
         
         // DRIVING SECTION
@@ -2646,15 +2646,15 @@ class TelemetryAnalysisApp {
         var totalTimeLoss = summary.totalTimeLoss || trackSegments.reduce(function(sum, s) { return sum + (s.timeLoss || 0); }, 0);
         var issueCount = summary.issueCount || trackSegments.reduce(function(sum, s) { return sum + (s.issues ? s.issues.length : 0); }, 0);
         
-        html += '<div class="bg-gray-700 rounded-lg p-4 text-center"><div class="text-3xl font-bold">' + cornerCount + '</div><div class="text-gray-400">Corners</div></div>';
-        html += '<div class="bg-gray-700 rounded-lg p-4 text-center"><div class="text-3xl font-bold">' + straightCount + '</div><div class="text-gray-400">Straights</div></div>';
-        html += '<div class="bg-gray-700 rounded-lg p-4 text-center"><div class="text-3xl font-bold text-' + (issueCount > 5 ? 'red' : 'yellow') + '-400">' + issueCount + '</div><div class="text-gray-400">Issues</div></div>';
-        html += '<div class="bg-gray-700 rounded-lg p-4 text-center"><div class="text-3xl font-bold text-red-400">~' + totalTimeLoss.toFixed(2) + 's</div><div class="text-gray-400">Time Loss</div></div>';
+        html += '<div class="bg-gray-700 rounded-lg p-4 text-center"><div class="text-3xl font-bold">' + cornerCount + '</div><div class="text-[#6e7681]">Corners</div></div>';
+        html += '<div class="bg-gray-700 rounded-lg p-4 text-center"><div class="text-3xl font-bold">' + straightCount + '</div><div class="text-[#6e7681]">Straights</div></div>';
+        html += '<div class="bg-gray-700 rounded-lg p-4 text-center"><div class="text-3xl font-bold text-' + (issueCount > 5 ? 'red' : 'yellow') + '-400">' + issueCount + '</div><div class="text-[#6e7681]">Issues</div></div>';
+        html += '<div class="bg-gray-700 rounded-lg p-4 text-center"><div class="text-3xl font-bold text-red-400">~' + totalTimeLoss.toFixed(2) + 's</div><div class="text-[#6e7681]">Time Loss</div></div>';
         html += '</div>';
         
         // Braking technique - just show smoothness comparison
         if (brakingTechnique.smoothnessVsRef) {
-            html += '<div class="bg-gray-700/50 rounded-lg p-3 inline-block"><span class="text-gray-400">Braking:</span> <span class="text-white font-bold">' + brakingTechnique.smoothnessVsRef + '</span></div>';
+            html += '<div class="bg-gray-700/50 rounded-lg p-3 inline-block"><span class="text-[#6e7681]">Braking:</span> <span class="text-white font-bold">' + brakingTechnique.smoothnessVsRef + '</span></div>';
         }
         html += '</div>';
         
@@ -2705,7 +2705,7 @@ class TelemetryAnalysisApp {
     // ============================================
     renderCornerCard(segment, idx) {
         var hasIssues = segment.issues && segment.issues.length > 0;
-        var bgColor = hasIssues ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200';
+        var bgColor = hasIssues ? 'bg-red-900/30 border-red-700' : 'bg-green-900/20 border-green-700';
         
         // Force correct turn label based on sorted index
         var turnLabel = 'Turn ' + (idx + 1);
@@ -2736,13 +2736,13 @@ class TelemetryAnalysisApp {
         // Header
         html += '<div class="flex justify-between items-start mb-4">';
         html += '<div>';
-        html += '<h3 class="text-xl font-bold text-gray-800"><i class="fas fa-undo text-red-500 mr-2"></i>' + turnLabel + '</h3>';
-        html += '<span class="text-gray-500">' + (segment.cornerType || 'corner') + ' corner at ' + (segment.distance || 0) + 'm</span>';
+        html += '<h3 class="text-xl font-bold text-[#f0f6fc]"><i class="fas fa-undo text-red-400 mr-2"></i>' + turnLabel + '</h3>';
+        html += '<span class="text-[#8b949e]">' + (segment.cornerType || 'corner') + ' corner at ' + (segment.distance || 0) + 'm</span>';
         html += '</div>';
         if (segment.timeLoss > 0) {
-            html += '<div class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-medium">~' + segment.timeLoss.toFixed(2) + 's lost</div>';
+            html += '<div class="bg-red-900/50 text-red-300 px-3 py-1 rounded-full text-sm font-medium">-' + segment.timeLoss.toFixed(2) + 's lost</div>';
         } else {
-            html += '<div class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium"><i class="fas fa-check mr-1"></i>Good</div>';
+            html += '<div class="bg-green-900/50 text-green-300 px-3 py-1 rounded-full text-sm font-medium"><i class="fas fa-check mr-1"></i>Good</div>';
         }
         html += '</div>';
         
@@ -2750,30 +2750,30 @@ class TelemetryAnalysisApp {
         html += '<div class="grid grid-cols-3 gap-4 mb-4">';
         
         // Entry Speed
-        html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
-        html += '<div class="text-gray-500 text-sm text-center mb-2">Entry Speed</div>';
+        html += '<div class="bg-[#21262d] rounded-lg p-3 border border-[#30363d]">';
+        html += '<div class="text-[#8b949e] text-sm text-center mb-2">Entry Speed</div>';
         html += '<div class="flex justify-between items-center">';
-        html += '<div class="text-center flex-1"><div class="text-[#ff85b1] font-semibold font-data text-lg">' + entrySpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
-        html += '<div class="text-center px-2"><div class="text-' + (deltaEntry >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaEntry >= 0 ? '+' : '') + deltaEntry + '</div><div class="text-xs text-gray-400">km/h</div></div>';
-        html += '<div class="text-center flex-1"><div class="text-gray-600 font-bold text-lg">' + refEntry + '</div><div class="text-xs text-gray-400">Ref</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + entrySpeed + '</div><div class="text-xs text-[#6e7681]">You</div></div>';
+        html += '<div class="text-center px-2"><div class="text-' + (deltaEntry >= 0 ? 'green' : 'red') + '-400 font-bold">' + (deltaEntry >= 0 ? '+' : '') + deltaEntry + '</div><div class="text-xs text-[#6e7681]">km/h</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-[#f0f6fc] font-bold text-lg">' + refEntry + '</div><div class="text-xs text-[#6e7681]">Ref</div></div>';
         html += '</div></div>';
         
         // Apex Speed
-        html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
-        html += '<div class="text-gray-500 text-sm text-center mb-2">Apex Speed</div>';
+        html += '<div class="bg-[#21262d] rounded-lg p-3 border border-[#30363d]">';
+        html += '<div class="text-[#8b949e] text-sm text-center mb-2">Apex Speed</div>';
         html += '<div class="flex justify-between items-center">';
-        html += '<div class="text-center flex-1"><div class="text-[#ff85b1] font-semibold font-data text-lg">' + apexSpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
-        html += '<div class="text-center px-2"><div class="text-' + (deltaApex >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaApex >= 0 ? '+' : '') + deltaApex + '</div><div class="text-xs text-gray-400">km/h</div></div>';
-        html += '<div class="text-center flex-1"><div class="text-gray-600 font-bold text-lg">' + refApex + '</div><div class="text-xs text-gray-400">Ref</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + apexSpeed + '</div><div class="text-xs text-[#6e7681]">You</div></div>';
+        html += '<div class="text-center px-2"><div class="text-' + (deltaApex >= 0 ? 'green' : 'red') + '-400 font-bold">' + (deltaApex >= 0 ? '+' : '') + deltaApex + '</div><div class="text-xs text-[#6e7681]">km/h</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-[#f0f6fc] font-bold text-lg">' + refApex + '</div><div class="text-xs text-[#6e7681]">Ref</div></div>';
         html += '</div></div>';
         
         // Exit Speed
-        html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
-        html += '<div class="text-gray-500 text-sm text-center mb-2">Exit Speed</div>';
+        html += '<div class="bg-[#21262d] rounded-lg p-3 border border-[#30363d]">';
+        html += '<div class="text-[#8b949e] text-sm text-center mb-2">Exit Speed</div>';
         html += '<div class="flex justify-between items-center">';
-        html += '<div class="text-center flex-1"><div class="text-[#ff85b1] font-semibold font-data text-lg">' + exitSpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
-        html += '<div class="text-center px-2"><div class="text-' + (deltaExit >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaExit >= 0 ? '+' : '') + deltaExit + '</div><div class="text-xs text-gray-400">km/h</div></div>';
-        html += '<div class="text-center flex-1"><div class="text-gray-600 font-bold text-lg">' + refExit + '</div><div class="text-xs text-gray-400">Ref</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + exitSpeed + '</div><div class="text-xs text-[#6e7681]">You</div></div>';
+        html += '<div class="text-center px-2"><div class="text-' + (deltaExit >= 0 ? 'green' : 'red') + '-400 font-bold">' + (deltaExit >= 0 ? '+' : '') + deltaExit + '</div><div class="text-xs text-[#6e7681]">km/h</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-[#f0f6fc] font-bold text-lg">' + refExit + '</div><div class="text-xs text-[#6e7681]">Ref</div></div>';
         html += '</div></div>';
         
         html += '</div>';
@@ -2789,60 +2789,60 @@ class TelemetryAnalysisApp {
         html += '<div class="grid grid-cols-3 gap-3 mb-4">';
         
         // Peak Brake - You / Delta / Ref
-        html += '<div class="bg-gray-100 rounded p-2">';
-        html += '<div class="text-xs text-gray-500 text-center mb-1">Peak Brake</div>';
+        html += '<div class="bg-[#30363d] rounded p-2">';
+        html += '<div class="text-xs text-[#8b949e] text-center mb-1">Peak Brake</div>';
         html += '<div class="flex justify-between items-center text-sm">';
-        html += '<div class="text-center flex-1"><div class="text-[#ff85b1] font-semibold font-data">' + peakBrake + '%</div><div class="text-xs text-gray-400">You</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-[#ff6b9d] font-semibold font-data">' + peakBrake + '%</div><div class="text-xs text-[#6e7681]">You</div></div>';
         if (typeof deltaPeakBrake === 'number' && deltaPeakBrake !== 0) {
-            html += '<div class="text-center px-1"><div class="text-' + (deltaPeakBrake >= 0 ? 'green' : 'red') + '-600 font-bold text-xs">' + (deltaPeakBrake >= 0 ? '+' : '') + deltaPeakBrake + '</div></div>';
+            html += '<div class="text-center px-1"><div class="text-' + (deltaPeakBrake >= 0 ? 'green' : 'red') + '-400 font-bold text-xs">' + (deltaPeakBrake >= 0 ? '+' : '') + deltaPeakBrake + '</div></div>';
         }
-        html += '<div class="text-center flex-1"><div class="text-gray-600 font-bold">' + refPeakBrake + '%</div><div class="text-xs text-gray-400">Ref</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-[#f0f6fc] font-bold">' + refPeakBrake + '%</div><div class="text-xs text-[#6e7681]">Ref</div></div>';
         html += '</div></div>';
         
         // Smoothness - handle string or number (comparative)
-        html += '<div class="bg-gray-100 rounded p-2 text-center">';
-        html += '<div class="text-xs text-gray-500">Smoothness</div>';
+        html += '<div class="bg-[#30363d] rounded p-2 text-center">';
+        html += '<div class="text-xs text-[#8b949e]">Smoothness</div>';
         if (segment.smoothness && typeof segment.smoothness === 'string') {
-            var smoothColor = segment.smoothness.includes('rougher') ? 'text-red-600' : segment.smoothness.includes('smoother') ? 'text-green-600' : 'text-gray-800';
+            var smoothColor = segment.smoothness.includes('rougher') ? 'text-red-400' : segment.smoothness.includes('smoother') ? 'text-green-400' : 'text-[#f0f6fc]';
             html += '<div class="' + smoothColor + ' font-semibold text-xs mt-1">' + segment.smoothness + '</div>';
         } else if (curr.smoothness !== undefined && curr.smoothness !== null) {
-            html += '<div class="text-gray-800 font-semibold">' + (typeof curr.smoothness === 'number' ? curr.smoothness + '/100' : curr.smoothness) + '</div>';
+            html += '<div class="text-[#f0f6fc] font-semibold">' + (typeof curr.smoothness === 'number' ? curr.smoothness + '/100' : curr.smoothness) + '</div>';
         } else {
-            html += '<div class="text-gray-400 font-semibold">-</div>';
+            html += '<div class="text-[#6e7681] font-semibold">-</div>';
         }
         html += '</div>';
         
         // Trail Braking - You / Delta / Ref
-        html += '<div class="bg-gray-100 rounded p-2">';
-        html += '<div class="text-xs text-gray-500 text-center mb-1">Trail Braking</div>';
+        html += '<div class="bg-[#30363d] rounded p-2">';
+        html += '<div class="text-xs text-[#8b949e] text-center mb-1">Trail Braking</div>';
         html += '<div class="flex justify-between items-center text-sm">';
         
         // Your trail braking
         html += '<div class="text-center flex-1">';
         if (trailBraking === true) {
-            html += '<div class="text-[#ff85b1] font-semibold font-data">' + (trailDist > 0 ? trailDist + 'm' : 'Yes') + '</div>';
+            html += '<div class="text-[#ff6b9d] font-semibold font-data">' + (trailDist > 0 ? trailDist + 'm' : 'Yes') + '</div>';
         } else if (trailBraking === false) {
-            html += '<div class="text-red-600 font-bold">No</div>';
+            html += '<div class="text-red-400 font-bold">No</div>';
         } else {
-            html += '<div class="text-gray-400 font-bold">-</div>';
+            html += '<div class="text-[#6e7681] font-bold">-</div>';
         }
-        html += '<div class="text-xs text-gray-400">You</div></div>';
+        html += '<div class="text-xs text-[#6e7681]">You</div></div>';
         
         // Delta
         if (typeof deltaTrailDist === 'number' && deltaTrailDist !== 0) {
-            html += '<div class="text-center px-1"><div class="text-' + (deltaTrailDist >= 0 ? 'green' : 'red') + '-600 font-bold text-xs">' + (deltaTrailDist >= 0 ? '+' : '') + deltaTrailDist + 'm</div></div>';
+            html += '<div class="text-center px-1"><div class="text-' + (deltaTrailDist >= 0 ? 'green' : 'red') + '-400 font-bold text-xs">' + (deltaTrailDist >= 0 ? '+' : '') + deltaTrailDist + 'm</div></div>';
         }
         
         // Ref trail braking
         html += '<div class="text-center flex-1">';
         if (refTrailBraking === true) {
-            html += '<div class="text-gray-600 font-bold">' + (refTrailDist > 0 ? refTrailDist + 'm' : 'Yes') + '</div>';
+            html += '<div class="text-[#f0f6fc] font-bold">' + (refTrailDist > 0 ? refTrailDist + 'm' : 'Yes') + '</div>';
         } else if (refTrailBraking === false) {
-            html += '<div class="text-gray-600 font-bold">No</div>';
+            html += '<div class="text-[#f0f6fc] font-bold">No</div>';
         } else {
-            html += '<div class="text-gray-400 font-bold">-</div>';
+            html += '<div class="text-[#6e7681] font-bold">-</div>';
         }
-        html += '<div class="text-xs text-gray-400">Ref</div></div>';
+        html += '<div class="text-xs text-[#6e7681]">Ref</div></div>';
         
         html += '</div></div>';
         
@@ -2850,19 +2850,19 @@ class TelemetryAnalysisApp {
         
         // Issues & recommendations
         if (hasIssues) {
-            html += '<div class="border-t border-gray-200 pt-4">';
-            html += '<h4 class="font-semibold text-red-600 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Issues</h4>';
+            html += '<div class="border-t border-[#30363d] pt-4">';
+            html += '<h4 class="font-semibold text-red-400 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Issues</h4>';
             html += '<ul class="space-y-1 mb-3">';
             segment.issues.forEach(function(issue) {
-                html += '<li class="text-gray-700 text-sm"><i class="fas fa-times text-red-500 mr-2"></i>' + issue + '</li>';
+                html += '<li class="text-[#c9d1d9] text-sm"><i class="fas fa-times text-red-400 mr-2"></i>' + issue + '</li>';
             });
             html += '</ul>';
             
             if (segment.recommendations && segment.recommendations.length > 0) {
-                html += '<h4 class="font-semibold text-green-600 mb-2"><i class="fas fa-lightbulb mr-2"></i>Recommendations</h4>';
+                html += '<h4 class="font-semibold text-green-400 mb-2"><i class="fas fa-lightbulb mr-2"></i>Recommendations</h4>';
                 html += '<ul class="space-y-1">';
                 segment.recommendations.forEach(function(rec) {
-                    html += '<li class="text-gray-700 text-sm"><i class="fas fa-arrow-right text-green-500 mr-2"></i>' + rec + '</li>';
+                    html += '<li class="text-[#c9d1d9] text-sm"><i class="fas fa-arrow-right text-green-400 mr-2"></i>' + rec + '</li>';
                 });
                 html += '</ul>';
             }
@@ -2878,7 +2878,7 @@ class TelemetryAnalysisApp {
     // ============================================
     renderStraightCard(segment, idx) {
         var hasIssues = segment.issues && segment.issues.length > 0;
-        var bgColor = hasIssues ? 'bg-yellow-50 border-yellow-200' : 'bg-blue-50 border-blue-200';
+        var bgColor = hasIssues ? 'bg-yellow-900/20 border-yellow-700' : 'bg-blue-900/20 border-b border-[#30363d]lue-700';
         
         // Use the name from the segment (e.g., "Start/Finish Straight" or "Straight 2")
         var straightLabel = segment.name || ('Straight ' + (idx + 1));
@@ -2910,13 +2910,13 @@ class TelemetryAnalysisApp {
         // Header
         html += '<div class="flex justify-between items-start mb-4">';
         html += '<div>';
-        html += '<h3 class="text-xl font-bold text-gray-800"><i class="fas fa-road text-blue-500 mr-2"></i>' + straightLabel + '</h3>';
-        html += '<span class="text-gray-500">' + (segment.startDistance || segment.distance || 0) + 'm - ' + (segment.endDistance || 0) + 'm (' + (segment.length || 0) + 'm)</span>';
+        html += '<h3 class="text-xl font-bold text-[#f0f6fc]"><i class="fas fa-road text-blue-400 mr-2"></i>' + straightLabel + '</h3>';
+        html += '<span class="text-[#8b949e]">' + (segment.startDistance || segment.distance || 0) + 'm - ' + (segment.endDistance || 0) + 'm (' + (segment.length || 0) + 'm)</span>';
         html += '</div>';
         if (segment.timeLoss > 0) {
-            html += '<div class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm font-medium">~' + segment.timeLoss.toFixed(2) + 's lost</div>';
+            html += '<div class="bg-yellow-900/50 text-yellow-300 px-3 py-1 rounded-full text-sm font-medium">-' + segment.timeLoss.toFixed(2) + 's lost</div>';
         } else if (lifts.length === 0 && isFullThrottle) {
-            html += '<div class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium"><i class="fas fa-check mr-1"></i>Clean</div>';
+            html += '<div class="bg-green-900/50 text-green-300 px-3 py-1 rounded-full text-sm font-medium"><i class="fas fa-check mr-1"></i>Clean</div>';
         }
         html += '</div>';
         
@@ -2924,99 +2924,99 @@ class TelemetryAnalysisApp {
         html += '<div class="grid grid-cols-3 gap-4 mb-4">';
         
         // Entry Speed
-        html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
-        html += '<div class="text-gray-500 text-sm mb-2 text-center">Entry Speed</div>';
+        html += '<div class="bg-[#21262d] rounded-lg p-3 border border-[#30363d]">';
+        html += '<div class="text-[#8b949e] text-sm mb-2 text-center">Entry Speed</div>';
         html += '<div class="flex justify-between items-center text-sm">';
-        html += '<div class="text-center"><div class="text-[#ff85b1] font-semibold font-data text-lg">' + entrySpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
-        html += '<div class="text-center"><div class="text-' + (deltaEntry >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaEntry >= 0 ? '+' : '') + deltaEntry + '</div></div>';
-        html += '<div class="text-center"><div class="text-gray-600 font-bold text-lg">' + refEntrySpeed + '</div><div class="text-gray-400 text-xs">Ref</div></div>';
+        html += '<div class="text-center"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + entrySpeed + '</div><div class="text-[#6e7681] text-xs">You</div></div>';
+        html += '<div class="text-center"><div class="text-' + (deltaEntry >= 0 ? 'green' : 'red') + '-400 font-bold">' + (deltaEntry >= 0 ? '+' : '') + deltaEntry + '</div></div>';
+        html += '<div class="text-center"><div class="text-[#f0f6fc] font-bold text-lg">' + refEntrySpeed + '</div><div class="text-[#6e7681] text-xs">Ref</div></div>';
         html += '</div></div>';
         
         // Max Speed
-        html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
-        html += '<div class="text-gray-500 text-sm mb-2 text-center">Max Speed</div>';
+        html += '<div class="bg-[#21262d] rounded-lg p-3 border border-[#30363d]">';
+        html += '<div class="text-[#8b949e] text-sm mb-2 text-center">Max Speed</div>';
         html += '<div class="flex justify-between items-center text-sm">';
-        html += '<div class="text-center"><div class="text-[#ff85b1] font-semibold font-data text-lg">' + maxSpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
-        html += '<div class="text-center"><div class="text-' + (deltaMax >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaMax >= 0 ? '+' : '') + deltaMax + '</div></div>';
-        html += '<div class="text-center"><div class="text-gray-600 font-bold text-lg">' + refMaxSpeed + '</div><div class="text-gray-400 text-xs">Ref</div></div>';
+        html += '<div class="text-center"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + maxSpeed + '</div><div class="text-[#6e7681] text-xs">You</div></div>';
+        html += '<div class="text-center"><div class="text-' + (deltaMax >= 0 ? 'green' : 'red') + '-400 font-bold">' + (deltaMax >= 0 ? '+' : '') + deltaMax + '</div></div>';
+        html += '<div class="text-center"><div class="text-[#f0f6fc] font-bold text-lg">' + refMaxSpeed + '</div><div class="text-[#6e7681] text-xs">Ref</div></div>';
         html += '</div></div>';
         
         // Exit Speed
-        html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
-        html += '<div class="text-gray-500 text-sm mb-2 text-center">Exit Speed</div>';
+        html += '<div class="bg-[#21262d] rounded-lg p-3 border border-[#30363d]">';
+        html += '<div class="text-[#8b949e] text-sm mb-2 text-center">Exit Speed</div>';
         html += '<div class="flex justify-between items-center text-sm">';
-        html += '<div class="text-center"><div class="text-[#ff85b1] font-semibold font-data text-lg">' + exitSpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
-        html += '<div class="text-center"><div class="text-' + (deltaExit >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaExit >= 0 ? '+' : '') + deltaExit + '</div></div>';
-        html += '<div class="text-center"><div class="text-gray-600 font-bold text-lg">' + refExitSpeed + '</div><div class="text-gray-400 text-xs">Ref</div></div>';
+        html += '<div class="text-center"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + exitSpeed + '</div><div class="text-[#6e7681] text-xs">You</div></div>';
+        html += '<div class="text-center"><div class="text-' + (deltaExit >= 0 ? 'green' : 'red') + '-400 font-bold">' + (deltaExit >= 0 ? '+' : '') + deltaExit + '</div></div>';
+        html += '<div class="text-center"><div class="text-[#f0f6fc] font-bold text-lg">' + refExitSpeed + '</div><div class="text-[#6e7681] text-xs">Ref</div></div>';
         html += '</div></div>';
         
         html += '</div>';
         
         // Throttle info
         html += '<div class="grid grid-cols-2 gap-4 mb-4">';
-        html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
-        html += '<div class="text-gray-500 text-sm">Avg Throttle</div>';
+        html += '<div class="bg-[#21262d] rounded-lg p-3 border border-[#30363d]">';
+        html += '<div class="text-[#8b949e] text-sm">Avg Throttle</div>';
         html += '<div class="flex justify-between items-center">';
-        html += '<span class="text-[#ff85b1] font-semibold font-data">' + avgThrottle + '%</span>';
-        html += '<span class="text-gray-400">vs</span>';
-        html += '<span class="text-gray-600 font-bold">' + refAvgThrottle + '%</span>';
+        html += '<span class="text-[#ff6b9d] font-semibold font-data">' + avgThrottle + '%</span>';
+        html += '<span class="text-[#6e7681]">vs</span>';
+        html += '<span class="text-[#f0f6fc] font-bold">' + refAvgThrottle + '%</span>';
         html += '</div></div>';
         
-        html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
-        html += '<div class="text-gray-500 text-sm">Throttle Lifts</div>';
+        html += '<div class="bg-[#21262d] rounded-lg p-3 border border-[#30363d]">';
+        html += '<div class="text-[#8b949e] text-sm">Throttle Lifts</div>';
         html += '<div class="flex justify-between items-center">';
         if (lifts.length > refLifts.length) {
-            html += '<span class="text-red-600 font-bold">' + lifts.length + ' lifts</span>';
-            html += '<span class="text-gray-400">vs</span>';
-            html += '<span class="text-gray-600 font-bold">' + refLifts.length + ' lifts</span>';
+            html += '<span class="text-red-400 font-bold">' + lifts.length + ' lifts</span>';
+            html += '<span class="text-[#6e7681]">vs</span>';
+            html += '<span class="text-[#f0f6fc] font-bold">' + refLifts.length + ' lifts</span>';
         } else if (lifts.length > 0) {
-            html += '<span class="text-yellow-600 font-bold">' + lifts.length + ' lifts</span>';
-            html += '<span class="text-gray-400">vs</span>';
-            html += '<span class="text-gray-600 font-bold">' + refLifts.length + ' lifts</span>';
+            html += '<span class="text-yellow-400 font-bold">' + lifts.length + ' lifts</span>';
+            html += '<span class="text-[#6e7681]">vs</span>';
+            html += '<span class="text-[#f0f6fc] font-bold">' + refLifts.length + ' lifts</span>';
         } else {
-            html += '<span class="text-green-600 font-bold">None</span>';
-            html += '<span class="text-gray-400">vs</span>';
-            html += '<span class="text-gray-600 font-bold">' + (refLifts.length > 0 ? refLifts.length + ' lifts' : 'None') + '</span>';
+            html += '<span class="text-green-400 font-bold">None</span>';
+            html += '<span class="text-[#6e7681]">vs</span>';
+            html += '<span class="text-[#f0f6fc] font-bold">' + (refLifts.length > 0 ? refLifts.length + ' lifts' : 'None') + '</span>';
         }
         html += '</div></div>';
         html += '</div>';
         
         // Show lift details if there are lifts
         if (lifts.length > 0) {
-            html += '<div class="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">';
-            html += '<h4 class="font-semibold text-orange-700 mb-2"><i class="fas fa-tachometer-alt-slow mr-2"></i>Throttle Lifts Detected</h4>';
+            html += '<div class="bg-orange-900/30 border border-orange-700 rounded-lg p-3 mb-4">';
+            html += '<h4 class="font-semibold text-orange-300 mb-2"><i class="fas fa-tachometer-alt-slow mr-2"></i>Throttle Lifts Detected</h4>';
             html += '<div class="space-y-2">';
             lifts.forEach(function(lift) {
-                html += '<div class="text-sm text-gray-700">';
-                html += '<i class="fas fa-exclamation-circle text-orange-500 mr-2"></i>';
+                html += '<div class="text-sm text-[#c9d1d9]">';
+                html += '<i class="fas fa-exclamation-circle text-orange-400 mr-2"></i>';
                 html += 'Lift at <strong>' + lift.distance + 'm</strong>: throttle dropped to ' + lift.minThrottle + '%, lost ~<strong>' + lift.speedLost + 'km/h</strong>';
                 html += '</div>';
             });
             
             // Check if reference also had lifts at similar positions
             if (refLifts.length > 0) {
-                html += '<div class="text-sm text-blue-600 mt-2"><i class="fas fa-info-circle mr-2"></i>Note: Reference lap also had lifts - may indicate traffic or track feature</div>';
+                html += '<div class="text-sm text-blue-400 mt-2"><i class="fas fa-info-circle mr-2"></i>Note: Reference lap also had lifts - may indicate traffic or track feature</div>';
             } else {
-                html += '<div class="text-sm text-red-600 mt-2"><i class="fas fa-flag mr-2"></i>Reference was flat out here - possible traffic, hesitation, or missed opportunity</div>';
+                html += '<div class="text-sm text-red-400 mt-2"><i class="fas fa-flag mr-2"></i>Reference was flat out here - possible traffic, hesitation, or missed opportunity</div>';
             }
             html += '</div></div>';
         }
         
         // Issues and recommendations
         if (hasIssues) {
-            html += '<div class="border-t border-gray-200 pt-4">';
-            html += '<h4 class="font-semibold text-yellow-600 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Issues</h4>';
+            html += '<div class="border-t border-[#30363d] pt-4">';
+            html += '<h4 class="font-semibold text-yellow-400 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Issues</h4>';
             html += '<ul class="space-y-1 mb-3">';
             segment.issues.forEach(function(issue) {
-                html += '<li class="text-gray-700 text-sm"><i class="fas fa-times text-yellow-500 mr-2"></i>' + issue + '</li>';
+                html += '<li class="text-[#c9d1d9] text-sm"><i class="fas fa-times text-yellow-400 mr-2"></i>' + issue + '</li>';
             });
             html += '</ul>';
             
             if (segment.recommendations && segment.recommendations.length > 0) {
-                html += '<h4 class="font-semibold text-green-600 mb-2"><i class="fas fa-lightbulb mr-2"></i>Recommendations</h4>';
+                html += '<h4 class="font-semibold text-green-400 mb-2"><i class="fas fa-lightbulb mr-2"></i>Recommendations</h4>';
                 html += '<ul class="space-y-1">';
                 segment.recommendations.forEach(function(rec) {
-                    html += '<li class="text-gray-700 text-sm"><i class="fas fa-arrow-right text-green-500 mr-2"></i>' + rec + '</li>';
+                    html += '<li class="text-[#c9d1d9] text-sm"><i class="fas fa-arrow-right text-green-400 mr-2"></i>' + rec + '</li>';
                 });
                 html += '</ul>';
             }
@@ -3033,56 +3033,56 @@ class TelemetryAnalysisApp {
     renderSetupSection(tireAnalysis, brakeAnalysis, fuelAnalysis) {
         var html = '';
         
-        html += '<div class="bg-white rounded-xl p-6 mb-6 shadow">';
-        html += '<h2 class="text-xl font-bold mb-4 text-gray-800"><i class="fas fa-cogs mr-2 text-green-500"></i>Setup Recommendations</h2>';
-        html += '<p class="text-gray-500 mb-6">Based on tire temperatures, brake data, and driving patterns:</p>';
+        html += '<div class="bg-[#161b22] rounded-xl p-6 mb-6 border border-[#30363d]">';
+        html += '<h2 class="text-xl font-bold mb-4 text-[#f0f6fc]"><i class="fas fa-cogs mr-2 text-green-400"></i>Setup Recommendations</h2>';
+        html += '<p class="text-[#8b949e] mb-6">Based on tire temperatures, brake data, and driving patterns:</p>';
         
         // Tire section
         if (tireAnalysis && tireAnalysis.available) {
             html += '<div class="mb-6">';
-            html += '<h3 class="text-lg font-semibold text-gray-800 mb-3"><i class="fas fa-circle text-yellow-500 mr-2"></i>Tire Setup</h3>';
+            html += '<h3 class="text-lg font-semibold text-[#f0f6fc] mb-3"><i class="fas fa-circle text-yellow-500 mr-2"></i>Tire Setup</h3>';
             html += '<div class="grid grid-cols-2 gap-4 mb-4">';
             
             ['fl', 'fr', 'rl', 'rr'].forEach(function(corner) {
                 var data = tireAnalysis[corner];
                 if (data && data.avg) {
-                    var bgColor = data.avg > 100 ? 'bg-red-100 border-red-300' : data.avg < 70 ? 'bg-blue-100 border-blue-300' : 'bg-green-100 border-green-300';
+                    var bgColor = data.avg > 100 ? 'bg-red-100 border-red-300' : data.avg < 70 ? 'bg-blue-100 border-b border-[#30363d]lue-300' : 'bg-green-100 border-green-300';
                     html += '<div class="' + bgColor + ' border rounded-lg p-4">';
-                    html += '<div class="font-bold text-gray-800">' + corner.toUpperCase() + ' Tire</div>';
-                    if (data.inner !== null) html += '<div class="text-sm text-gray-600">Inner: ' + Math.round(data.inner) + '°C</div>';
-                    if (data.center !== null) html += '<div class="text-sm text-gray-600">Center: ' + Math.round(data.center) + '°C</div>';
-                    if (data.outer !== null) html += '<div class="text-sm text-gray-600">Outer: ' + Math.round(data.outer) + '°C</div>';
+                    html += '<div class="font-bold text-[#f0f6fc]">' + corner.toUpperCase() + ' Tire</div>';
+                    if (data.inner !== null) html += '<div class="text-sm text-[#8b949e]">Inner: ' + Math.round(data.inner) + '°C</div>';
+                    if (data.center !== null) html += '<div class="text-sm text-[#8b949e]">Center: ' + Math.round(data.center) + '°C</div>';
+                    if (data.outer !== null) html += '<div class="text-sm text-[#8b949e]">Outer: ' + Math.round(data.outer) + '°C</div>';
                     html += '</div>';
                 }
             });
             html += '</div>';
             
             if (tireAnalysis.issues && tireAnalysis.issues.length > 0) {
-                html += '<div class="bg-yellow-50 border border-yellow-300 rounded-lg p-4">';
+                html += '<div class="bg-yellow-900/20 border border-yellow-300 rounded-lg p-4">';
                 html += '<h4 class="font-semibold text-yellow-700 mb-2">Recommended Changes:</h4>';
                 html += '<ul class="space-y-2">';
                 tireAnalysis.issues.forEach(function(issue) {
-                    html += '<li class="text-gray-700"><i class="fas fa-wrench text-yellow-500 mr-2"></i>' + (issue.issue || issue) + '</li>';
+                    html += '<li class="text-[#c9d1d9]"><i class="fas fa-wrench text-yellow-500 mr-2"></i>' + (issue.issue || issue) + '</li>';
                 });
                 html += '</ul>';
                 html += '</div>';
             }
             html += '</div>';
         } else {
-            html += '<div class="bg-gray-100 border border-gray-300 rounded-lg p-4 mb-6">';
-            html += '<p class="text-gray-500"><i class="fas fa-info-circle mr-2"></i>No tire temperature data available</p>';
+            html += '<div class="bg-[#30363d] border border-[#30363d] rounded-lg p-4 mb-6">';
+            html += '<p class="text-[#8b949e]"><i class="fas fa-info-circle mr-2"></i>No tire temperature data available</p>';
             html += '</div>';
         }
         
         // Brake section
         if (brakeAnalysis && brakeAnalysis.available) {
             html += '<div class="mb-6">';
-            html += '<h3 class="text-lg font-semibold text-gray-800 mb-3"><i class="fas fa-compact-disc text-red-500 mr-2"></i>Brake Setup</h3>';
+            html += '<h3 class="text-lg font-semibold text-[#f0f6fc] mb-3"><i class="fas fa-compact-disc text-red-500 mr-2"></i>Brake Setup</h3>';
             html += '<div class="grid grid-cols-4 gap-4 mb-4">';
-            if (brakeAnalysis.fl !== null) html += '<div class="bg-gray-100 rounded-lg p-3 text-center"><div class="text-xl font-bold">' + Math.round(brakeAnalysis.fl) + '°C</div><div class="text-gray-500 text-sm">FL</div></div>';
-            if (brakeAnalysis.fr !== null) html += '<div class="bg-gray-100 rounded-lg p-3 text-center"><div class="text-xl font-bold">' + Math.round(brakeAnalysis.fr) + '°C</div><div class="text-gray-500 text-sm">FR</div></div>';
-            if (brakeAnalysis.rl !== null) html += '<div class="bg-gray-100 rounded-lg p-3 text-center"><div class="text-xl font-bold">' + Math.round(brakeAnalysis.rl) + '°C</div><div class="text-gray-500 text-sm">RL</div></div>';
-            if (brakeAnalysis.rr !== null) html += '<div class="bg-gray-100 rounded-lg p-3 text-center"><div class="text-xl font-bold">' + Math.round(brakeAnalysis.rr) + '°C</div><div class="text-gray-500 text-sm">RR</div></div>';
+            if (brakeAnalysis.fl !== null) html += '<div class="bg-[#30363d] rounded-lg p-3 text-center"><div class="text-xl font-bold">' + Math.round(brakeAnalysis.fl) + '°C</div><div class="text-[#8b949e] text-sm">FL</div></div>';
+            if (brakeAnalysis.fr !== null) html += '<div class="bg-[#30363d] rounded-lg p-3 text-center"><div class="text-xl font-bold">' + Math.round(brakeAnalysis.fr) + '°C</div><div class="text-[#8b949e] text-sm">FR</div></div>';
+            if (brakeAnalysis.rl !== null) html += '<div class="bg-[#30363d] rounded-lg p-3 text-center"><div class="text-xl font-bold">' + Math.round(brakeAnalysis.rl) + '°C</div><div class="text-[#8b949e] text-sm">RL</div></div>';
+            if (brakeAnalysis.rr !== null) html += '<div class="bg-[#30363d] rounded-lg p-3 text-center"><div class="text-xl font-bold">' + Math.round(brakeAnalysis.rr) + '°C</div><div class="text-[#8b949e] text-sm">RR</div></div>';
             html += '</div>';
             html += '</div>';
         }
@@ -3090,12 +3090,12 @@ class TelemetryAnalysisApp {
         // Fuel section
         if (fuelAnalysis && fuelAnalysis.available && fuelAnalysis.fuelPerLap) {
             html += '<div class="mb-6">';
-            html += '<h3 class="text-lg font-semibold text-gray-800 mb-3"><i class="fas fa-gas-pump text-blue-500 mr-2"></i>Fuel Strategy</h3>';
-            html += '<div class="bg-gray-100 rounded-lg p-4">';
+            html += '<h3 class="text-lg font-semibold text-[#f0f6fc] mb-3"><i class="fas fa-gas-pump text-blue-500 mr-2"></i>Fuel Strategy</h3>';
+            html += '<div class="bg-[#30363d] rounded-lg p-4">';
             html += '<div class="grid grid-cols-3 gap-4">';
-            html += '<div class="text-center"><div class="text-xl font-bold">' + fuelAnalysis.fuelPerLap.toFixed(2) + ' L</div><div class="text-gray-500 text-sm">Per Lap</div></div>';
-            if (fuelAnalysis.estimatedRange) html += '<div class="text-center"><div class="text-xl font-bold">' + fuelAnalysis.estimatedRange + '</div><div class="text-gray-500 text-sm">Laps Left</div></div>';
-            if (fuelAnalysis.endFuel) html += '<div class="text-center"><div class="text-xl font-bold">' + fuelAnalysis.endFuel.toFixed(1) + ' L</div><div class="text-gray-500 text-sm">Current</div></div>';
+            html += '<div class="text-center"><div class="text-xl font-bold">' + fuelAnalysis.fuelPerLap.toFixed(2) + ' L</div><div class="text-[#8b949e] text-sm">Per Lap</div></div>';
+            if (fuelAnalysis.estimatedRange) html += '<div class="text-center"><div class="text-xl font-bold">' + fuelAnalysis.estimatedRange + '</div><div class="text-[#8b949e] text-sm">Laps Left</div></div>';
+            if (fuelAnalysis.endFuel) html += '<div class="text-center"><div class="text-xl font-bold">' + fuelAnalysis.endFuel.toFixed(1) + ' L</div><div class="text-[#8b949e] text-sm">Current</div></div>';
             html += '</div>';
             html += '</div>';
             html += '</div>';
@@ -3175,7 +3175,7 @@ class TelemetryAnalysisApp {
     generateTrackMap() {
         var self = this;
         if (!this.referenceData || !this.currentData) { 
-            document.getElementById('track-map').innerHTML = '<p class="text-gray-400 text-center py-20">No track data</p>'; 
+            document.getElementById('track-map').innerHTML = '<p class="text-[#6e7681] text-center py-20">No track data</p>'; 
             return; 
         }
         
@@ -3583,7 +3583,7 @@ class TelemetryAnalysisApp {
         var currTrack = buildTrack(this.currentData, positionSource);
         
         if (refTrack.length < 10) { 
-            document.getElementById('track-map').innerHTML = '<p class="text-gray-400 text-center py-20">Insufficient data</p>'; 
+            document.getElementById('track-map').innerHTML = '<p class="text-[#6e7681] text-center py-20">Insufficient data</p>'; 
             return; 
         }
         
@@ -3903,7 +3903,7 @@ class TelemetryAnalysisApp {
         refData.forEach(function(row, i) { var dist = refDist[i]; var val = self.getValue(row, channelConfig.names, null); if (dist !== null && val !== null) { refX.push(dist); refY.push(val); } });
         var currX = [], currY = [];
         currData.forEach(function(row, i) { var dist = currDist[i]; var val = self.getValue(row, channelConfig.names, null); if (dist !== null && val !== null) { currX.push(dist); currY.push(val); } });
-        if (refX.length === 0 && currX.length === 0) { container.innerHTML = '<p class="text-gray-400 text-center py-16 text-sm">No ' + channelConfig.label + ' data</p>'; return; }
+        if (refX.length === 0 && currX.length === 0) { container.innerHTML = '<p class="text-[#6e7681] text-center py-16 text-sm">No ' + channelConfig.label + ' data</p>'; return; }
         var traces = [];
         if (refX.length > 0) traces.push({ x: refX, y: refY, mode: 'lines', name: 'Reference', line: { color: channelConfig.color.ref, width: 1.5 }, hovertemplate: 'Ref: %{y:.2f} ' + channelConfig.unit + '<extra></extra>' });
         if (currX.length > 0) traces.push({ x: currX, y: currY, mode: 'lines', name: 'Your Lap', line: { color: channelConfig.color.curr, width: 2 }, hovertemplate: 'You: %{y:.2f} ' + channelConfig.unit + '<extra></extra>' });
@@ -4004,7 +4004,7 @@ class TelemetryAnalysisApp {
         var chartDiv = document.createElement('div');
         chartDiv.className = 'relative';
         var colName = channelValue.replace('custom:', '');
-        chartDiv.innerHTML = '<button class="absolute top-0 right-0 z-10 bg-red-500 text-white rounded-full w-6 h-6 text-xs hover:bg-red-600" onclick="this.parentElement.remove();">&times;</button><h4 class="font-semibold mb-2 text-sm pr-8">' + colName + '</h4><div id="' + chartId + '" class="bg-gray-50 rounded border" style="height: 280px; width: 100%;"></div>';
+        chartDiv.innerHTML = '<button class="absolute top-0 right-0 z-10 bg-red-900/200 text-white rounded-full w-6 h-6 text-xs hover:bg-red-600" onclick="this.parentElement.remove();">&times;</button><h4 class="font-semibold mb-2 text-sm pr-8">' + colName + '</h4><div id="' + chartId + '" class="bg-[#21262d] rounded border" style="height: 280px; width: 100%;"></div>';
         container.appendChild(chartDiv);
         var refX = [], refY = [], currX = [], currY = [];
         refData.forEach(function(row) { var dist = self.getValue(row, distNames, null); var val = self.getValue(row, [colName], null); if (dist !== null && val !== null) { refX.push(dist); refY.push(val); } });
@@ -4019,7 +4019,7 @@ class TelemetryAnalysisApp {
     generateSectorTimeChart(analysis) {
         var container = document.getElementById('sector-time-chart');
         if (!container) return;
-        if (!analysis.sectors || analysis.sectors.length === 0) { container.innerHTML = '<p class="text-gray-500 text-center py-10">No sector data</p>'; return; }
+        if (!analysis.sectors || analysis.sectors.length === 0) { container.innerHTML = '<p class="text-[#8b949e] text-center py-10">No sector data</p>'; return; }
         var sectorLabels = analysis.sectors.map(function(s) { return 'Sector ' + s.sector; });
         var timeDeltas = analysis.sectors.map(function(s) { return s.timeDelta !== undefined ? s.timeDelta : -(s.avgSpeedDelta || 0) * 0.02; });
         var colors = timeDeltas.map(function(t) { return t > 0 ? '#ef4444' : '#22c55e'; });
@@ -4031,7 +4031,7 @@ class TelemetryAnalysisApp {
     generateSpeedComparison(analysis) {
         var container = document.getElementById('speed-comparison');
         if (!container) return;
-        if (!analysis.avgSpeedCurr) { container.innerHTML = '<p class="text-gray-500 text-center py-10">No speed data</p>'; return; }
+        if (!analysis.avgSpeedCurr) { container.innerHTML = '<p class="text-[#8b949e] text-center py-10">No speed data</p>'; return; }
         var yourTrace = { x: ['Average', 'Top', 'Min Corner'], y: [analysis.avgSpeedCurr || 0, analysis.maxSpeedCurr || 0, analysis.minSpeedCurr || 0], type: 'bar', name: 'Comparison', marker: { color: '#ff6b9d' } };
         var refTrace = { x: ['Average', 'Top', 'Min Corner'], y: [analysis.avgSpeedRef || 0, analysis.maxSpeedRef || 0, analysis.minSpeedRef || 0], type: 'bar', name: 'Reference', marker: { color: '#00d4aa' } };
         var layout = { barmode: 'group', yaxis: { title: 'Speed (km/h)' }, margin: { t: 30, b: 40, l: 50, r: 20 }, legend: { orientation: 'h', y: -0.15 } };
@@ -4040,12 +4040,12 @@ class TelemetryAnalysisApp {
     
     displaySetupRecommendations(analysis) {
         var container = document.getElementById('setup-recommendations');
-        var html = '<div class="bg-white rounded-lg p-4 shadow"><h3 class="font-bold text-lg mb-3">Analysis Summary</h3>';
+        var html = '<div class="bg-[#161b22] rounded-lg p-4 shadow"><h3 class="font-bold text-lg mb-3">Analysis Summary</h3>';
         if (analysis.sectors && analysis.sectors.length > 0) {
             html += '<div class="space-y-2">';
             analysis.sectors.forEach(function(s) { var color = (s.avgSpeedDelta || 0) >= 0 ? 'green' : 'red'; html += '<div class="border-l-4 border-' + color + '-500 pl-3 py-2"><p class="font-medium">Sector ' + s.sector + '</p><p class="text-sm">Speed Delta: ' + (s.avgSpeedDelta || 0).toFixed(1) + ' km/h</p></div>'; });
             html += '</div>';
-        } else { html += '<p class="text-gray-500">Sector analysis will appear after processing.</p>'; }
+        } else { html += '<p class="text-[#8b949e]">Sector analysis will appear after processing.</p>'; }
         html += '</div>';
         container.innerHTML = html;
     }
@@ -4055,10 +4055,10 @@ class TelemetryAnalysisApp {
         if (!container) return;
         var timeDelta = analysis.timeDelta || 0;
         var html = '<h2 class="text-2xl font-bold mb-4">Telemetry Report</h2>';
-        html += '<div class="bg-gray-50 p-4 rounded-lg mb-4"><p class="text-lg font-bold">Lap Time Delta: ' + (timeDelta > 0 ? '+' : '') + timeDelta.toFixed(3) + 's</p>';
+        html += '<div class="bg-[#21262d] p-4 rounded-lg mb-4"><p class="text-lg font-bold">Lap Time Delta: ' + (timeDelta > 0 ? '+' : '') + timeDelta.toFixed(3) + 's</p>';
         html += '<p>Average Speed: ' + (analysis.avgSpeedCurr || 0).toFixed(1) + ' km/h (Ref: ' + (analysis.avgSpeedRef || 0).toFixed(1) + ' km/h)</p></div>';
         if (analysis.sectors && analysis.sectors.length > 0) {
-            html += '<h3 class="text-xl font-bold mt-4 mb-2">Sector Analysis</h3><table class="w-full border-collapse"><thead><tr class="bg-gray-100"><th class="border p-2">Sector</th><th class="border p-2">Speed Delta</th></tr></thead><tbody>';
+            html += '<h3 class="text-xl font-bold mt-4 mb-2">Sector Analysis</h3><table class="w-full border-collapse"><thead><tr class="bg-[#30363d]"><th class="border p-2">Sector</th><th class="border p-2">Speed Delta</th></tr></thead><tbody>';
             analysis.sectors.forEach(function(s) { html += '<tr><td class="border p-2">Sector ' + s.sector + '</td><td class="border p-2">' + (s.avgSpeedDelta || 0).toFixed(1) + ' km/h</td></tr>'; });
             html += '</tbody></table>';
         }
