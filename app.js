@@ -2753,7 +2753,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm text-center mb-2">Entry Speed</div>';
         html += '<div class="flex justify-between items-center">';
-        html += '<div class="text-center flex-1"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + entrySpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-[#ff85b1] font-semibold font-data text-lg">' + entrySpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
         html += '<div class="text-center px-2"><div class="text-' + (deltaEntry >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaEntry >= 0 ? '+' : '') + deltaEntry + '</div><div class="text-xs text-gray-400">km/h</div></div>';
         html += '<div class="text-center flex-1"><div class="text-gray-600 font-bold text-lg">' + refEntry + '</div><div class="text-xs text-gray-400">Ref</div></div>';
         html += '</div></div>';
@@ -2762,7 +2762,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm text-center mb-2">Apex Speed</div>';
         html += '<div class="flex justify-between items-center">';
-        html += '<div class="text-center flex-1"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + apexSpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-[#ff85b1] font-semibold font-data text-lg">' + apexSpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
         html += '<div class="text-center px-2"><div class="text-' + (deltaApex >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaApex >= 0 ? '+' : '') + deltaApex + '</div><div class="text-xs text-gray-400">km/h</div></div>';
         html += '<div class="text-center flex-1"><div class="text-gray-600 font-bold text-lg">' + refApex + '</div><div class="text-xs text-gray-400">Ref</div></div>';
         html += '</div></div>';
@@ -2771,7 +2771,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm text-center mb-2">Exit Speed</div>';
         html += '<div class="flex justify-between items-center">';
-        html += '<div class="text-center flex-1"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + exitSpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-[#ff85b1] font-semibold font-data text-lg">' + exitSpeed + '</div><div class="text-xs text-gray-400">You</div></div>';
         html += '<div class="text-center px-2"><div class="text-' + (deltaExit >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaExit >= 0 ? '+' : '') + deltaExit + '</div><div class="text-xs text-gray-400">km/h</div></div>';
         html += '<div class="text-center flex-1"><div class="text-gray-600 font-bold text-lg">' + refExit + '</div><div class="text-xs text-gray-400">Ref</div></div>';
         html += '</div></div>';
@@ -2792,7 +2792,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-gray-100 rounded p-2">';
         html += '<div class="text-xs text-gray-500 text-center mb-1">Peak Brake</div>';
         html += '<div class="flex justify-between items-center text-sm">';
-        html += '<div class="text-center flex-1"><div class="text-[#ff6b9d] font-semibold font-data">' + peakBrake + '%</div><div class="text-xs text-gray-400">You</div></div>';
+        html += '<div class="text-center flex-1"><div class="text-[#ff85b1] font-semibold font-data">' + peakBrake + '%</div><div class="text-xs text-gray-400">You</div></div>';
         if (typeof deltaPeakBrake === 'number' && deltaPeakBrake !== 0) {
             html += '<div class="text-center px-1"><div class="text-' + (deltaPeakBrake >= 0 ? 'green' : 'red') + '-600 font-bold text-xs">' + (deltaPeakBrake >= 0 ? '+' : '') + deltaPeakBrake + '</div></div>';
         }
@@ -2820,7 +2820,7 @@ class TelemetryAnalysisApp {
         // Your trail braking
         html += '<div class="text-center flex-1">';
         if (trailBraking === true) {
-            html += '<div class="text-[#ff6b9d] font-semibold font-data">' + (trailDist > 0 ? trailDist + 'm' : 'Yes') + '</div>';
+            html += '<div class="text-[#ff85b1] font-semibold font-data">' + (trailDist > 0 ? trailDist + 'm' : 'Yes') + '</div>';
         } else if (trailBraking === false) {
             html += '<div class="text-red-600 font-bold">No</div>';
         } else {
@@ -2927,7 +2927,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm mb-2 text-center">Entry Speed</div>';
         html += '<div class="flex justify-between items-center text-sm">';
-        html += '<div class="text-center"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + entrySpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
+        html += '<div class="text-center"><div class="text-[#ff85b1] font-semibold font-data text-lg">' + entrySpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
         html += '<div class="text-center"><div class="text-' + (deltaEntry >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaEntry >= 0 ? '+' : '') + deltaEntry + '</div></div>';
         html += '<div class="text-center"><div class="text-gray-600 font-bold text-lg">' + refEntrySpeed + '</div><div class="text-gray-400 text-xs">Ref</div></div>';
         html += '</div></div>';
@@ -2936,7 +2936,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm mb-2 text-center">Max Speed</div>';
         html += '<div class="flex justify-between items-center text-sm">';
-        html += '<div class="text-center"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + maxSpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
+        html += '<div class="text-center"><div class="text-[#ff85b1] font-semibold font-data text-lg">' + maxSpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
         html += '<div class="text-center"><div class="text-' + (deltaMax >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaMax >= 0 ? '+' : '') + deltaMax + '</div></div>';
         html += '<div class="text-center"><div class="text-gray-600 font-bold text-lg">' + refMaxSpeed + '</div><div class="text-gray-400 text-xs">Ref</div></div>';
         html += '</div></div>';
@@ -2945,7 +2945,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm mb-2 text-center">Exit Speed</div>';
         html += '<div class="flex justify-between items-center text-sm">';
-        html += '<div class="text-center"><div class="text-[#ff6b9d] font-semibold font-data text-lg">' + exitSpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
+        html += '<div class="text-center"><div class="text-[#ff85b1] font-semibold font-data text-lg">' + exitSpeed + '</div><div class="text-gray-400 text-xs">You</div></div>';
         html += '<div class="text-center"><div class="text-' + (deltaExit >= 0 ? 'green' : 'red') + '-600 font-bold">' + (deltaExit >= 0 ? '+' : '') + deltaExit + '</div></div>';
         html += '<div class="text-center"><div class="text-gray-600 font-bold text-lg">' + refExitSpeed + '</div><div class="text-gray-400 text-xs">Ref</div></div>';
         html += '</div></div>';
@@ -2957,7 +2957,7 @@ class TelemetryAnalysisApp {
         html += '<div class="bg-white rounded-lg p-3 shadow-sm">';
         html += '<div class="text-gray-500 text-sm">Avg Throttle</div>';
         html += '<div class="flex justify-between items-center">';
-        html += '<span class="text-[#ff6b9d] font-semibold font-data">' + avgThrottle + '%</span>';
+        html += '<span class="text-[#ff85b1] font-semibold font-data">' + avgThrottle + '%</span>';
         html += '<span class="text-gray-400">vs</span>';
         html += '<span class="text-gray-600 font-bold">' + refAvgThrottle + '%</span>';
         html += '</div></div>';
@@ -3648,7 +3648,7 @@ class TelemetryAnalysisApp {
         });
         allTraces.push({ x: outerEdge.x, y: outerEdge.y, mode: 'lines', line: { color: '#ffffff', width: 2 }, hoverinfo: 'skip', showlegend: false });
         allTraces.push({ x: innerEdge.x, y: innerEdge.y, mode: 'lines', line: { color: '#ffffff', width: 2 }, hoverinfo: 'skip', showlegend: false });
-        allTraces.push({ x: refNorm.map(function(p) { return p.x; }), y: refNorm.map(function(p) { return p.y; }), mode: 'lines', name: 'Reference', line: { color: '#00d4aa', width: 4 }, hoverinfo: 'name' });
+        allTraces.push({ x: refNorm.map(function(p) { return p.x; }), y: refNorm.map(function(p) { return p.y; }), mode: 'lines', name: 'Reference', line: { color: '#00d4aa', width: 4 }, hoverinfo: 'skip' });
         
         // Your lap - solid magenta line (no speed coloring)
         allTraces.push({ 
@@ -3657,7 +3657,7 @@ class TelemetryAnalysisApp {
             mode: 'lines', 
             name: 'Comparison', 
             line: { color: '#ff6b9d', width: 3 }, 
-            hoverinfo: 'name' 
+            hoverinfo: 'skip' 
         });
         
         // Add segment markers (Turns and Straights) from LOCAL DETECTION
@@ -4137,7 +4137,7 @@ class TelemetryAnalysisApp {
         var messageDiv = document.createElement('div');
         messageDiv.className = 'flex items-start';
         var cleanMessage = message.replace(/<[^>]*>/g, '');
-        messageDiv.innerHTML = '<div class="chat-message-ai rounded-lg p-4 max-w-2xl"><div class="flex items-center gap-3 mb-3"><div class="w-8 h-8 bg-gradient-to-br from-[#ff6b9d] to-[#ff4777] rounded flex items-center justify-center"><span class="text-white font-bold text-sm font-display">A</span></div><span class="font-display font-semibold text-[#ff6b9d] text-sm tracking-wide">AIRTON</span></div><div class="text-[#f0f6fc] text-sm leading-relaxed">' + cleanMessage.replace(/\n/g, '<br>') + '</div></div>';
+        messageDiv.innerHTML = '<div class="chat-message-ai rounded-lg p-4 max-w-2xl"><div class="flex items-center gap-3 mb-3"><div class="w-8 h-8 bg-gradient-to-br from-[#ff6b9d] to-[#ff4777] rounded flex items-center justify-center"><span class="text-white font-bold text-sm font-display">A</span></div><span class="font-display font-semibold text-[#ff85b1] text-sm tracking-wide">AIRTON</span></div><div class="text-[#f0f6fc] text-sm leading-relaxed">' + cleanMessage.replace(/\n/g, '<br>') + '</div></div>';
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
@@ -4147,7 +4147,7 @@ class TelemetryAnalysisApp {
         var typingDiv = document.createElement('div');
         typingDiv.id = 'typing-indicator';
         typingDiv.className = 'flex items-start';
-        typingDiv.innerHTML = '<div class="rounded-lg p-4 bg-[#21262d] border border-[#30363d]"><p class="text-[#8b949e] text-sm font-data"><i class="fas fa-circle-notch fa-spin mr-2 text-[#ff6b9d]"></i>Analyzing data...</p></div>';
+        typingDiv.innerHTML = '<div class="rounded-lg p-4 bg-[#21262d] border border-[#30363d]"><p class="text-[#8b949e] text-sm font-data"><i class="fas fa-circle-notch fa-spin mr-2 text-[#ff85b1]"></i>Analyzing data...</p></div>';
         chatMessages.appendChild(typingDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
