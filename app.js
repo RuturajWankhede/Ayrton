@@ -3475,7 +3475,8 @@ class TelemetryAnalysisApp {
     
     calculateCornerType(cornerDistance) {
         // Calculate corner type based on telemetry data
-        // Priority: 1) Heading change (best), 2) Lateral G, 3) Speed reduction
+        // Priority for severity: 1) Heading change, 2) Lateral G, 3) Speed reduction
+        // Direction always from steering wheel data (most reliable)
         
         if (!this.referenceData || this.referenceData.length < 10) return 'corner';
         
@@ -3484,7 +3485,7 @@ class TelemetryAnalysisApp {
         var distNames = ['Corrected Distance', 'Corrected Distance[m]', 'Lap Distance', 'Distance', 'Dist'];
         var gLatNames = ['G Force Lat', 'G-Force Lat', 'G-Force Lat[G]', 'gLat', 'Lateral G', 'LateralAccel', 'G_Lat', 'LatG'];
         var speedNames = ['Ground Speed', 'Speed', 'Speed[kph]', 'Ground Speed_ms', 'speed', 'Speed_ms'];
-        var steerNames = ['Steering Angle', 'Steer', 'Steering', 'SteerAngle', 'Steer Angle[°]'];
+        var steerNames = ['Steering Angle', 'Steer', 'Steering', 'SteerAngle', 'Steer Angle[°]', 'Steer Angle', 'SteeringAngle'];
         
         var self = this;
         
@@ -3533,7 +3534,46 @@ class TelemetryAnalysisApp {
         var cornerType = 'corner';
         var direction = '';
         
-        // METHOD 1: Heading/Yaw change (most accurate - geometric property)
+        // FIRST: Determine direction from steering wheel data (most reliable)
+        // Steering is independent of circuit direction (CW vs CCW)
+        if (steerChannel) {
+            var steerAngles = cornerData.map(function(row) {
+                return getValue(row, steerNames);
+            }).filter(function(s) { return s !== null; });
+            
+            if (steerAngles.length > 3) {
+                // Find peak steering angle (largest absolute value)
+                var peakSteer = 0;
+                for (var i = 0; i < steerAngles.length; i++) {
+                    if (Math.abs(steerAngles[i]) > Math.abs(peakSteer)) {
+                        peakSteer = steerAngles[i];
+                    }
+                }
+                
+                // Positive steering = right turn, negative = left turn
+                // (This is the convention for most racing sims and data loggers)
+                direction = peakSteer > 0 ? 'right' : 'left';
+            }
+        }
+        
+        // If no steering data, try lateral G for direction
+        if (!direction && gLatChannel) {
+            var gLatValues = cornerData.map(function(row) {
+                return getValue(row, gLatNames);
+            }).filter(function(g) { return g !== null; });
+            
+            if (gLatValues.length > 3) {
+                var sumGLat = 0;
+                for (var i = 0; i < gLatValues.length; i++) {
+                    sumGLat += gLatValues[i];
+                }
+                var avgGLat = sumGLat / gLatValues.length;
+                // Positive lateral G = right turn (convention varies, but consistent within dataset)
+                direction = avgGLat > 0 ? 'right' : 'left';
+            }
+        }
+        
+        // METHOD 1: Heading/Yaw change for severity (most accurate for corner type)
         if (yawChannel) {
             var startYaw = getValue(cornerData[0], yawNames);
             var endYaw = getValue(cornerData[cornerData.length - 1], yawNames);
@@ -3546,19 +3586,18 @@ class TelemetryAnalysisApp {
                 while (headingChange < -180) headingChange += 360;
                 
                 var absHeadingChange = Math.abs(headingChange);
-                direction = headingChange > 0 ? 'right' : 'left';
                 
                 // Classify based on heading change
                 if (absHeadingChange >= 150) {
                     cornerType = 'hairpin';
                 } else if (absHeadingChange >= 90) {
-                    cornerType = 'tight ' + direction;
+                    cornerType = direction ? 'tight ' + direction : 'tight';
                 } else if (absHeadingChange >= 60) {
-                    cornerType = 'medium ' + direction;
+                    cornerType = direction ? 'medium ' + direction : 'medium';
                 } else if (absHeadingChange >= 30) {
-                    cornerType = 'fast ' + direction;
+                    cornerType = direction ? 'fast ' + direction : 'fast';
                 } else if (absHeadingChange >= 10) {
-                    cornerType = 'kink ' + direction;
+                    cornerType = direction ? 'kink ' + direction : 'kink';
                 } else {
                     cornerType = 'straight';
                 }
@@ -3567,39 +3606,33 @@ class TelemetryAnalysisApp {
             }
         }
         
-        // METHOD 2: Lateral G (fallback - indicates corner severity)
+        // METHOD 2: Lateral G for severity (fallback)
         if (gLatChannel) {
             var gLatValues = cornerData.map(function(row) {
                 return getValue(row, gLatNames);
             }).filter(function(g) { return g !== null; });
             
             if (gLatValues.length > 3) {
-                // Get peak lateral G and determine direction from sign
                 var peakGLat = 0;
-                var sumGLat = 0;
                 for (var i = 0; i < gLatValues.length; i++) {
                     if (Math.abs(gLatValues[i]) > Math.abs(peakGLat)) {
                         peakGLat = gLatValues[i];
                     }
-                    sumGLat += gLatValues[i];
                 }
                 
-                var avgGLat = sumGLat / gLatValues.length;
-                direction = avgGLat > 0 ? 'right' : 'left';
                 var absPeakG = Math.abs(peakGLat);
                 
                 // Classify based on peak lateral G
-                // Higher G = tighter corner (requires more grip)
                 if (absPeakG >= 2.5) {
-                    cornerType = 'hairpin';  // Very high G, must be slow/tight
+                    cornerType = 'hairpin';
                 } else if (absPeakG >= 1.8) {
-                    cornerType = 'tight ' + direction;
+                    cornerType = direction ? 'tight ' + direction : 'tight';
                 } else if (absPeakG >= 1.2) {
-                    cornerType = 'medium ' + direction;
+                    cornerType = direction ? 'medium ' + direction : 'medium';
                 } else if (absPeakG >= 0.6) {
-                    cornerType = 'fast ' + direction;
+                    cornerType = direction ? 'fast ' + direction : 'fast';
                 } else if (absPeakG >= 0.3) {
-                    cornerType = 'kink ' + direction;
+                    cornerType = direction ? 'kink ' + direction : 'kink';
                 } else {
                     cornerType = 'straight';
                 }
@@ -3608,7 +3641,7 @@ class TelemetryAnalysisApp {
             }
         }
         
-        // METHOD 3: Speed reduction (last resort fallback)
+        // METHOD 3: Speed reduction for severity (last resort)
         if (speedChannel) {
             var speeds = cornerData.map(function(row) {
                 return getValue(row, speedNames);
@@ -3624,21 +3657,20 @@ class TelemetryAnalysisApp {
                     minSpeed = minSpeed * 3.6;
                 }
                 
-                var speedReduction = maxSpeed - minSpeed;
                 var speedRatio = minSpeed / maxSpeed;
+                var speedReduction = maxSpeed - minSpeed;
                 
-                // Classify based on how much speed is lost through corner
-                // Bigger drop = tighter corner
+                // Classify based on speed reduction
                 if (speedRatio < 0.35 || speedReduction > 120) {
                     cornerType = 'hairpin';
                 } else if (speedRatio < 0.50 || speedReduction > 80) {
-                    cornerType = 'tight';
+                    cornerType = direction ? 'tight ' + direction : 'tight';
                 } else if (speedRatio < 0.65 || speedReduction > 50) {
-                    cornerType = 'medium';
+                    cornerType = direction ? 'medium ' + direction : 'medium';
                 } else if (speedRatio < 0.80 || speedReduction > 25) {
-                    cornerType = 'fast';
+                    cornerType = direction ? 'fast ' + direction : 'fast';
                 } else if (speedReduction > 10) {
-                    cornerType = 'kink';
+                    cornerType = direction ? 'kink ' + direction : 'kink';
                 } else {
                     cornerType = 'straight';
                 }
@@ -3647,7 +3679,7 @@ class TelemetryAnalysisApp {
             }
         }
         
-        // METHOD 4: Steering angle (if available)
+        // METHOD 4: Steering angle for severity (if nothing else works)
         if (steerChannel) {
             var steerAngles = cornerData.map(function(row) {
                 return getValue(row, steerNames);
@@ -3661,20 +3693,19 @@ class TelemetryAnalysisApp {
                     }
                 }
                 
-                direction = peakSteer > 0 ? 'right' : 'left';
                 var absSteer = Math.abs(peakSteer);
                 
-                // Classify based on steering angle (varies by car, but rough guide)
+                // Classify based on steering angle
                 if (absSteer >= 300) {
                     cornerType = 'hairpin';
                 } else if (absSteer >= 180) {
-                    cornerType = 'tight ' + direction;
+                    cornerType = direction ? 'tight ' + direction : 'tight';
                 } else if (absSteer >= 90) {
-                    cornerType = 'medium ' + direction;
+                    cornerType = direction ? 'medium ' + direction : 'medium';
                 } else if (absSteer >= 40) {
-                    cornerType = 'fast ' + direction;
+                    cornerType = direction ? 'fast ' + direction : 'fast';
                 } else if (absSteer >= 15) {
-                    cornerType = 'kink ' + direction;
+                    cornerType = direction ? 'kink ' + direction : 'kink';
                 } else {
                     cornerType = 'straight';
                 }
@@ -3683,7 +3714,7 @@ class TelemetryAnalysisApp {
             }
         }
         
-        return cornerType;
+        return direction ? cornerType + ' ' + direction : cornerType;
     }
     
     generateGraphs(analysis) {
