@@ -2555,7 +2555,11 @@ class TelemetryAnalysisApp {
         document.getElementById('lap-delta').textContent = (lapDelta > 0 ? '+' : '') + lapDelta.toFixed(3) + 's';
         
         var gripUsage = this.calculateGripUsage();
-        document.getElementById('g-force-usage').textContent = gripUsage.toFixed(0) + '%';
+        if (gripUsage !== null) {
+            document.getElementById('g-force-usage').textContent = gripUsage.toFixed(0) + '%';
+        } else {
+            document.getElementById('g-force-usage').textContent = '--';
+        }
         
         var drivingStyle = lapDelta > 2 ? 'Learning' : lapDelta > 1 ? 'Building' : lapDelta > 0.5 ? 'Close' : lapDelta > 0 ? 'Competitive' : 'Faster!';
         document.getElementById('tire-status').textContent = drivingStyle;
@@ -3107,14 +3111,15 @@ class TelemetryAnalysisApp {
     
     calculateGripUsage() {
         var self = this;
-        if (!this.referenceData || !this.currentData || !this.detectedChannels) return 75;
+        if (!this.referenceData || !this.currentData) return null;
         
+        // Look for direct lateral G channel
         var gLatChannel = null;
-        var channels = this.detectedChannels.optional || {};
+        var channels = this.detectedChannels ? (this.detectedChannels.optional || {}) : {};
         if (channels.gLat) gLatChannel = channels.gLat.csvColumn || channels.gLat;
         
         if (!gLatChannel) {
-            var possibleNames = ['G Force Lat', 'gLat', 'Lateral G', 'LateralAccel', 'G_Lat'];
+            var possibleNames = ['G Force Lat', 'G-Force Lat', 'G-Force Lat[G]', 'gLat', 'Lateral G', 'LateralAccel', 'G_Lat', 'LatG', 'G Lat[G]', 'G Lat'];
             var sampleRow = this.referenceData[0];
             for (var i = 0; i < possibleNames.length; i++) {
                 if (sampleRow && sampleRow[possibleNames[i]] !== undefined) {
@@ -3124,20 +3129,123 @@ class TelemetryAnalysisApp {
             }
         }
         
-        if (!gLatChannel) return 75;
+        var refGLat = [];
+        var currGLat = [];
         
-        var refGLat = this.referenceData.map(function(row) {
-            var val = parseFloat(row[gLatChannel]);
-            return isNaN(val) ? 0 : Math.abs(val);
-        }).filter(function(g) { return g > 0.1; });
+        if (gLatChannel) {
+            // Use direct lateral G data
+            console.log('Grip usage: using direct lateral G channel:', gLatChannel);
+            refGLat = this.referenceData.map(function(row) {
+                var val = parseFloat(row[gLatChannel]);
+                return isNaN(val) ? 0 : Math.abs(val);
+            }).filter(function(g) { return g > 0.1; });
+            
+            currGLat = this.currentData.map(function(row) {
+                var val = parseFloat(row[gLatChannel]);
+                return isNaN(val) ? 0 : Math.abs(val);
+            }).filter(function(g) { return g > 0.1; });
+        } else {
+            // Try to derive lateral G from yaw/heading and speed
+            var yawNames = ['Yaw[°]', 'Yaw', 'Heading', 'Heading[°]', 'Car Heading', 'YawNorth[°]', 'YawNorth'];
+            var speedNames = ['Ground Speed', 'Speed', 'Speed[kph]', 'Ground Speed_ms', 'speed', 'Speed_ms'];
+            var distNames = ['Corrected Distance', 'Corrected Distance[m]', 'Lap Distance', 'Distance', 'Dist'];
+            
+            var sampleRow = this.referenceData[0];
+            var yawChannel = null;
+            var speedChannel = null;
+            var distChannel = null;
+            
+            for (var i = 0; i < yawNames.length; i++) {
+                if (sampleRow && sampleRow[yawNames[i]] !== undefined) {
+                    yawChannel = yawNames[i];
+                    break;
+                }
+            }
+            for (var i = 0; i < speedNames.length; i++) {
+                if (sampleRow && sampleRow[speedNames[i]] !== undefined) {
+                    speedChannel = speedNames[i];
+                    break;
+                }
+            }
+            for (var i = 0; i < distNames.length; i++) {
+                if (sampleRow && sampleRow[distNames[i]] !== undefined) {
+                    distChannel = distNames[i];
+                    break;
+                }
+            }
+            
+            if (!yawChannel || !speedChannel || !distChannel) {
+                console.log('Grip usage: insufficient data (no lateral G, yaw, speed, or distance)');
+                return null;
+            }
+            
+            console.log('Grip usage: deriving lateral G from yaw/speed');
+            
+            // Calculate derived lateral G for reference lap
+            for (var i = 1; i < this.referenceData.length - 1; i++) {
+                var prev = this.referenceData[i - 1];
+                var curr = this.referenceData[i];
+                var next = this.referenceData[i + 1];
+                
+                var yawPrev = parseFloat(prev[yawChannel]);
+                var yawNext = parseFloat(next[yawChannel]);
+                var speed = parseFloat(curr[speedChannel]);
+                var distPrev = parseFloat(prev[distChannel]);
+                var distNext = parseFloat(next[distChannel]);
+                
+                if (!isNaN(yawPrev) && !isNaN(yawNext) && !isNaN(speed) && !isNaN(distPrev) && !isNaN(distNext)) {
+                    var dYaw = yawNext - yawPrev;
+                    if (dYaw > 180) dYaw -= 360;
+                    if (dYaw < -180) dYaw += 360;
+                    
+                    var dDist = distNext - distPrev;
+                    if (dDist > 0.1) {
+                        var speedMs = speed < 100 ? speed : speed / 3.6;
+                        var curvature = (dYaw * Math.PI / 180) / dDist;
+                        var gLat = Math.abs((speedMs * speedMs * curvature) / 9.81);
+                        if (gLat > 0.1 && gLat < 5) {  // Sanity check
+                            refGLat.push(gLat);
+                        }
+                    }
+                }
+            }
+            
+            // Calculate derived lateral G for current lap
+            for (var i = 1; i < this.currentData.length - 1; i++) {
+                var prev = this.currentData[i - 1];
+                var curr = this.currentData[i];
+                var next = this.currentData[i + 1];
+                
+                var yawPrev = parseFloat(prev[yawChannel]);
+                var yawNext = parseFloat(next[yawChannel]);
+                var speed = parseFloat(curr[speedChannel]);
+                var distPrev = parseFloat(prev[distChannel]);
+                var distNext = parseFloat(next[distChannel]);
+                
+                if (!isNaN(yawPrev) && !isNaN(yawNext) && !isNaN(speed) && !isNaN(distPrev) && !isNaN(distNext)) {
+                    var dYaw = yawNext - yawPrev;
+                    if (dYaw > 180) dYaw -= 360;
+                    if (dYaw < -180) dYaw += 360;
+                    
+                    var dDist = distNext - distPrev;
+                    if (dDist > 0.1) {
+                        var speedMs = speed < 100 ? speed : speed / 3.6;
+                        var curvature = (dYaw * Math.PI / 180) / dDist;
+                        var gLat = Math.abs((speedMs * speedMs * curvature) / 9.81);
+                        if (gLat > 0.1 && gLat < 5) {  // Sanity check
+                            currGLat.push(gLat);
+                        }
+                    }
+                }
+            }
+        }
         
-        var currGLat = this.currentData.map(function(row) {
-            var val = parseFloat(row[gLatChannel]);
-            return isNaN(val) ? 0 : Math.abs(val);
-        }).filter(function(g) { return g > 0.1; });
+        if (refGLat.length < 10 || currGLat.length < 10) {
+            console.log('Grip usage: insufficient G data points (ref:', refGLat.length, ', curr:', currGLat.length, ')');
+            return null;
+        }
         
-        if (refGLat.length === 0 || currGLat.length === 0) return 75;
-        
+        // Sort and take top 10%
         refGLat.sort(function(a, b) { return b - a; });
         currGLat.sort(function(a, b) { return b - a; });
         
@@ -3147,11 +3255,14 @@ class TelemetryAnalysisApp {
         var avgTopRefG = top10PercentRef.reduce(function(a, b) { return a + b; }, 0) / top10PercentRef.length;
         var avgTopCurrG = top10PercentCurr.reduce(function(a, b) { return a + b; }, 0) / top10PercentCurr.length;
         
-        if (avgTopRefG > 0) {
+        console.log('Grip usage: ref top 10% avg G =', avgTopRefG.toFixed(3), ', curr top 10% avg G =', avgTopCurrG.toFixed(3));
+        
+        if (avgTopRefG > 0.1) {
             var gripUsage = (avgTopCurrG / avgTopRefG) * 100;
             return Math.min(Math.max(gripUsage, 0), 120);
         }
-        return 75;
+        
+        return null;
     }
     
     generateGraphs(analysis) {
