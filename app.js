@@ -2809,16 +2809,18 @@ class TelemetryAnalysisApp {
         html += '<div class="text-center flex-1"><div class="text-[#f0f6fc] font-bold">' + refPeakBrake + '%</div><div class="text-xs text-[#6e7681]">Ref</div></div>';
         html += '</div></div>';
         
-        // Smoothness - handle string or number (comparative)
+        // Corner Grip Efficiency - based on time and G-force through corner
         html += '<div class="bg-[#30363d] rounded p-2 text-center">';
-        html += '<div class="text-xs text-[#8b949e]">Smoothness</div>';
-        if (segment.smoothness && typeof segment.smoothness === 'string') {
-            var smoothColor = segment.smoothness.includes('rougher') ? 'text-red-400' : segment.smoothness.includes('smoother') ? 'text-green-400' : 'text-[#f0f6fc]';
-            html += '<div class="' + smoothColor + ' font-semibold text-xs mt-1">' + segment.smoothness + '</div>';
-        } else if (curr.smoothness !== undefined && curr.smoothness !== null) {
-            html += '<div class="text-[#f0f6fc] font-semibold">' + (typeof curr.smoothness === 'number' ? curr.smoothness + '/100' : curr.smoothness) + '</div>';
+        html += '<div class="text-xs text-[#8b949e]">Grip Efficiency</div>';
+        
+        // Calculate corner grip efficiency using same formula as overall: (RefTime/YourTime) × (RefG/YourG)
+        var cornerEfficiency = this.calculateCornerGripEfficiency(segment.distance || 0);
+        
+        if (cornerEfficiency !== null) {
+            var effColor = cornerEfficiency >= 100 ? 'text-green-400' : cornerEfficiency >= 95 ? 'text-yellow-400' : 'text-red-400';
+            html += '<div class="' + effColor + ' font-semibold font-data text-lg mt-1">' + cornerEfficiency.toFixed(0) + '%</div>';
         } else {
-            html += '<div class="text-[#6e7681] font-semibold">-</div>';
+            html += '<div class="text-[#6e7681] font-semibold mt-1">--</div>';
         }
         html += '</div>';
         
@@ -3298,6 +3300,171 @@ class TelemetryAnalysisApp {
         console.log('Grip efficiency: refTime=' + refEndTime.toFixed(3) + 's, currTime=' + currEndTime.toFixed(3) + 's');
         console.log('Grip efficiency: refG=' + avgTopRefG.toFixed(3) + ', currG=' + avgTopCurrG.toFixed(3));
         console.log('Grip efficiency: timeRatio=' + timeRatio.toFixed(3) + ', gRatio=' + gRatio.toFixed(3) + ', efficiency=' + efficiency.toFixed(1) + '%');
+        
+        return Math.min(Math.max(efficiency, 0), 150);
+    }
+    
+    calculateCornerGripEfficiency(cornerDistance, cornerRadius) {
+        // Calculate grip efficiency for a specific corner
+        // Formula: (RefTime / YourTime) × (RefG / YourG) × 100
+        
+        if (!this.referenceData || !this.currentData) return null;
+        
+        // Define corner zone - use radius if provided, otherwise estimate based on corner type
+        var zoneRadius = cornerRadius || 75; // meters before and after apex
+        var startDist = cornerDistance - zoneRadius;
+        var endDist = cornerDistance + zoneRadius;
+        
+        // Channel names
+        var distNames = ['Corrected Distance', 'Corrected Distance[m]', 'Lap Distance', 'Distance', 'Dist'];
+        var timeNames = ['Time', 'Time[s]', 'Lap Time', 'Session Time', 'time'];
+        var gLatNames = ['G Force Lat', 'G-Force Lat', 'G-Force Lat[G]', 'gLat', 'Lateral G', 'LateralAccel', 'G_Lat'];
+        var yawNames = ['Yaw[°]', 'Yaw', 'Heading', 'Heading[°]', 'Car Heading', 'YawNorth[°]'];
+        var speedNames = ['Ground Speed', 'Speed', 'Speed[kph]', 'Ground Speed_ms', 'speed'];
+        
+        var self = this;
+        
+        function getValue(row, names) {
+            for (var i = 0; i < names.length; i++) {
+                if (row && row[names[i]] !== undefined && row[names[i]] !== null) {
+                    var val = parseFloat(row[names[i]]);
+                    if (!isNaN(val)) return val;
+                }
+            }
+            return null;
+        }
+        
+        function getDataInZone(data, startD, endD) {
+            return data.filter(function(row) {
+                var dist = getValue(row, distNames);
+                return dist !== null && dist >= startD && dist <= endD;
+            });
+        }
+        
+        // Get data points within corner zone
+        var refZone = getDataInZone(this.referenceData, startDist, endDist);
+        var currZone = getDataInZone(this.currentData, startDist, endDist);
+        
+        if (refZone.length < 3 || currZone.length < 3) {
+            return null;
+        }
+        
+        // Calculate time through corner zone
+        var refStartTime = getValue(refZone[0], timeNames);
+        var refEndTime = getValue(refZone[refZone.length - 1], timeNames);
+        var currStartTime = getValue(currZone[0], timeNames);
+        var currEndTime = getValue(currZone[currZone.length - 1], timeNames);
+        
+        if (!refStartTime || !refEndTime || !currStartTime || !currEndTime) {
+            return null;
+        }
+        
+        var refCornerTime = refEndTime - refStartTime;
+        var currCornerTime = currEndTime - currStartTime;
+        
+        if (refCornerTime <= 0 || currCornerTime <= 0) {
+            return null;
+        }
+        
+        // Get lateral G values in zone
+        var refGLat = [];
+        var currGLat = [];
+        
+        // Check if we have direct lateral G
+        var hasDirectGLat = getValue(refZone[0], gLatNames) !== null;
+        
+        if (hasDirectGLat) {
+            refGLat = refZone.map(function(row) {
+                var val = getValue(row, gLatNames);
+                return val !== null ? Math.abs(val) : 0;
+            }).filter(function(g) { return g > 0.1; });
+            
+            currGLat = currZone.map(function(row) {
+                var val = getValue(row, gLatNames);
+                return val !== null ? Math.abs(val) : 0;
+            }).filter(function(g) { return g > 0.1; });
+        } else {
+            // Derive from yaw/speed
+            for (var i = 1; i < refZone.length - 1; i++) {
+                var prev = refZone[i - 1];
+                var curr = refZone[i];
+                var next = refZone[i + 1];
+                
+                var yawPrev = getValue(prev, yawNames);
+                var yawNext = getValue(next, yawNames);
+                var speed = getValue(curr, speedNames);
+                var distPrev = getValue(prev, distNames);
+                var distNext = getValue(next, distNames);
+                
+                if (yawPrev !== null && yawNext !== null && speed !== null && distPrev !== null && distNext !== null) {
+                    var dYaw = yawNext - yawPrev;
+                    if (dYaw > 180) dYaw -= 360;
+                    if (dYaw < -180) dYaw += 360;
+                    
+                    var dDist = distNext - distPrev;
+                    if (dDist > 0.1) {
+                        var speedMs = speed < 100 ? speed : speed / 3.6;
+                        var curvature = (dYaw * Math.PI / 180) / dDist;
+                        var gLat = Math.abs((speedMs * speedMs * curvature) / 9.81);
+                        if (gLat > 0.1 && gLat < 5) {
+                            refGLat.push(gLat);
+                        }
+                    }
+                }
+            }
+            
+            for (var i = 1; i < currZone.length - 1; i++) {
+                var prev = currZone[i - 1];
+                var curr = currZone[i];
+                var next = currZone[i + 1];
+                
+                var yawPrev = getValue(prev, yawNames);
+                var yawNext = getValue(next, yawNames);
+                var speed = getValue(curr, speedNames);
+                var distPrev = getValue(prev, distNames);
+                var distNext = getValue(next, distNames);
+                
+                if (yawPrev !== null && yawNext !== null && speed !== null && distPrev !== null && distNext !== null) {
+                    var dYaw = yawNext - yawPrev;
+                    if (dYaw > 180) dYaw -= 360;
+                    if (dYaw < -180) dYaw += 360;
+                    
+                    var dDist = distNext - distPrev;
+                    if (dDist > 0.1) {
+                        var speedMs = speed < 100 ? speed : speed / 3.6;
+                        var curvature = (dYaw * Math.PI / 180) / dDist;
+                        var gLat = Math.abs((speedMs * speedMs * curvature) / 9.81);
+                        if (gLat > 0.1 && gLat < 5) {
+                            currGLat.push(gLat);
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (refGLat.length < 2 || currGLat.length < 2) {
+            return null;
+        }
+        
+        // Use peak G (top 20% average) for corners
+        refGLat.sort(function(a, b) { return b - a; });
+        currGLat.sort(function(a, b) { return b - a; });
+        
+        var top20Ref = refGLat.slice(0, Math.max(1, Math.ceil(refGLat.length * 0.2)));
+        var top20Curr = currGLat.slice(0, Math.max(1, Math.ceil(currGLat.length * 0.2)));
+        
+        var avgRefG = top20Ref.reduce(function(a, b) { return a + b; }, 0) / top20Ref.length;
+        var avgCurrG = top20Curr.reduce(function(a, b) { return a + b; }, 0) / top20Curr.length;
+        
+        if (avgRefG < 0.1 || avgCurrG < 0.1) {
+            return null;
+        }
+        
+        // Calculate efficiency: (RefTime / YourTime) × (RefG / YourG) × 100
+        var timeRatio = refCornerTime / currCornerTime;  // >1 if you're faster
+        var gRatio = avgRefG / avgCurrG;                  // >1 if you use less G
+        
+        var efficiency = timeRatio * gRatio * 100;
         
         return Math.min(Math.max(efficiency, 0), 150);
     }
