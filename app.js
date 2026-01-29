@@ -2747,7 +2747,11 @@ class TelemetryAnalysisApp {
         html += '<div class="flex justify-between items-start mb-4">';
         html += '<div>';
         html += '<h3 class="text-xl font-bold text-[#f0f6fc]"><i class="fas fa-undo text-red-400 mr-2"></i>' + turnLabel + '</h3>';
-        html += '<span class="text-[#8b949e]">' + (segment.cornerType || 'corner') + ' corner at ' + (segment.distance || 0) + 'm</span>';
+        
+        // Calculate corner type from heading change through the corner (industry standard method)
+        // Uses the corner's geometric property rather than speed which varies by car/conditions
+        var calculatedCornerType = this.calculateCornerType(segment.distance || 0);
+        html += '<span class="text-[#8b949e]">' + calculatedCornerType + ' at ' + (segment.distance || 0) + 'm</span>';
         html += '</div>';
         if (segment.timeLoss > 0) {
             html += '<div class="bg-red-900/50 text-red-300 px-3 py-1 rounded-full text-sm font-medium">-' + segment.timeLoss.toFixed(2) + 's lost</div>';
@@ -3467,6 +3471,219 @@ class TelemetryAnalysisApp {
         var efficiency = timeRatio * gRatio * 100;
         
         return Math.min(Math.max(efficiency, 0), 150);
+    }
+    
+    calculateCornerType(cornerDistance) {
+        // Calculate corner type based on telemetry data
+        // Priority: 1) Heading change (best), 2) Lateral G, 3) Speed reduction
+        
+        if (!this.referenceData || this.referenceData.length < 10) return 'corner';
+        
+        // Channel names
+        var yawNames = ['Yaw[°]', 'Yaw', 'Heading', 'Heading[°]', 'Car Heading', 'YawNorth[°]', 'YawNorth'];
+        var distNames = ['Corrected Distance', 'Corrected Distance[m]', 'Lap Distance', 'Distance', 'Dist'];
+        var gLatNames = ['G Force Lat', 'G-Force Lat', 'G-Force Lat[G]', 'gLat', 'Lateral G', 'LateralAccel', 'G_Lat', 'LatG'];
+        var speedNames = ['Ground Speed', 'Speed', 'Speed[kph]', 'Ground Speed_ms', 'speed', 'Speed_ms'];
+        var steerNames = ['Steering Angle', 'Steer', 'Steering', 'SteerAngle', 'Steer Angle[°]'];
+        
+        var self = this;
+        
+        function getValue(row, names) {
+            for (var i = 0; i < names.length; i++) {
+                if (row && row[names[i]] !== undefined && row[names[i]] !== null) {
+                    var val = parseFloat(row[names[i]]);
+                    if (!isNaN(val)) return val;
+                }
+            }
+            return null;
+        }
+        
+        function findChannel(names) {
+            var sampleRow = self.referenceData[0];
+            for (var i = 0; i < names.length; i++) {
+                if (sampleRow && sampleRow[names[i]] !== undefined) {
+                    return names[i];
+                }
+            }
+            return null;
+        }
+        
+        // Find available channels
+        var distChannel = findChannel(distNames);
+        var yawChannel = findChannel(yawNames);
+        var gLatChannel = findChannel(gLatNames);
+        var speedChannel = findChannel(speedNames);
+        var steerChannel = findChannel(steerNames);
+        
+        if (!distChannel) return 'corner';
+        
+        // Define corner zone (75m before and after apex)
+        var zoneRadius = 75;
+        var startDist = cornerDistance - zoneRadius;
+        var endDist = cornerDistance + zoneRadius;
+        
+        // Get data points within corner zone
+        var cornerData = this.referenceData.filter(function(row) {
+            var dist = getValue(row, distNames);
+            return dist !== null && dist >= startDist && dist <= endDist;
+        });
+        
+        if (cornerData.length < 5) return 'corner';
+        
+        var cornerType = 'corner';
+        var direction = '';
+        
+        // METHOD 1: Heading/Yaw change (most accurate - geometric property)
+        if (yawChannel) {
+            var startYaw = getValue(cornerData[0], yawNames);
+            var endYaw = getValue(cornerData[cornerData.length - 1], yawNames);
+            
+            if (startYaw !== null && endYaw !== null) {
+                var headingChange = endYaw - startYaw;
+                
+                // Normalize to -180 to 180 range (handle wraparound)
+                while (headingChange > 180) headingChange -= 360;
+                while (headingChange < -180) headingChange += 360;
+                
+                var absHeadingChange = Math.abs(headingChange);
+                direction = headingChange > 0 ? 'right' : 'left';
+                
+                // Classify based on heading change
+                if (absHeadingChange >= 150) {
+                    cornerType = 'hairpin';
+                } else if (absHeadingChange >= 90) {
+                    cornerType = 'tight ' + direction;
+                } else if (absHeadingChange >= 60) {
+                    cornerType = 'medium ' + direction;
+                } else if (absHeadingChange >= 30) {
+                    cornerType = 'fast ' + direction;
+                } else if (absHeadingChange >= 10) {
+                    cornerType = 'kink ' + direction;
+                } else {
+                    cornerType = 'straight';
+                }
+                
+                return cornerType;
+            }
+        }
+        
+        // METHOD 2: Lateral G (fallback - indicates corner severity)
+        if (gLatChannel) {
+            var gLatValues = cornerData.map(function(row) {
+                return getValue(row, gLatNames);
+            }).filter(function(g) { return g !== null; });
+            
+            if (gLatValues.length > 3) {
+                // Get peak lateral G and determine direction from sign
+                var peakGLat = 0;
+                var sumGLat = 0;
+                for (var i = 0; i < gLatValues.length; i++) {
+                    if (Math.abs(gLatValues[i]) > Math.abs(peakGLat)) {
+                        peakGLat = gLatValues[i];
+                    }
+                    sumGLat += gLatValues[i];
+                }
+                
+                var avgGLat = sumGLat / gLatValues.length;
+                direction = avgGLat > 0 ? 'right' : 'left';
+                var absPeakG = Math.abs(peakGLat);
+                
+                // Classify based on peak lateral G
+                // Higher G = tighter corner (requires more grip)
+                if (absPeakG >= 2.5) {
+                    cornerType = 'hairpin';  // Very high G, must be slow/tight
+                } else if (absPeakG >= 1.8) {
+                    cornerType = 'tight ' + direction;
+                } else if (absPeakG >= 1.2) {
+                    cornerType = 'medium ' + direction;
+                } else if (absPeakG >= 0.6) {
+                    cornerType = 'fast ' + direction;
+                } else if (absPeakG >= 0.3) {
+                    cornerType = 'kink ' + direction;
+                } else {
+                    cornerType = 'straight';
+                }
+                
+                return cornerType;
+            }
+        }
+        
+        // METHOD 3: Speed reduction (last resort fallback)
+        if (speedChannel) {
+            var speeds = cornerData.map(function(row) {
+                return getValue(row, speedNames);
+            }).filter(function(s) { return s !== null && s > 0; });
+            
+            if (speeds.length > 3) {
+                var maxSpeed = Math.max.apply(null, speeds);
+                var minSpeed = Math.min.apply(null, speeds);
+                
+                // Convert to consistent units (assume km/h if > 50)
+                if (maxSpeed < 50) {
+                    maxSpeed = maxSpeed * 3.6;
+                    minSpeed = minSpeed * 3.6;
+                }
+                
+                var speedReduction = maxSpeed - minSpeed;
+                var speedRatio = minSpeed / maxSpeed;
+                
+                // Classify based on how much speed is lost through corner
+                // Bigger drop = tighter corner
+                if (speedRatio < 0.35 || speedReduction > 120) {
+                    cornerType = 'hairpin';
+                } else if (speedRatio < 0.50 || speedReduction > 80) {
+                    cornerType = 'tight';
+                } else if (speedRatio < 0.65 || speedReduction > 50) {
+                    cornerType = 'medium';
+                } else if (speedRatio < 0.80 || speedReduction > 25) {
+                    cornerType = 'fast';
+                } else if (speedReduction > 10) {
+                    cornerType = 'kink';
+                } else {
+                    cornerType = 'straight';
+                }
+                
+                return cornerType;
+            }
+        }
+        
+        // METHOD 4: Steering angle (if available)
+        if (steerChannel) {
+            var steerAngles = cornerData.map(function(row) {
+                return getValue(row, steerNames);
+            }).filter(function(s) { return s !== null; });
+            
+            if (steerAngles.length > 3) {
+                var peakSteer = 0;
+                for (var i = 0; i < steerAngles.length; i++) {
+                    if (Math.abs(steerAngles[i]) > Math.abs(peakSteer)) {
+                        peakSteer = steerAngles[i];
+                    }
+                }
+                
+                direction = peakSteer > 0 ? 'right' : 'left';
+                var absSteer = Math.abs(peakSteer);
+                
+                // Classify based on steering angle (varies by car, but rough guide)
+                if (absSteer >= 300) {
+                    cornerType = 'hairpin';
+                } else if (absSteer >= 180) {
+                    cornerType = 'tight ' + direction;
+                } else if (absSteer >= 90) {
+                    cornerType = 'medium ' + direction;
+                } else if (absSteer >= 40) {
+                    cornerType = 'fast ' + direction;
+                } else if (absSteer >= 15) {
+                    cornerType = 'kink ' + direction;
+                } else {
+                    cornerType = 'straight';
+                }
+                
+                return cornerType;
+            }
+        }
+        
+        return cornerType;
     }
     
     generateGraphs(analysis) {
