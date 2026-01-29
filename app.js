@@ -3571,31 +3571,47 @@ class TelemetryAnalysisApp {
         var cornerType = 'corner';
         var direction = '';
         
-        // FIRST: Determine direction from steering wheel data (most reliable)
-        // Steering is independent of circuit direction (CW vs CCW)
+        // Get peak steering for logging (but don't use for direction - sign convention varies)
+        var peakSteer = 0;
         if (steerChannel) {
             var steerAngles = cornerData.map(function(row) {
                 return getValue(row, steerChannel, steerNames);
             }).filter(function(s) { return s !== null && Math.abs(s) > 1; });
             
             if (steerAngles.length > 3) {
-                // Find peak steering angle (largest absolute value)
-                var peakSteer = 0;
                 for (var i = 0; i < steerAngles.length; i++) {
                     if (Math.abs(steerAngles[i]) > Math.abs(peakSteer)) {
                         peakSteer = steerAngles[i];
                     }
                 }
+            }
+        }
+        
+        // PRIMARY: Use heading change to determine direction (most reliable)
+        // Heading change is independent of sim/logger conventions
+        if (yawChannel) {
+            var startYaw = getValue(cornerData[0], yawChannel, yawNames);
+            var endYaw = getValue(cornerData[cornerData.length - 1], yawChannel, yawNames);
+            
+            if (startYaw !== null && endYaw !== null) {
+                var headingChange = endYaw - startYaw;
                 
-                if (Math.abs(peakSteer) > 5) {
-                    // Positive steering = right turn, negative = left turn
-                    direction = peakSteer > 0 ? 'right' : 'left';
-                    console.log('Corner at ' + cornerDistance + 'm: direction from steering = ' + direction + ' (peak: ' + peakSteer.toFixed(1) + '°)');
+                // Normalize to -180 to 180 range
+                while (headingChange > 180) headingChange -= 360;
+                while (headingChange < -180) headingChange += 360;
+                
+                // Heading/Yaw convention (looking from above):
+                // Positive change = clockwise = RIGHT turn
+                // Negative change = counter-clockwise = LEFT turn
+                if (Math.abs(headingChange) > 5) {
+                    direction = headingChange > 0 ? 'right' : 'left';
+                    console.log('Corner at ' + cornerDistance + 'm: direction from heading = ' + direction + 
+                        ' (Δheading: ' + headingChange.toFixed(1) + '°, steering: ' + peakSteer.toFixed(1) + '°)');
                 }
             }
         }
         
-        // If no steering data, try lateral G for direction
+        // FALLBACK: Use lateral G if no heading data
         if (!direction && gLatChannel) {
             var gLatValues = cornerData.map(function(row) {
                 return getValue(row, gLatChannel, gLatNames);
@@ -3608,10 +3624,17 @@ class TelemetryAnalysisApp {
                 }
                 var avgGLat = sumGLat / gLatValues.length;
                 if (Math.abs(avgGLat) > 0.2) {
+                    // Lateral G convention: positive = right turn (typically)
                     direction = avgGLat > 0 ? 'right' : 'left';
                     console.log('Corner at ' + cornerDistance + 'm: direction from lateral G = ' + direction + ' (avg: ' + avgGLat.toFixed(2) + 'G)');
                 }
             }
+        }
+        
+        // LAST RESORT: Use steering with standard convention (may be wrong for some sims)
+        if (!direction && Math.abs(peakSteer) > 5) {
+            direction = peakSteer > 0 ? 'right' : 'left';
+            console.log('Corner at ' + cornerDistance + 'm: direction from steering (fallback) = ' + direction + ' (peak: ' + peakSteer.toFixed(1) + '°)');
         }
         
         if (!direction) {
