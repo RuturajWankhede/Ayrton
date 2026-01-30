@@ -3600,11 +3600,11 @@ class TelemetryAnalysisApp {
                 while (headingChange > 180) headingChange -= 360;
                 while (headingChange < -180) headingChange += 360;
                 
-                // Heading/Yaw convention (looking from above):
-                // Positive change = clockwise = RIGHT turn
-                // Negative change = counter-clockwise = LEFT turn
+                // Heading/Yaw convention varies by sim:
+                // iRacing: Negative change = RIGHT turn, Positive change = LEFT turn
+                // (opposite of standard compass convention)
                 if (Math.abs(headingChange) > 5) {
-                    direction = headingChange > 0 ? 'right' : 'left';
+                    direction = headingChange < 0 ? 'right' : 'left';
                     console.log('Corner at ' + cornerDistance + 'm: direction from heading = ' + direction + 
                         ' (Δheading: ' + headingChange.toFixed(1) + '°, steering: ' + peakSteer.toFixed(1) + '°)');
                 }
