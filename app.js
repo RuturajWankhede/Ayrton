@@ -3061,11 +3061,15 @@ class TelemetryAnalysisApp {
             html += '<div class="mb-6">';
             html += '<h3 class="text-lg font-semibold text-[#f0f6fc] mb-3"><i class="fas fa-circle text-yellow-500 mr-2"></i>Tire Temperature Analysis</h3>';
             
-            // Tire temp comparison graphs - full width, stacked
-            html += '<div class="mb-6 space-y-4">';
+            // Tire temp comparison graphs - full width, taller
+            html += '<div class="mb-6 space-y-6">';
             html += '<h4 class="text-sm font-semibold text-[#8b949e] mb-2">Temperature Over Lap Distance</h4>';
-            html += '<div id="tire-temp-graph-front" style="height: 220px; width: 100%;"></div>';
-            html += '<div id="tire-temp-graph-rear" style="height: 220px; width: 100%;"></div>';
+            html += '<div class="bg-[#0d1117] rounded-lg p-2">';
+            html += '<div id="tire-temp-graph-front" style="height: 280px; width: 100%;"></div>';
+            html += '</div>';
+            html += '<div class="bg-[#0d1117] rounded-lg p-2">';
+            html += '<div id="tire-temp-graph-rear" style="height: 280px; width: 100%;"></div>';
+            html += '</div>';
             html += '</div>';
             
             // Tire diagram - 2x2 grid showing car from above
@@ -5250,24 +5254,57 @@ class TelemetryAnalysisApp {
         var compLR = extractTempData(this.currentData, distChannel, lrChannel);
         var compRR = extractTempData(this.currentData, distChannel, rrChannel);
         
-        console.log('Tire temp data points:', {
-            refLF: refLF.dist.length, refRF: refRF.dist.length,
-            refLR: refLR.dist.length, refRR: refRR.dist.length,
-            compLF: compLF.dist.length, compRF: compRF.dist.length
-        });
+        // Get corners for annotations
+        var corners = this.detectedCorners || [];
         
-        // Log sample temps to verify data
-        if (refLF.temp.length > 0) {
-            console.log('Sample LF temps - min:', Math.min.apply(null, refLF.temp).toFixed(1), 
-                        'max:', Math.max.apply(null, refLF.temp).toFixed(1));
+        // Find y-axis range for corner markers
+        var allTemps = [].concat(refLF.temp, refRF.temp, compLF.temp, compRF.temp);
+        var minTemp = allTemps.length > 0 ? Math.min.apply(null, allTemps) : 40;
+        var maxTemp = allTemps.length > 0 ? Math.max.apply(null, allTemps) : 100;
+        
+        var allTempsRear = [].concat(refLR.temp, refRR.temp, compLR.temp, compRR.temp);
+        var minTempRear = allTempsRear.length > 0 ? Math.min.apply(null, allTempsRear) : 40;
+        var maxTempRear = allTempsRear.length > 0 ? Math.max.apply(null, allTempsRear) : 100;
+        
+        // Create corner annotation shapes and labels
+        function createCornerAnnotations(minY, maxY) {
+            var shapes = [];
+            var annotations = [];
+            
+            corners.forEach(function(corner, idx) {
+                // Vertical line at corner
+                shapes.push({
+                    type: 'line',
+                    x0: corner.distance,
+                    x1: corner.distance,
+                    y0: minY,
+                    y1: maxY,
+                    line: { color: '#6e7681', width: 1, dash: 'dot' }
+                });
+                
+                // Corner label at top
+                annotations.push({
+                    x: corner.distance,
+                    y: maxY,
+                    text: 'T' + (idx + 1),
+                    showarrow: false,
+                    font: { size: 9, color: '#8b949e' },
+                    yshift: 10
+                });
+            });
+            
+            return { shapes: shapes, annotations: annotations };
         }
+        
+        var frontCorners = createCornerAnnotations(minTemp - 5, maxTemp + 5);
+        var rearCorners = createCornerAnnotations(minTempRear - 5, maxTempRear + 5);
         
         // Dark theme layout
         var layoutBase = {
-            paper_bgcolor: '#161b22',
-            plot_bgcolor: '#161b22',
+            paper_bgcolor: '#0d1117',
+            plot_bgcolor: '#0d1117',
             font: { color: '#8b949e', size: 10 },
-            margin: { t: 35, b: 45, l: 50, r: 15 },
+            margin: { t: 60, b: 50, l: 55, r: 20 },
             xaxis: { 
                 title: { text: 'Distance (m)', font: { size: 10 } },
                 gridcolor: '#30363d',
@@ -5282,10 +5319,12 @@ class TelemetryAnalysisApp {
             },
             legend: { 
                 orientation: 'h', 
-                y: 1.15,
+                y: 1.0,
                 x: 0.5,
                 xanchor: 'center',
-                font: { size: 8 }
+                yanchor: 'bottom',
+                font: { size: 9 },
+                bgcolor: 'rgba(13,17,23,0.8)'
             },
             showlegend: true
         };
@@ -5328,7 +5367,12 @@ class TelemetryAnalysisApp {
                 });
             }
             
-            var frontLayout = Object.assign({}, layoutBase, { title: { text: 'Front Tires', font: { size: 12, color: '#f0f6fc' } } });
+            var frontLayout = Object.assign({}, layoutBase, { 
+                title: { text: 'Front Tires', font: { size: 13, color: '#f0f6fc' }, y: 0.98 },
+                shapes: frontCorners.shapes,
+                annotations: frontCorners.annotations,
+                yaxis: Object.assign({}, layoutBase.yaxis, { range: [minTemp - 5, maxTemp + 10] })
+            });
             Plotly.newPlot('tire-temp-graph-front', frontTraces, frontLayout, { responsive: true, displayModeBar: false });
         }
         
@@ -5370,7 +5414,12 @@ class TelemetryAnalysisApp {
                 });
             }
             
-            var rearLayout = Object.assign({}, layoutBase, { title: { text: 'Rear Tires', font: { size: 12, color: '#f0f6fc' } } });
+            var rearLayout = Object.assign({}, layoutBase, { 
+                title: { text: 'Rear Tires', font: { size: 13, color: '#f0f6fc' }, y: 0.98 },
+                shapes: rearCorners.shapes,
+                annotations: rearCorners.annotations,
+                yaxis: Object.assign({}, layoutBase.yaxis, { range: [minTempRear - 5, maxTempRear + 10] })
+            });
             Plotly.newPlot('tire-temp-graph-rear', rearTraces, rearLayout, { responsive: true, displayModeBar: false });
         }
     }
