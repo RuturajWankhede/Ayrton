@@ -3061,15 +3061,11 @@ class TelemetryAnalysisApp {
             html += '<div class="mb-6">';
             html += '<h3 class="text-lg font-semibold text-[#f0f6fc] mb-3"><i class="fas fa-circle text-yellow-500 mr-2"></i>Tire Temperature Analysis</h3>';
             
-            // Tire temp comparison graphs - full width, taller
-            html += '<div class="mb-6 space-y-6">';
-            html += '<h4 class="text-sm font-semibold text-[#8b949e] mb-2">Temperature Over Lap Distance</h4>';
-            html += '<div class="bg-[#0d1117] rounded-lg p-2">';
-            html += '<div id="tire-temp-graph-front" style="height: 280px; width: 100%;"></div>';
-            html += '</div>';
-            html += '<div class="bg-[#0d1117] rounded-lg p-2">';
-            html += '<div id="tire-temp-graph-rear" style="height: 280px; width: 100%;"></div>';
-            html += '</div>';
+            // Tire temp comparison graphs - extend to full card width
+            html += '<div class="mb-6 space-y-4 -mx-6">';
+            html += '<h4 class="text-sm font-semibold text-[#8b949e] mb-2 px-6">Temperature Over Lap Distance</h4>';
+            html += '<div id="tire-temp-graph-front" style="height: 280px;"></div>';
+            html += '<div id="tire-temp-graph-rear" style="height: 280px;"></div>';
             html += '</div>';
             
             // Tire diagram - 2x2 grid showing car from above
@@ -5299,12 +5295,12 @@ class TelemetryAnalysisApp {
         var frontCorners = createCornerAnnotations(minTemp - 5, maxTemp + 5);
         var rearCorners = createCornerAnnotations(minTempRear - 5, maxTempRear + 5);
         
-        // Dark theme layout
+        // Dark theme layout - minimal margins for full width
         var layoutBase = {
-            paper_bgcolor: '#0d1117',
+            paper_bgcolor: 'rgba(0,0,0,0)',
             plot_bgcolor: '#0d1117',
             font: { color: '#8b949e', size: 10 },
-            margin: { t: 60, b: 50, l: 55, r: 20 },
+            margin: { t: 55, b: 45, l: 45, r: 15 },
             xaxis: { 
                 title: { text: 'Distance (m)', font: { size: 10 } },
                 gridcolor: '#30363d',
@@ -5324,9 +5320,10 @@ class TelemetryAnalysisApp {
                 xanchor: 'center',
                 yanchor: 'bottom',
                 font: { size: 9 },
-                bgcolor: 'rgba(13,17,23,0.8)'
+                bgcolor: 'rgba(0,0,0,0)'
             },
-            showlegend: true
+            showlegend: true,
+            autosize: true
         };
         
         // Front tires graph
