@@ -396,7 +396,7 @@ class TelemetryAnalysisApp {
         function shouldKeepChannel(channelName) {
             var lower = channelName.toLowerCase();
             // Keep essential channels plus a few useful ones
-            var keepPatterns = ['time', 'distance', 'speed', 'throttle', 'brake', 'gear', 'heading', 'steer', 'lap', 'elapsed', 'yaw', 'lat', 'lon', 'gps', 'lftemp', 'lrtemp', 'rftemp', 'rrtemp', 'tyretemp', 'tiretemp'];
+            var keepPatterns = ['time', 'distance', 'speed', 'throttle', 'brake', 'gear', 'heading', 'steer', 'lap', 'elapsed', 'yaw', 'lat', 'lon', 'gps', 'temp', 'tyre', 'tire'];
             return keepPatterns.some(function(p) { return lower.indexOf(p) !== -1; });
         }
         
@@ -5154,14 +5154,15 @@ class TelemetryAnalysisApp {
     
     displaySetupRecommendations(analysis) {
         var container = document.getElementById('setup-recommendations');
-        var html = '<div class="bg-[#161b22] rounded-lg p-4 shadow"><h3 class="font-bold text-lg mb-3">Analysis Summary</h3>';
-        if (analysis.sectors && analysis.sectors.length > 0) {
-            html += '<div class="space-y-2">';
-            analysis.sectors.forEach(function(s) { var color = (s.avgSpeedDelta || 0) >= 0 ? 'green' : 'red'; html += '<div class="border-l-4 border-' + color + '-500 pl-3 py-2"><p class="font-medium">Sector ' + s.sector + '</p><p class="text-sm">Speed Delta: ' + (s.avgSpeedDelta || 0).toFixed(1) + ' km/h</p></div>'; });
-            html += '</div>';
-        } else { html += '<p class="text-[#8b949e]">Sector analysis will appear after processing.</p>'; }
-        html += '</div>';
-        container.innerHTML = html;
+        if (!container) return;
+        
+        // Use rule-based tire analysis
+        var tireAnalysis = this.calculateTireAnalysis();
+        var brakeAnalysis = analysis.brakeAnalysis || {};
+        var fuelAnalysis = analysis.fuelAnalysis || {};
+        
+        // Render the full setup section
+        container.innerHTML = this.renderSetupSection(tireAnalysis, brakeAnalysis, fuelAnalysis);
     }
     
     generateFullReport(analysis) {
