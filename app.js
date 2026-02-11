@@ -3061,13 +3061,11 @@ class TelemetryAnalysisApp {
             html += '<div class="mb-6">';
             html += '<h3 class="text-lg font-semibold text-[#f0f6fc] mb-3"><i class="fas fa-circle text-yellow-500 mr-2"></i>Tire Temperature Analysis</h3>';
             
-            // Tire temp comparison graph
-            html += '<div class="mb-6">';
+            // Tire temp comparison graphs - full width, stacked
+            html += '<div class="mb-6 space-y-4">';
             html += '<h4 class="text-sm font-semibold text-[#8b949e] mb-2">Temperature Over Lap Distance</h4>';
-            html += '<div class="grid grid-cols-2 gap-4">';
-            html += '<div id="tire-temp-graph-front" style="height: 200px;"></div>';
-            html += '<div id="tire-temp-graph-rear" style="height: 200px;"></div>';
-            html += '</div>';
+            html += '<div id="tire-temp-graph-front" style="height: 220px; width: 100%;"></div>';
+            html += '<div id="tire-temp-graph-rear" style="height: 220px; width: 100%;"></div>';
             html += '</div>';
             
             // Tire diagram - 2x2 grid showing car from above
@@ -5185,12 +5183,18 @@ class TelemetryAnalysisApp {
         var sampleRow = this.referenceData[0];
         var availableKeys = Object.keys(sampleRow);
         
-        // Channel patterns for tire temps (average temp per tire)
+        console.log('Tire temp graphs - available keys with temp:', availableKeys.filter(function(k) {
+            return k.toLowerCase().indexOf('temp') !== -1;
+        }));
+        
+        // Channel patterns for tire temps
+        // Prefer surface temps (LFtempM) over carcass temps (LFtempCM) as they vary more during a lap
+        // Surface temps respond faster to track conditions and driving
         var tempPatterns = {
-            lf: ['LFtempCM[°C]', 'LFtempM[°C]', 'LFtempCM', 'LFtempM', 'AverageLFtyretemp[°C]', 'AverageLFtyretemp'],
-            rf: ['RFtempCM[°C]', 'RFtempM[°C]', 'RFtempCM', 'RFtempM', 'AverageRFtyretemp[°C]', 'AverageRFtyretemp'],
-            lr: ['LRtempCM[°C]', 'LRtempM[°C]', 'LRtempCM', 'LRtempM', 'AverageLRtyretemp[°C]', 'AverageLRtyretemp'],
-            rr: ['RRtempCM[°C]', 'RRtempM[°C]', 'RRtempCM', 'RRtempM', 'AverageRRtyretemp[°C]', 'AverageRRtyretemp']
+            lf: ['LFtempM[°C]', 'LFtempM', 'LFtempCM[°C]', 'LFtempCM', 'AverageLFtyretemp[°C]', 'AverageLFtyretemp'],
+            rf: ['RFtempM[°C]', 'RFtempM', 'RFtempCM[°C]', 'RFtempCM', 'AverageRFtyretemp[°C]', 'AverageRFtyretemp'],
+            lr: ['LRtempM[°C]', 'LRtempM', 'LRtempCM[°C]', 'LRtempCM', 'AverageLRtyretemp[°C]', 'AverageLRtyretemp'],
+            rr: ['RRtempM[°C]', 'RRtempM', 'RRtempCM[°C]', 'RRtempCM', 'AverageRRtyretemp[°C]', 'AverageRRtyretemp']
         };
         
         var distPatterns = ['Corrected Distance', 'Distance', 'Lap Distance', 'LapDist[m]'];
@@ -5210,15 +5214,15 @@ class TelemetryAnalysisApp {
         var lrChannel = findChannel(tempPatterns.lr);
         var rrChannel = findChannel(tempPatterns.rr);
         
+        console.log('Tire temp graphs using:', { dist: distChannel, lf: lfChannel, rf: rfChannel, lr: lrChannel, rr: rrChannel });
+        
         if (!distChannel || (!lfChannel && !rfChannel && !lrChannel && !rrChannel)) {
-            console.log('Tire temp graphs: Missing channels', { dist: distChannel, lf: lfChannel, rf: rfChannel, lr: lrChannel, rr: rrChannel });
+            console.log('Tire temp graphs: Missing channels');
             return;
         }
         
-        console.log('Tire temp graphs using:', { dist: distChannel, lf: lfChannel, rf: rfChannel, lr: lrChannel, rr: rrChannel });
-        
-        // Sample data for performance (every 50th point)
-        var sampleRate = 50;
+        // Sample data - use every 10th point for smoother graphs
+        var sampleRate = 10;
         
         function extractTempData(data, distCh, tempCh) {
             if (!tempCh) return { dist: [], temp: [] };
@@ -5246,26 +5250,42 @@ class TelemetryAnalysisApp {
         var compLR = extractTempData(this.currentData, distChannel, lrChannel);
         var compRR = extractTempData(this.currentData, distChannel, rrChannel);
         
+        console.log('Tire temp data points:', {
+            refLF: refLF.dist.length, refRF: refRF.dist.length,
+            refLR: refLR.dist.length, refRR: refRR.dist.length,
+            compLF: compLF.dist.length, compRF: compRF.dist.length
+        });
+        
+        // Log sample temps to verify data
+        if (refLF.temp.length > 0) {
+            console.log('Sample LF temps - min:', Math.min.apply(null, refLF.temp).toFixed(1), 
+                        'max:', Math.max.apply(null, refLF.temp).toFixed(1));
+        }
+        
         // Dark theme layout
         var layoutBase = {
             paper_bgcolor: '#161b22',
             plot_bgcolor: '#161b22',
             font: { color: '#8b949e', size: 10 },
-            margin: { t: 30, b: 40, l: 45, r: 10 },
+            margin: { t: 35, b: 45, l: 50, r: 15 },
             xaxis: { 
-                title: 'Distance (m)', 
+                title: { text: 'Distance (m)', font: { size: 10 } },
                 gridcolor: '#30363d',
-                zerolinecolor: '#30363d'
+                zerolinecolor: '#30363d',
+                tickfont: { size: 9 }
             },
             yaxis: { 
-                title: 'Temp (°C)', 
+                title: { text: 'Temp (°C)', font: { size: 10 } },
                 gridcolor: '#30363d',
-                zerolinecolor: '#30363d'
+                zerolinecolor: '#30363d',
+                tickfont: { size: 9 }
             },
             legend: { 
                 orientation: 'h', 
                 y: 1.15,
-                font: { size: 9 }
+                x: 0.5,
+                xanchor: 'center',
+                font: { size: 8 }
             },
             showlegend: true
         };
