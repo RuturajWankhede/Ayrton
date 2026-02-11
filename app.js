@@ -396,7 +396,7 @@ class TelemetryAnalysisApp {
         function shouldKeepChannel(channelName) {
             var lower = channelName.toLowerCase();
             // Keep essential channels plus a few useful ones
-            var keepPatterns = ['time', 'distance', 'speed', 'throttle', 'brake', 'gear', 'heading', 'steer', 'lap', 'elapsed', 'yaw', 'lat', 'lon', 'gps', 'temp', 'tyre', 'tire'];
+            var keepPatterns = ['time', 'distance', 'speed', 'throttle', 'brake', 'gear', 'heading', 'steer', 'lap', 'elapsed', 'yaw', 'lat', 'lon', 'gps', 'temp', 'tyre', 'tire', 'average'];
             return keepPatterns.some(function(p) { return lower.indexOf(p) !== -1; });
         }
         
@@ -3061,6 +3061,15 @@ class TelemetryAnalysisApp {
             html += '<div class="mb-6">';
             html += '<h3 class="text-lg font-semibold text-[#f0f6fc] mb-3"><i class="fas fa-circle text-yellow-500 mr-2"></i>Tire Temperature Analysis</h3>';
             
+            // Tire temp comparison graph
+            html += '<div class="mb-6">';
+            html += '<h4 class="text-sm font-semibold text-[#8b949e] mb-2">Temperature Over Lap Distance</h4>';
+            html += '<div class="grid grid-cols-2 gap-4">';
+            html += '<div id="tire-temp-graph-front" style="height: 200px;"></div>';
+            html += '<div id="tire-temp-graph-rear" style="height: 200px;"></div>';
+            html += '</div>';
+            html += '</div>';
+            
             // Tire diagram - 2x2 grid showing car from above
             html += '<div class="grid grid-cols-2 gap-4 mb-4 max-w-lg mx-auto">';
             
@@ -5163,6 +5172,187 @@ class TelemetryAnalysisApp {
         
         // Render the full setup section
         container.innerHTML = this.renderSetupSection(tireAnalysis, brakeAnalysis, fuelAnalysis);
+        
+        // Render tire temperature comparison graphs
+        this.renderTireTempGraphs();
+    }
+    
+    renderTireTempGraphs() {
+        var self = this;
+        if (!this.referenceData || !this.currentData) return;
+        
+        // Find tire temp and distance channels
+        var sampleRow = this.referenceData[0];
+        var availableKeys = Object.keys(sampleRow);
+        
+        // Channel patterns for tire temps (average temp per tire)
+        var tempPatterns = {
+            lf: ['LFtempCM[°C]', 'LFtempM[°C]', 'LFtempCM', 'LFtempM', 'AverageLFtyretemp[°C]', 'AverageLFtyretemp'],
+            rf: ['RFtempCM[°C]', 'RFtempM[°C]', 'RFtempCM', 'RFtempM', 'AverageRFtyretemp[°C]', 'AverageRFtyretemp'],
+            lr: ['LRtempCM[°C]', 'LRtempM[°C]', 'LRtempCM', 'LRtempM', 'AverageLRtyretemp[°C]', 'AverageLRtyretemp'],
+            rr: ['RRtempCM[°C]', 'RRtempM[°C]', 'RRtempCM', 'RRtempM', 'AverageRRtyretemp[°C]', 'AverageRRtyretemp']
+        };
+        
+        var distPatterns = ['Corrected Distance', 'Distance', 'Lap Distance', 'LapDist[m]'];
+        
+        function findChannel(patterns) {
+            for (var i = 0; i < patterns.length; i++) {
+                if (availableKeys.indexOf(patterns[i]) !== -1) {
+                    return patterns[i];
+                }
+            }
+            return null;
+        }
+        
+        var distChannel = findChannel(distPatterns);
+        var lfChannel = findChannel(tempPatterns.lf);
+        var rfChannel = findChannel(tempPatterns.rf);
+        var lrChannel = findChannel(tempPatterns.lr);
+        var rrChannel = findChannel(tempPatterns.rr);
+        
+        if (!distChannel || (!lfChannel && !rfChannel && !lrChannel && !rrChannel)) {
+            console.log('Tire temp graphs: Missing channels', { dist: distChannel, lf: lfChannel, rf: rfChannel, lr: lrChannel, rr: rrChannel });
+            return;
+        }
+        
+        console.log('Tire temp graphs using:', { dist: distChannel, lf: lfChannel, rf: rfChannel, lr: lrChannel, rr: rrChannel });
+        
+        // Sample data for performance (every 50th point)
+        var sampleRate = 50;
+        
+        function extractTempData(data, distCh, tempCh) {
+            if (!tempCh) return { dist: [], temp: [] };
+            var dist = [], temp = [];
+            for (var i = 0; i < data.length; i += sampleRate) {
+                var row = data[i];
+                var d = parseFloat(row[distCh]);
+                var t = parseFloat(row[tempCh]);
+                if (!isNaN(d) && !isNaN(t) && t > 0 && t < 200) {
+                    dist.push(d);
+                    temp.push(t);
+                }
+            }
+            return { dist: dist, temp: temp };
+        }
+        
+        // Extract data for both laps
+        var refLF = extractTempData(this.referenceData, distChannel, lfChannel);
+        var refRF = extractTempData(this.referenceData, distChannel, rfChannel);
+        var refLR = extractTempData(this.referenceData, distChannel, lrChannel);
+        var refRR = extractTempData(this.referenceData, distChannel, rrChannel);
+        
+        var compLF = extractTempData(this.currentData, distChannel, lfChannel);
+        var compRF = extractTempData(this.currentData, distChannel, rfChannel);
+        var compLR = extractTempData(this.currentData, distChannel, lrChannel);
+        var compRR = extractTempData(this.currentData, distChannel, rrChannel);
+        
+        // Dark theme layout
+        var layoutBase = {
+            paper_bgcolor: '#161b22',
+            plot_bgcolor: '#161b22',
+            font: { color: '#8b949e', size: 10 },
+            margin: { t: 30, b: 40, l: 45, r: 10 },
+            xaxis: { 
+                title: 'Distance (m)', 
+                gridcolor: '#30363d',
+                zerolinecolor: '#30363d'
+            },
+            yaxis: { 
+                title: 'Temp (°C)', 
+                gridcolor: '#30363d',
+                zerolinecolor: '#30363d'
+            },
+            legend: { 
+                orientation: 'h', 
+                y: 1.15,
+                font: { size: 9 }
+            },
+            showlegend: true
+        };
+        
+        // Front tires graph
+        var frontContainer = document.getElementById('tire-temp-graph-front');
+        if (frontContainer && (refLF.dist.length > 0 || refRF.dist.length > 0)) {
+            var frontTraces = [];
+            
+            if (refLF.dist.length > 0) {
+                frontTraces.push({
+                    x: refLF.dist, y: refLF.temp,
+                    type: 'scatter', mode: 'lines',
+                    name: 'LF Ref',
+                    line: { color: '#00d4aa', width: 1.5 }
+                });
+            }
+            if (compLF.dist.length > 0) {
+                frontTraces.push({
+                    x: compLF.dist, y: compLF.temp,
+                    type: 'scatter', mode: 'lines',
+                    name: 'LF You',
+                    line: { color: '#ff6b9d', width: 1.5 }
+                });
+            }
+            if (refRF.dist.length > 0) {
+                frontTraces.push({
+                    x: refRF.dist, y: refRF.temp,
+                    type: 'scatter', mode: 'lines',
+                    name: 'RF Ref',
+                    line: { color: '#00d4aa', width: 1.5, dash: 'dot' }
+                });
+            }
+            if (compRF.dist.length > 0) {
+                frontTraces.push({
+                    x: compRF.dist, y: compRF.temp,
+                    type: 'scatter', mode: 'lines',
+                    name: 'RF You',
+                    line: { color: '#ff6b9d', width: 1.5, dash: 'dot' }
+                });
+            }
+            
+            var frontLayout = Object.assign({}, layoutBase, { title: { text: 'Front Tires', font: { size: 12, color: '#f0f6fc' } } });
+            Plotly.newPlot('tire-temp-graph-front', frontTraces, frontLayout, { responsive: true, displayModeBar: false });
+        }
+        
+        // Rear tires graph
+        var rearContainer = document.getElementById('tire-temp-graph-rear');
+        if (rearContainer && (refLR.dist.length > 0 || refRR.dist.length > 0)) {
+            var rearTraces = [];
+            
+            if (refLR.dist.length > 0) {
+                rearTraces.push({
+                    x: refLR.dist, y: refLR.temp,
+                    type: 'scatter', mode: 'lines',
+                    name: 'LR Ref',
+                    line: { color: '#00d4aa', width: 1.5 }
+                });
+            }
+            if (compLR.dist.length > 0) {
+                rearTraces.push({
+                    x: compLR.dist, y: compLR.temp,
+                    type: 'scatter', mode: 'lines',
+                    name: 'LR You',
+                    line: { color: '#ff6b9d', width: 1.5 }
+                });
+            }
+            if (refRR.dist.length > 0) {
+                rearTraces.push({
+                    x: refRR.dist, y: refRR.temp,
+                    type: 'scatter', mode: 'lines',
+                    name: 'RR Ref',
+                    line: { color: '#00d4aa', width: 1.5, dash: 'dot' }
+                });
+            }
+            if (compRR.dist.length > 0) {
+                rearTraces.push({
+                    x: compRR.dist, y: compRR.temp,
+                    type: 'scatter', mode: 'lines',
+                    name: 'RR You',
+                    line: { color: '#ff6b9d', width: 1.5, dash: 'dot' }
+                });
+            }
+            
+            var rearLayout = Object.assign({}, layoutBase, { title: { text: 'Rear Tires', font: { size: 12, color: '#f0f6fc' } } });
+            Plotly.newPlot('tire-temp-graph-rear', rearTraces, rearLayout, { responsive: true, displayModeBar: false });
+        }
     }
     
     generateFullReport(analysis) {
