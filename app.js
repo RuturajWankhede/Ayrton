@@ -396,7 +396,7 @@ class TelemetryAnalysisApp {
         function shouldKeepChannel(channelName) {
             var lower = channelName.toLowerCase();
             // Keep essential channels plus a few useful ones
-            var keepPatterns = ['time', 'distance', 'speed', 'throttle', 'brake', 'gear', 'heading', 'steer', 'lap', 'elapsed', 'yaw', 'lat', 'lon', 'gps'];
+            var keepPatterns = ['time', 'distance', 'speed', 'throttle', 'brake', 'gear', 'heading', 'steer', 'lap', 'elapsed', 'yaw', 'lat', 'lon', 'gps', 'lftemp', 'lrtemp', 'rftemp', 'rrtemp', 'tyretemp', 'tiretemp'];
             return keepPatterns.some(function(p) { return lower.indexOf(p) !== -1; });
         }
         
@@ -2588,7 +2588,10 @@ class TelemetryAnalysisApp {
     generateAnalysisTab(analysis, sessionData) {
         var self = this;
         var trackSegments = analysis.trackSegments || [];
-        var tireAnalysis = analysis.tireAnalysis || {};
+        
+        // Use rule-based tire analysis from telemetry data
+        var tireAnalysis = this.calculateTireAnalysis() || {};
+        
         var brakeAnalysis = analysis.brakeAnalysis || {};
         var fuelAnalysis = analysis.fuelAnalysis || {};
         var brakingTechnique = analysis.brakingTechnique || {};
@@ -3051,42 +3054,139 @@ class TelemetryAnalysisApp {
         
         html += '<div class="bg-[#161b22] rounded-xl p-6 mb-6 border border-[#30363d]">';
         html += '<h2 class="text-xl font-bold mb-4 text-[#f0f6fc]"><i class="fas fa-cogs mr-2 text-green-400"></i>Setup Recommendations</h2>';
-        html += '<p class="text-[#8b949e] mb-6">Based on tire temperatures, brake data, and driving patterns:</p>';
+        html += '<p class="text-[#8b949e] mb-6">Rule-based analysis from tire temperatures, brake data, and telemetry patterns:</p>';
         
-        // Tire section
+        // Tire section - Enhanced visualization
         if (tireAnalysis && tireAnalysis.available) {
             html += '<div class="mb-6">';
-            html += '<h3 class="text-lg font-semibold text-[#f0f6fc] mb-3"><i class="fas fa-circle text-yellow-500 mr-2"></i>Tire Setup</h3>';
-            html += '<div class="grid grid-cols-2 gap-4 mb-4">';
+            html += '<h3 class="text-lg font-semibold text-[#f0f6fc] mb-3"><i class="fas fa-circle text-yellow-500 mr-2"></i>Tire Temperature Analysis</h3>';
             
-            ['fl', 'fr', 'rl', 'rr'].forEach(function(corner) {
+            // Tire diagram - 2x2 grid showing car from above
+            html += '<div class="grid grid-cols-2 gap-4 mb-4 max-w-lg mx-auto">';
+            
+            ['lf', 'rf', 'lr', 'rr'].forEach(function(corner) {
                 var data = tireAnalysis[corner];
-                if (data && data.avg) {
-                    var bgColor = data.avg > 100 ? 'bg-red-100 border-red-300' : data.avg < 70 ? 'bg-blue-100 border-b border-[#30363d]lue-300' : 'bg-green-100 border-green-300';
-                    html += '<div class="' + bgColor + ' border rounded-lg p-4">';
-                    html += '<div class="font-bold text-[#f0f6fc]">' + corner.toUpperCase() + ' Tire</div>';
-                    if (data.inner !== null) html += '<div class="text-sm text-[#8b949e]">Inner: ' + Math.round(data.inner) + '°C</div>';
-                    if (data.center !== null) html += '<div class="text-sm text-[#8b949e]">Center: ' + Math.round(data.center) + '°C</div>';
-                    if (data.outer !== null) html += '<div class="text-sm text-[#8b949e]">Outer: ' + Math.round(data.outer) + '°C</div>';
+                if (data && data.avg !== null) {
+                    // Determine background color based on temperature
+                    var bgColor = 'bg-[#21262d]';
+                    var borderColor = 'border-[#30363d]';
+                    if (data.avg > 105) {
+                        bgColor = 'bg-red-900/30';
+                        borderColor = 'border-red-500';
+                    } else if (data.avg < 75) {
+                        bgColor = 'bg-blue-900/30';
+                        borderColor = 'border-blue-500';
+                    } else {
+                        bgColor = 'bg-green-900/30';
+                        borderColor = 'border-green-500';
+                    }
+                    
+                    html += '<div class="' + bgColor + ' ' + borderColor + ' border-2 rounded-lg p-4">';
+                    html += '<div class="font-bold text-[#f0f6fc] text-center mb-2">' + corner.toUpperCase() + '</div>';
+                    
+                    // Temperature bar visualization (Inner | Middle | Outer)
+                    html += '<div class="flex justify-between text-xs mb-2">';
+                    html += '<span class="text-[#6e7681]">In</span>';
+                    html += '<span class="text-[#6e7681]">Mid</span>';
+                    html += '<span class="text-[#6e7681]">Out</span>';
+                    html += '</div>';
+                    
+                    // Temperature values
+                    html += '<div class="flex justify-between text-sm font-mono">';
+                    var innerColor = data.inner > 100 ? 'text-red-400' : data.inner < 70 ? 'text-blue-400' : 'text-green-400';
+                    var middleColor = data.middle > 100 ? 'text-red-400' : data.middle < 70 ? 'text-blue-400' : 'text-green-400';
+                    var outerColor = data.outer > 100 ? 'text-red-400' : data.outer < 70 ? 'text-blue-400' : 'text-green-400';
+                    
+                    html += '<span class="' + innerColor + '">' + (data.inner !== null ? Math.round(data.inner) + '°' : '--') + '</span>';
+                    html += '<span class="' + middleColor + '">' + (data.middle !== null ? Math.round(data.middle) + '°' : '--') + '</span>';
+                    html += '<span class="' + outerColor + '">' + (data.outer !== null ? Math.round(data.outer) + '°' : '--') + '</span>';
+                    html += '</div>';
+                    
+                    // Average
+                    html += '<div class="text-center mt-2 pt-2 border-t border-[#30363d]">';
+                    html += '<span class="text-[#8b949e] text-xs">Avg: </span>';
+                    html += '<span class="text-[#f0f6fc] font-bold">' + Math.round(data.avg) + '°C</span>';
+                    html += '</div>';
+                    
+                    html += '</div>';
+                } else {
+                    html += '<div class="bg-[#21262d] border border-[#30363d] rounded-lg p-4 opacity-50">';
+                    html += '<div class="font-bold text-[#8b949e] text-center">' + corner.toUpperCase() + '</div>';
+                    html += '<div class="text-center text-[#6e7681] text-sm mt-2">No data</div>';
                     html += '</div>';
                 }
             });
             html += '</div>';
             
+            // Balance indicators
+            if (tireAnalysis.frontAvg !== null || tireAnalysis.leftAvg !== null) {
+                html += '<div class="grid grid-cols-2 gap-4 mb-4 max-w-lg mx-auto">';
+                
+                // Front/Rear balance
+                if (tireAnalysis.frontAvg !== null && tireAnalysis.rearAvg !== null) {
+                    var frDiff = tireAnalysis.frontAvg - tireAnalysis.rearAvg;
+                    var frColor = Math.abs(frDiff) > 10 ? 'text-yellow-400' : 'text-green-400';
+                    html += '<div class="bg-[#21262d] rounded-lg p-3 text-center">';
+                    html += '<div class="text-[#8b949e] text-xs mb-1">Front/Rear</div>';
+                    html += '<div class="' + frColor + ' font-bold">';
+                    html += (frDiff > 0 ? 'F+' : 'R+') + Math.round(Math.abs(frDiff)) + '°C';
+                    html += '</div>';
+                    html += '</div>';
+                }
+                
+                // Left/Right balance
+                if (tireAnalysis.leftAvg !== null && tireAnalysis.rightAvg !== null) {
+                    var lrDiff = tireAnalysis.leftAvg - tireAnalysis.rightAvg;
+                    var lrColor = Math.abs(lrDiff) > 10 ? 'text-yellow-400' : 'text-green-400';
+                    html += '<div class="bg-[#21262d] rounded-lg p-3 text-center">';
+                    html += '<div class="text-[#8b949e] text-xs mb-1">Left/Right</div>';
+                    html += '<div class="' + lrColor + ' font-bold">';
+                    html += (lrDiff > 0 ? 'L+' : 'R+') + Math.round(Math.abs(lrDiff)) + '°C';
+                    html += '</div>';
+                    html += '</div>';
+                }
+                
+                html += '</div>';
+            }
+            
+            // Issues list
             if (tireAnalysis.issues && tireAnalysis.issues.length > 0) {
-                html += '<div class="bg-yellow-900/20 border border-yellow-300 rounded-lg p-4">';
-                html += '<h4 class="font-semibold text-yellow-700 mb-2">Recommended Changes:</h4>';
+                html += '<div class="bg-[#21262d] border border-[#30363d] rounded-lg p-4 mb-4">';
+                html += '<h4 class="font-semibold text-[#f0f6fc] mb-3"><i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>Analysis Findings</h4>';
                 html += '<ul class="space-y-2">';
                 tireAnalysis.issues.forEach(function(issue) {
-                    html += '<li class="text-[#c9d1d9]"><i class="fas fa-wrench text-yellow-500 mr-2"></i>' + (issue.issue || issue) + '</li>';
+                    var iconColor = 'text-yellow-500';
+                    var icon = 'fa-info-circle';
+                    if (issue.severity === 'high') {
+                        iconColor = 'text-red-500';
+                        icon = 'fa-exclamation-circle';
+                    } else if (issue.severity === 'low' || issue.severity === 'info') {
+                        iconColor = 'text-blue-400';
+                        icon = 'fa-info-circle';
+                    }
+                    html += '<li class="text-[#c9d1d9] text-sm"><i class="fas ' + icon + ' ' + iconColor + ' mr-2"></i>' + (issue.issue || issue) + '</li>';
                 });
                 html += '</ul>';
                 html += '</div>';
             }
+            
+            // Recommendations
+            if (tireAnalysis.recommendations && tireAnalysis.recommendations.length > 0) {
+                html += '<div class="bg-green-900/20 border border-green-700 rounded-lg p-4">';
+                html += '<h4 class="font-semibold text-green-400 mb-3"><i class="fas fa-wrench mr-2"></i>Recommended Setup Changes</h4>';
+                html += '<ul class="space-y-2">';
+                tireAnalysis.recommendations.forEach(function(rec) {
+                    html += '<li class="text-[#c9d1d9] text-sm"><i class="fas fa-chevron-right text-green-500 mr-2"></i>' + (rec.action || rec) + '</li>';
+                });
+                html += '</ul>';
+                html += '</div>';
+            }
+            
             html += '</div>';
         } else {
             html += '<div class="bg-[#30363d] border border-[#30363d] rounded-lg p-4 mb-6">';
-            html += '<p class="text-[#8b949e]"><i class="fas fa-info-circle mr-2"></i>No tire temperature data available</p>';
+            html += '<p class="text-[#8b949e]"><i class="fas fa-info-circle mr-2"></i>No tire temperature data available in telemetry. ';
+            html += 'Enable tire temp channels in your data export to get camber/pressure recommendations.</p>';
             html += '</div>';
         }
         
@@ -3119,6 +3219,389 @@ class TelemetryAnalysisApp {
         
         html += '</div>';
         return html;
+    }
+    
+    // ============================================
+    // RULE-BASED TIRE TEMPERATURE ANALYSIS
+    // ============================================
+    calculateTireAnalysis() {
+        var self = this;
+        if (!this.referenceData || this.referenceData.length < 100) {
+            return { available: false };
+        }
+        
+        // Tire temp channel patterns for iRacing
+        // Core temps (inside carcass): LFtempCL, LFtempCM, LFtempCR
+        // Surface temps: LFtempL, LFtempM, LFtempR
+        var tireChannels = {
+            lf: { inner: null, middle: null, outer: null },
+            rf: { inner: null, middle: null, outer: null },
+            lr: { inner: null, middle: null, outer: null },
+            rr: { inner: null, middle: null, outer: null }
+        };
+        
+        // Channel name patterns to search for
+        var patterns = {
+            // Left Front - for a car going forward, L=inner, R=outer on left side
+            lf: {
+                inner: ['LFtempL[°C]', 'LFtempCL[°C]', 'LFtempL', 'LFtempCL', 'LF Temp Inner', 'TireTempLFL'],
+                middle: ['LFtempM[°C]', 'LFtempCM[°C]', 'LFtempM', 'LFtempCM', 'LF Temp Middle', 'TireTempLFM'],
+                outer: ['LFtempR[°C]', 'LFtempCR[°C]', 'LFtempR', 'LFtempCR', 'LF Temp Outer', 'TireTempLFR']
+            },
+            // Right Front - R=inner, L=outer on right side
+            rf: {
+                inner: ['RFtempR[°C]', 'RFtempCR[°C]', 'RFtempR', 'RFtempCR', 'RF Temp Inner', 'TireTempRFR'],
+                middle: ['RFtempM[°C]', 'RFtempCM[°C]', 'RFtempM', 'RFtempCM', 'RF Temp Middle', 'TireTempRFM'],
+                outer: ['RFtempL[°C]', 'RFtempCL[°C]', 'RFtempL', 'RFtempCL', 'RF Temp Outer', 'TireTempRFL']
+            },
+            // Left Rear
+            lr: {
+                inner: ['LRtempL[°C]', 'LRtempCL[°C]', 'LRtempL', 'LRtempCL', 'LR Temp Inner', 'TireTempLRL'],
+                middle: ['LRtempM[°C]', 'LRtempCM[°C]', 'LRtempM', 'LRtempCM', 'LR Temp Middle', 'TireTempLRM'],
+                outer: ['LRtempR[°C]', 'LRtempCR[°C]', 'LRtempR', 'LRtempCR', 'LR Temp Outer', 'TireTempLRR']
+            },
+            // Right Rear
+            rr: {
+                inner: ['RRtempR[°C]', 'RRtempCR[°C]', 'RRtempR', 'RRtempCR', 'RR Temp Inner', 'TireTempRRR'],
+                middle: ['RRtempM[°C]', 'RRtempCM[°C]', 'RRtempM', 'RRtempCM', 'RR Temp Middle', 'TireTempRRM'],
+                outer: ['RRtempL[°C]', 'RRtempCL[°C]', 'RRtempL', 'RRtempCL', 'RR Temp Outer', 'TireTempRRL']
+            }
+        };
+        
+        // Find available channels
+        var sampleRow = this.referenceData[0];
+        var availableKeys = Object.keys(sampleRow);
+        
+        function findChannel(nameList) {
+            for (var i = 0; i < nameList.length; i++) {
+                if (availableKeys.indexOf(nameList[i]) !== -1) {
+                    return nameList[i];
+                }
+            }
+            return null;
+        }
+        
+        // Map channels for each tire position
+        var channelMap = {};
+        var foundAny = false;
+        ['lf', 'rf', 'lr', 'rr'].forEach(function(tire) {
+            channelMap[tire] = {
+                inner: findChannel(patterns[tire].inner),
+                middle: findChannel(patterns[tire].middle),
+                outer: findChannel(patterns[tire].outer)
+            };
+            if (channelMap[tire].inner || channelMap[tire].middle || channelMap[tire].outer) {
+                foundAny = true;
+            }
+        });
+        
+        if (!foundAny) {
+            console.log('Tire analysis: No tire temp channels found');
+            console.log('Available channels containing "temp":', availableKeys.filter(function(k) { 
+                return k.toLowerCase().indexOf('temp') !== -1; 
+            }));
+            return { available: false };
+        }
+        
+        console.log('Tire analysis: Found channels:', channelMap);
+        
+        // Calculate average temps for each position (use last 25% of lap for stable temps)
+        var startIdx = Math.floor(this.referenceData.length * 0.75);
+        var endData = this.referenceData.slice(startIdx);
+        
+        var temps = {
+            lf: { inner: [], middle: [], outer: [] },
+            rf: { inner: [], middle: [], outer: [] },
+            lr: { inner: [], middle: [], outer: [] },
+            rr: { inner: [], middle: [], outer: [] }
+        };
+        
+        endData.forEach(function(row) {
+            ['lf', 'rf', 'lr', 'rr'].forEach(function(tire) {
+                ['inner', 'middle', 'outer'].forEach(function(pos) {
+                    var ch = channelMap[tire][pos];
+                    if (ch && row[ch] !== undefined && row[ch] !== null) {
+                        var val = parseFloat(row[ch]);
+                        if (!isNaN(val) && val > 0 && val < 200) {
+                            temps[tire][pos].push(val);
+                        }
+                    }
+                });
+            });
+        });
+        
+        // Calculate averages
+        function avg(arr) {
+            if (arr.length === 0) return null;
+            var sum = 0;
+            for (var i = 0; i < arr.length; i++) sum += arr[i];
+            return sum / arr.length;
+        }
+        
+        var result = {
+            available: true,
+            lf: { inner: avg(temps.lf.inner), middle: avg(temps.lf.middle), outer: avg(temps.lf.outer) },
+            rf: { inner: avg(temps.rf.inner), middle: avg(temps.rf.middle), outer: avg(temps.rf.outer) },
+            lr: { inner: avg(temps.lr.inner), middle: avg(temps.lr.middle), outer: avg(temps.lr.outer) },
+            rr: { inner: avg(temps.rr.inner), middle: avg(temps.rr.middle), outer: avg(temps.rr.outer) },
+            issues: [],
+            recommendations: []
+        };
+        
+        // Calculate tire averages
+        ['lf', 'rf', 'lr', 'rr'].forEach(function(tire) {
+            var t = result[tire];
+            var validTemps = [t.inner, t.middle, t.outer].filter(function(v) { return v !== null; });
+            t.avg = validTemps.length > 0 ? validTemps.reduce(function(a, b) { return a + b; }, 0) / validTemps.length : null;
+        });
+        
+        // ============================================
+        // RULE-BASED ANALYSIS
+        // ============================================
+        
+        // 1. CAMBER ANALYSIS - Inner vs Outer temperature gradient
+        // Ideal: Inner slightly hotter (5-15°C) due to negative camber loading
+        ['lf', 'rf', 'lr', 'rr'].forEach(function(tire) {
+            var t = result[tire];
+            if (t.inner !== null && t.outer !== null) {
+                var gradient = t.inner - t.outer;
+                t.gradient = gradient;
+                
+                var tireName = tire.toUpperCase();
+                var isRear = tire.indexOf('r') === 1;
+                
+                if (gradient > 20) {
+                    result.issues.push({
+                        tire: tire,
+                        type: 'camber',
+                        severity: 'high',
+                        issue: tireName + ': Inner edge ' + Math.round(gradient) + '°C hotter - too much negative camber'
+                    });
+                    result.recommendations.push({
+                        tire: tire,
+                        action: 'Reduce ' + tireName + ' negative camber by 0.3-0.5°'
+                    });
+                } else if (gradient > 10) {
+                    result.issues.push({
+                        tire: tire,
+                        type: 'camber',
+                        severity: 'medium',
+                        issue: tireName + ': Inner edge running ' + Math.round(gradient) + '°C hotter - camber slightly aggressive'
+                    });
+                } else if (gradient < -10) {
+                    result.issues.push({
+                        tire: tire,
+                        type: 'camber',
+                        severity: 'high',
+                        issue: tireName + ': Outer edge ' + Math.round(Math.abs(gradient)) + '°C hotter - not enough negative camber or understeering'
+                    });
+                    result.recommendations.push({
+                        tire: tire,
+                        action: 'Increase ' + tireName + ' negative camber by 0.3-0.5° or address understeer'
+                    });
+                } else if (gradient < 0) {
+                    result.issues.push({
+                        tire: tire,
+                        type: 'camber',
+                        severity: 'low',
+                        issue: tireName + ': Outer edge slightly hotter - consider more negative camber'
+                    });
+                }
+            }
+        });
+        
+        // 2. PRESSURE ANALYSIS - Middle vs average of Inner/Outer
+        // Middle hot: Over-inflated | Middle cold: Under-inflated
+        ['lf', 'rf', 'lr', 'rr'].forEach(function(tire) {
+            var t = result[tire];
+            if (t.inner !== null && t.middle !== null && t.outer !== null) {
+                var edgeAvg = (t.inner + t.outer) / 2;
+                var pressureDiff = t.middle - edgeAvg;
+                t.pressureDiff = pressureDiff;
+                
+                var tireName = tire.toUpperCase();
+                
+                if (pressureDiff > 8) {
+                    result.issues.push({
+                        tire: tire,
+                        type: 'pressure',
+                        severity: 'high',
+                        issue: tireName + ': Center ' + Math.round(pressureDiff) + '°C hotter than edges - over-inflated'
+                    });
+                    result.recommendations.push({
+                        tire: tire,
+                        action: 'Reduce ' + tireName + ' cold pressure by 1-2 psi'
+                    });
+                } else if (pressureDiff > 4) {
+                    result.issues.push({
+                        tire: tire,
+                        type: 'pressure',
+                        severity: 'medium',
+                        issue: tireName + ': Center running slightly hot - consider reducing pressure'
+                    });
+                } else if (pressureDiff < -8) {
+                    result.issues.push({
+                        tire: tire,
+                        type: 'pressure',
+                        severity: 'high',
+                        issue: tireName + ': Edges ' + Math.round(Math.abs(pressureDiff)) + '°C hotter than center - under-inflated'
+                    });
+                    result.recommendations.push({
+                        tire: tire,
+                        action: 'Increase ' + tireName + ' cold pressure by 1-2 psi'
+                    });
+                } else if (pressureDiff < -4) {
+                    result.issues.push({
+                        tire: tire,
+                        type: 'pressure',
+                        severity: 'medium',
+                        issue: tireName + ': Edges hotter than center - pressure may be low'
+                    });
+                }
+            }
+        });
+        
+        // 3. FRONT-REAR BALANCE
+        var frontAvg = null, rearAvg = null;
+        if (result.lf.avg !== null && result.rf.avg !== null) {
+            frontAvg = (result.lf.avg + result.rf.avg) / 2;
+        }
+        if (result.lr.avg !== null && result.rr.avg !== null) {
+            rearAvg = (result.lr.avg + result.rr.avg) / 2;
+        }
+        
+        if (frontAvg !== null && rearAvg !== null) {
+            var frBalance = frontAvg - rearAvg;
+            result.frontRearBalance = frBalance;
+            result.frontAvg = frontAvg;
+            result.rearAvg = rearAvg;
+            
+            if (frBalance > 12) {
+                result.issues.push({
+                    type: 'balance',
+                    severity: 'high',
+                    issue: 'Front tires ' + Math.round(frBalance) + '°C hotter than rears - potential understeer, fronts overworking'
+                });
+                result.recommendations.push({
+                    action: 'Consider: More front downforce, softer front springs, or stiffer rear ARB'
+                });
+            } else if (frBalance > 6) {
+                result.issues.push({
+                    type: 'balance',
+                    severity: 'medium',
+                    issue: 'Front tires running ' + Math.round(frBalance) + '°C hotter - slight front bias'
+                });
+            } else if (frBalance < -12) {
+                result.issues.push({
+                    type: 'balance',
+                    severity: 'high',
+                    issue: 'Rear tires ' + Math.round(Math.abs(frBalance)) + '°C hotter than fronts - potential oversteer on exit'
+                });
+                result.recommendations.push({
+                    action: 'Consider: More rear downforce, softer rear springs, or stiffer front ARB'
+                });
+            } else if (frBalance < -6) {
+                result.issues.push({
+                    type: 'balance',
+                    severity: 'medium',
+                    issue: 'Rear tires running ' + Math.round(Math.abs(frBalance)) + '°C hotter - slight rear bias'
+                });
+            }
+        }
+        
+        // 4. LEFT-RIGHT BALANCE (indicates track direction bias or alignment issues)
+        var leftAvg = null, rightAvg = null;
+        if (result.lf.avg !== null && result.lr.avg !== null) {
+            leftAvg = (result.lf.avg + result.lr.avg) / 2;
+        }
+        if (result.rf.avg !== null && result.rr.avg !== null) {
+            rightAvg = (result.rf.avg + result.rr.avg) / 2;
+        }
+        
+        if (leftAvg !== null && rightAvg !== null) {
+            var lrBalance = leftAvg - rightAvg;
+            result.leftRightBalance = lrBalance;
+            result.leftAvg = leftAvg;
+            result.rightAvg = rightAvg;
+            
+            if (Math.abs(lrBalance) > 15) {
+                var hotSide = lrBalance > 0 ? 'Left' : 'Right';
+                result.issues.push({
+                    type: 'balance',
+                    severity: 'info',
+                    issue: hotSide + ' tires ' + Math.round(Math.abs(lrBalance)) + '°C hotter - track has more ' + (lrBalance > 0 ? 'right' : 'left') + '-hand corners'
+                });
+            }
+        }
+        
+        // 5. ABSOLUTE TEMPERATURE CHECKS
+        var optimalRange = { min: 75, max: 105 }; // Typical racing tire window
+        
+        ['lf', 'rf', 'lr', 'rr'].forEach(function(tire) {
+            var t = result[tire];
+            if (t.avg !== null) {
+                var tireName = tire.toUpperCase();
+                
+                if (t.avg < optimalRange.min - 10) {
+                    result.issues.push({
+                        tire: tire,
+                        type: 'temperature',
+                        severity: 'high',
+                        issue: tireName + ' at ' + Math.round(t.avg) + '°C - significantly below optimal window'
+                    });
+                    result.recommendations.push({
+                        tire: tire,
+                        action: tireName + ': Increase hot pressure or reduce camber to generate more heat'
+                    });
+                } else if (t.avg < optimalRange.min) {
+                    result.issues.push({
+                        tire: tire,
+                        type: 'temperature',
+                        severity: 'low',
+                        issue: tireName + ' at ' + Math.round(t.avg) + '°C - running cool'
+                    });
+                } else if (t.avg > optimalRange.max + 10) {
+                    result.issues.push({
+                        tire: tire,
+                        type: 'temperature',
+                        severity: 'high',
+                        issue: tireName + ' at ' + Math.round(t.avg) + '°C - overheating, degradation risk'
+                    });
+                    result.recommendations.push({
+                        tire: tire,
+                        action: tireName + ': Reduce pressure, consider more downforce, or adjust driving style'
+                    });
+                } else if (t.avg > optimalRange.max) {
+                    result.issues.push({
+                        tire: tire,
+                        type: 'temperature',
+                        severity: 'medium',
+                        issue: tireName + ' at ' + Math.round(t.avg) + '°C - running hot'
+                    });
+                }
+            }
+        });
+        
+        // 6. DIAGONAL BALANCE (cross-weight indicator)
+        if (result.lf.avg !== null && result.rr.avg !== null && 
+            result.rf.avg !== null && result.lr.avg !== null) {
+            var diagonal1 = result.lf.avg + result.rr.avg;
+            var diagonal2 = result.rf.avg + result.lr.avg;
+            var crossDiff = diagonal1 - diagonal2;
+            result.crossWeight = crossDiff;
+            
+            if (Math.abs(crossDiff) > 20) {
+                var heavyDiag = crossDiff > 0 ? 'LF+RR' : 'RF+LR';
+                result.issues.push({
+                    type: 'balance',
+                    severity: 'medium',
+                    issue: 'Cross-weight imbalance: ' + heavyDiag + ' diagonal ' + Math.round(Math.abs(crossDiff)) + '°C hotter'
+                });
+            }
+        }
+        
+        console.log('Tire analysis result:', result);
+        return result;
     }
     
     calculateGripEfficiency() {
