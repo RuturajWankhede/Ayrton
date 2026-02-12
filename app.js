@@ -3310,16 +3310,17 @@ class TelemetryAnalysisApp {
             }
             
             // Ride Height graph placeholder
-            html += '</div>'; // Close padding div for now
+            html += '</div>'; // Close the suspension content wrapper div (mb-6 mt-6)
+            html += '</div>'; // Close the padding div (p-6 pt-2) to allow full-width graphs
             
-            // Ride Height graph - full width
+            // Ride Height graph - full width (outside padding)
             if (suspensionAnalysis.hasRideHeight) {
                 html += '<div class="mb-4">';
                 html += '<div id="ride-height-graph" style="height: 280px; width: 100%;"></div>';
                 html += '</div>';
             }
             
-            // Shock velocity histogram - full width
+            // Shock velocity histogram - full width (outside padding)
             if (suspensionAnalysis.hasShockVel) {
                 html += '<div class="mb-4">';
                 html += '<div id="shock-histogram" style="height: 280px; width: 100%;"></div>';
@@ -3782,14 +3783,23 @@ class TelemetryAnalysisApp {
         };
         
         function findChannel(nameList) {
+            // Exact match first
             for (var i = 0; i < nameList.length; i++) {
                 if (availableKeys.indexOf(nameList[i]) !== -1) return nameList[i];
             }
-            // Fuzzy match: check if any available key contains the pattern
+            // Case-insensitive exact match
             for (var i = 0; i < nameList.length; i++) {
                 var lower = nameList[i].toLowerCase();
                 for (var j = 0; j < availableKeys.length; j++) {
                     if (availableKeys[j].toLowerCase() === lower) return availableKeys[j];
+                }
+            }
+            // Substring match - check if available key contains core pattern
+            for (var i = 0; i < nameList.length; i++) {
+                var lower = nameList[i].toLowerCase().replace(/[\[\]°\/]/g, '');
+                for (var j = 0; j < availableKeys.length; j++) {
+                    var keyLower = availableKeys[j].toLowerCase().replace(/[\[\]°\/]/g, '');
+                    if (keyLower.indexOf(lower) !== -1 || lower.indexOf(keyLower) !== -1) return availableKeys[j];
                 }
             }
             return null;
@@ -3812,10 +3822,11 @@ class TelemetryAnalysisApp {
         
         if (!hasRideHeight && !hasShockDefl && !hasShockVel) {
             console.log('Suspension analysis: No suspension channels found');
-            console.log('Available channels with ride/shock/susp/damp:', availableKeys.filter(function(k) {
+            console.log('Available channels with ride/shock/susp/damp/height/defl:', availableKeys.filter(function(k) {
                 var kl = k.toLowerCase();
-                return kl.indexOf('ride') !== -1 || kl.indexOf('shock') !== -1 || kl.indexOf('susp') !== -1 || kl.indexOf('damp') !== -1;
+                return kl.indexOf('ride') !== -1 || kl.indexOf('shock') !== -1 || kl.indexOf('susp') !== -1 || kl.indexOf('damp') !== -1 || kl.indexOf('height') !== -1 || kl.indexOf('defl') !== -1;
             }));
+            console.log('ALL available channel names:', availableKeys);
             return { available: false };
         }
         
