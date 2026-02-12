@@ -4829,7 +4829,7 @@ class TelemetryAnalysisApp {
         this.setupCustomOverlayControls();
         
         setTimeout(function() {
-            ['track-map', 'speed-overlay', 'throttle-overlay', 'brake-overlay', 'steering-overlay', 'glat-overlay', 'glong-overlay', 'gear-overlay', 'sector-time-chart', 'speed-comparison'].forEach(function(id) {
+            ['track-map', 'speed-overlay', 'throttle-overlay', 'brake-overlay', 'steering-overlay', 'glat-overlay', 'glong-overlay', 'gear-overlay'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el && el.data) Plotly.Plots.resize(el);
             });
@@ -6248,7 +6248,7 @@ class TelemetryAnalysisApp {
         
         if (tabName === 'graphs') {
             setTimeout(function() {
-                ['track-map', 'speed-overlay', 'throttle-overlay', 'brake-overlay', 'steering-overlay', 'glat-overlay', 'glong-overlay', 'gear-overlay', 'sector-time-chart', 'speed-comparison'].forEach(function(id) {
+                ['track-map', 'speed-overlay', 'throttle-overlay', 'brake-overlay', 'steering-overlay', 'glat-overlay', 'glong-overlay', 'gear-overlay'].forEach(function(id) {
                     var el = document.getElementById(id);
                     if (el && el.data) Plotly.Plots.resize(el);
                 });
