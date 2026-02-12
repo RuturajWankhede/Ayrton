@@ -396,7 +396,7 @@ class TelemetryAnalysisApp {
         function shouldKeepChannel(channelName) {
             var lower = channelName.toLowerCase();
             // Keep essential channels plus a few useful ones
-            var keepPatterns = ['time', 'distance', 'speed', 'throttle', 'brake', 'gear', 'heading', 'steer', 'lap', 'elapsed', 'yaw', 'lat', 'lon', 'gps', 'temp', 'tyre', 'tire', 'average'];
+            var keepPatterns = ['time', 'distance', 'speed', 'throttle', 'brake', 'gear', 'heading', 'steer', 'lap', 'elapsed', 'yaw', 'lat', 'lon', 'gps', 'temp', 'tyre', 'tire', 'average', 'ride', 'height', 'shock', 'defl', 'susp', 'damp', 'vel'];
             return keepPatterns.some(function(p) { return lower.indexOf(p) !== -1; });
         }
         
@@ -3760,25 +3760,26 @@ class TelemetryAnalysisApp {
         var sampleRow = this.referenceData[0];
         var availableKeys = Object.keys(sampleRow);
         
-        // Channel name patterns for iRacing suspension data
+        // Channel name patterns for suspension data
+        // Covers: iRacing IBT, Pi Toolbox export, MoTeC, generic
         var patterns = {
             rideHeight: {
-                lf: ['LFrideHeight', 'LFrideHeight[mm]', 'LFrideHeight[m]', 'Ride Height FL', 'RideHeightFL', 'LF Ride Height', 'LF ride height[mm]'],
-                rf: ['RFrideHeight', 'RFrideHeight[mm]', 'RFrideHeight[m]', 'Ride Height FR', 'RideHeightFR', 'RF Ride Height', 'RF ride height[mm]'],
-                lr: ['LRrideHeight', 'LRrideHeight[mm]', 'LRrideHeight[m]', 'Ride Height RL', 'RideHeightRL', 'LR Ride Height', 'LR ride height[mm]'],
-                rr: ['RRrideHeight', 'RRrideHeight[mm]', 'RRrideHeight[m]', 'Ride Height RR', 'RideHeightRR', 'RR Ride Height', 'RR ride height[mm]']
+                lf: ['LFrideHeight', 'LFrideHeight[mm]', 'LFrideHeight[m]', 'Ride Height FL', 'Ride Height FL[mm]', 'Ride Height FL[m]', 'RideHeightFL', 'LF Ride Height', 'LF Ride Height[mm]', 'LF Ride Height[m]', 'Ride Height LF', 'Ride Height LF[mm]', 'Ride Height LF[m]'],
+                rf: ['RFrideHeight', 'RFrideHeight[mm]', 'RFrideHeight[m]', 'Ride Height FR', 'Ride Height FR[mm]', 'Ride Height FR[m]', 'RideHeightFR', 'RF Ride Height', 'RF Ride Height[mm]', 'RF Ride Height[m]', 'Ride Height RF', 'Ride Height RF[mm]', 'Ride Height RF[m]'],
+                lr: ['LRrideHeight', 'LRrideHeight[mm]', 'LRrideHeight[m]', 'Ride Height RL', 'Ride Height RL[mm]', 'Ride Height RL[m]', 'RideHeightRL', 'LR Ride Height', 'LR Ride Height[mm]', 'LR Ride Height[m]', 'Ride Height LR', 'Ride Height LR[mm]', 'Ride Height LR[m]'],
+                rr: ['RRrideHeight', 'RRrideHeight[mm]', 'RRrideHeight[m]', 'Ride Height RR', 'Ride Height RR[mm]', 'Ride Height RR[m]', 'RideHeightRR', 'RR Ride Height', 'RR Ride Height[mm]', 'RR Ride Height[m]']
             },
             shockDefl: {
-                lf: ['LFshockDefl', 'LFshockDefl[mm]', 'LFshockDefl[m]', 'Damper Pos FL', 'Susp Pos FL', 'LF Shock Defl', 'LF shock deflection[mm]'],
-                rf: ['RFshockDefl', 'RFshockDefl[mm]', 'RFshockDefl[m]', 'Damper Pos FR', 'Susp Pos FR', 'RF Shock Defl', 'RF shock deflection[mm]'],
-                lr: ['LRshockDefl', 'LRshockDefl[mm]', 'LRshockDefl[m]', 'Damper Pos RL', 'Susp Pos RL', 'LR Shock Defl', 'LR shock deflection[mm]'],
-                rr: ['RRshockDefl', 'RRshockDefl[mm]', 'RRshockDefl[m]', 'Damper Pos RR', 'Susp Pos RR', 'RR Shock Defl', 'RR shock deflection[mm]']
+                lf: ['LFshockDefl', 'LFshockDefl[mm]', 'LFshockDefl[m]', 'Shock Defl FL', 'Shock Defl FL[mm]', 'Shock Defl FL[m]', 'Damper Pos FL', 'Damper Pos FL[mm]', 'Susp Pos FL', 'Susp Pos FL[mm]', 'LF Shock Defl', 'Suspension FL[mm]', 'Shock Deflection FL[m]'],
+                rf: ['RFshockDefl', 'RFshockDefl[mm]', 'RFshockDefl[m]', 'Shock Defl FR', 'Shock Defl FR[mm]', 'Shock Defl FR[m]', 'Damper Pos FR', 'Damper Pos FR[mm]', 'Susp Pos FR', 'Susp Pos FR[mm]', 'RF Shock Defl', 'Suspension FR[mm]', 'Shock Deflection FR[m]'],
+                lr: ['LRshockDefl', 'LRshockDefl[mm]', 'LRshockDefl[m]', 'Shock Defl RL', 'Shock Defl RL[mm]', 'Shock Defl RL[m]', 'Damper Pos RL', 'Damper Pos RL[mm]', 'Susp Pos RL', 'Susp Pos RL[mm]', 'LR Shock Defl', 'Suspension RL[mm]', 'Shock Deflection RL[m]'],
+                rr: ['RRshockDefl', 'RRshockDefl[mm]', 'RRshockDefl[m]', 'Shock Defl RR', 'Shock Defl RR[mm]', 'Shock Defl RR[m]', 'Damper Pos RR', 'Damper Pos RR[mm]', 'Susp Pos RR', 'Susp Pos RR[mm]', 'RR Shock Defl', 'Suspension RR[mm]', 'Shock Deflection RR[m]']
             },
             shockVel: {
-                lf: ['LFshockVel', 'LFshockVel[m/s]', 'LFshockVel[mm/s]', 'LF Shock Vel', 'LF shock velocity[m/s]'],
-                rf: ['RFshockVel', 'RFshockVel[m/s]', 'RFshockVel[mm/s]', 'RF Shock Vel', 'RF shock velocity[m/s]'],
-                lr: ['LRshockVel', 'LRshockVel[m/s]', 'LRshockVel[mm/s]', 'LR Shock Vel', 'LR shock velocity[m/s]'],
-                rr: ['RRshockVel', 'RRshockVel[m/s]', 'RRshockVel[mm/s]', 'RR Shock Vel', 'RR shock velocity[m/s]']
+                lf: ['LFshockVel', 'LFshockVel[m/s]', 'LFshockVel[mm/s]', 'Shock Vel FL', 'Shock Vel FL[m/s]', 'Shock Vel FL[mm/s]', 'LF Shock Vel', 'Damper Vel FL[m/s]', 'Shock Velocity FL[m/s]'],
+                rf: ['RFshockVel', 'RFshockVel[m/s]', 'RFshockVel[mm/s]', 'Shock Vel FR', 'Shock Vel FR[m/s]', 'Shock Vel FR[mm/s]', 'RF Shock Vel', 'Damper Vel FR[m/s]', 'Shock Velocity FR[m/s]'],
+                lr: ['LRshockVel', 'LRshockVel[m/s]', 'LRshockVel[mm/s]', 'Shock Vel RL', 'Shock Vel RL[m/s]', 'Shock Vel RL[mm/s]', 'LR Shock Vel', 'Damper Vel RL[m/s]', 'Shock Velocity RL[m/s]'],
+                rr: ['RRshockVel', 'RRshockVel[m/s]', 'RRshockVel[mm/s]', 'Shock Vel RR', 'Shock Vel RR[m/s]', 'Shock Vel RR[mm/s]', 'RR Shock Vel', 'Damper Vel RR[m/s]', 'Shock Velocity RR[m/s]']
             }
         };
         
@@ -3794,12 +3795,12 @@ class TelemetryAnalysisApp {
                     if (availableKeys[j].toLowerCase() === lower) return availableKeys[j];
                 }
             }
-            // Substring match - check if available key contains core pattern
+            // Strip units brackets from both sides and compare core names
             for (var i = 0; i < nameList.length; i++) {
-                var lower = nameList[i].toLowerCase().replace(/[\[\]°\/]/g, '');
+                var coreName = nameList[i].replace(/\[.*?\]/g, '').trim().toLowerCase();
                 for (var j = 0; j < availableKeys.length; j++) {
-                    var keyLower = availableKeys[j].toLowerCase().replace(/[\[\]°\/]/g, '');
-                    if (keyLower.indexOf(lower) !== -1 || lower.indexOf(keyLower) !== -1) return availableKeys[j];
+                    var keyCore = availableKeys[j].replace(/\[.*?\]/g, '').trim().toLowerCase();
+                    if (keyCore === coreName) return availableKeys[j];
                 }
             }
             return null;
