@@ -3063,12 +3063,12 @@ class TelemetryAnalysisApp {
             html += '<h4 class="text-sm font-semibold text-[#8b949e] mb-2">Temperature Over Lap Distance</h4>';
             html += '</div>'; // Close padding div
             
-            // Graphs at full width (no padding)
-            html += '<div class="mb-4">';
-            html += '<div id="tire-temp-graph-front" style="height: 280px; width: 100%;"></div>';
+            // Graphs at full width - negative margins to break out of parent padding
+            html += '<div class="mb-4" style="margin-left: -24px; margin-right: -24px;">';
+            html += '<div id="tire-temp-graph-front" style="height: 300px; width: 100%;"></div>';
             html += '</div>';
-            html += '<div class="mb-4">';
-            html += '<div id="tire-temp-graph-rear" style="height: 280px; width: 100%;"></div>';
+            html += '<div class="mb-4" style="margin-left: -24px; margin-right: -24px;">';
+            html += '<div id="tire-temp-graph-rear" style="height: 300px; width: 100%;"></div>';
             html += '</div>';
             
             // Reopen padding div for rest of content
@@ -5308,7 +5308,7 @@ class TelemetryAnalysisApp {
             paper_bgcolor: 'rgba(0,0,0,0)',
             plot_bgcolor: '#161b22',
             font: { color: '#8b949e', size: 10 },
-            margin: { t: 50, b: 40, l: 45, r: 5 },
+            margin: { t: 50, b: 40, l: 50, r: 15 },
             xaxis: { 
                 title: { text: 'Distance (m)', font: { size: 10 } },
                 gridcolor: '#30363d',
