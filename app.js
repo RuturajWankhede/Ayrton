@@ -2591,6 +2591,7 @@ class TelemetryAnalysisApp {
         
         // Use rule-based tire analysis from telemetry data
         var tireAnalysis = this.calculateTireAnalysis() || {};
+        var suspensionAnalysis = this.calculateSuspensionAnalysis() || {};
         
         var brakeAnalysis = analysis.brakeAnalysis || {};
         var fuelAnalysis = analysis.fuelAnalysis || {};
@@ -2707,10 +2708,14 @@ class TelemetryAnalysisApp {
         
         // SETUP SECTION
         html += '<div id="setup-section" class="hidden">';
-        html += this.renderSetupSection(tireAnalysis, brakeAnalysis, fuelAnalysis);
+        html += this.renderSetupSection(tireAnalysis, brakeAnalysis, fuelAnalysis, suspensionAnalysis);
         html += '</div>';
         
         analysisTab.innerHTML = html;
+        
+        // Render graphs after HTML is in the DOM
+        this.renderTireTempGraphs();
+        this.renderSuspensionGraphs(suspensionAnalysis);
     }
     
     // ============================================
@@ -3049,7 +3054,7 @@ class TelemetryAnalysisApp {
     // ============================================
     // SETUP SECTION
     // ============================================
-    renderSetupSection(tireAnalysis, brakeAnalysis, fuelAnalysis) {
+    renderSetupSection(tireAnalysis, brakeAnalysis, fuelAnalysis, suspensionAnalysis) {
         var html = '';
         
         html += '<div class="bg-[#161b22] rounded-xl mb-6 border border-[#30363d]">';
@@ -3231,7 +3236,130 @@ class TelemetryAnalysisApp {
             html += '</div>';
         }
         
-        html += '</div>'; // Close padding div
+        // Suspension / Ride Height section (inside padding div)
+        if (suspensionAnalysis && suspensionAnalysis.available) {
+            html += '<div class="mb-6 mt-6">';
+            html += '<h3 class="text-lg font-semibold text-[#f0f6fc] mb-3"><i class="fas fa-arrows-alt-v text-purple-400 mr-2"></i>Ride Height & Suspension</h3>';
+            
+            // Ride Height summary cards
+            if (suspensionAnalysis.hasRideHeight) {
+                html += '<div class="grid grid-cols-4 gap-3 mb-4">';
+                ['lf', 'rf', 'lr', 'rr'].forEach(function(corner) {
+                    var rh = suspensionAnalysis.corners[corner] ? suspensionAnalysis.corners[corner].rideHeight : null;
+                    if (rh) {
+                        var isLow = rh.min < 15;
+                        var borderColor = isLow ? 'border-red-500' : 'border-[#30363d]';
+                        var bgColor = isLow ? 'bg-red-900/20' : 'bg-[#30363d]';
+                        html += '<div class="' + bgColor + ' border ' + borderColor + ' rounded-lg p-3 text-center">';
+                        html += '<div class="text-lg font-bold text-[#f0f6fc]">' + rh.avg.toFixed(1) + '<span class="text-xs text-[#8b949e]">mm</span></div>';
+                        html += '<div class="text-[#8b949e] text-xs">' + corner.toUpperCase() + ' avg</div>';
+                        html += '<div class="text-[10px] text-[#6e7681] mt-1">' + rh.min.toFixed(1) + ' – ' + rh.max.toFixed(1) + '</div>';
+                        html += '</div>';
+                    }
+                });
+                html += '</div>';
+                
+                // Rake display
+                if (suspensionAnalysis.rake !== undefined) {
+                    var rakeColor = suspensionAnalysis.rake < 0 ? 'text-red-400' : (suspensionAnalysis.rake < 2 ? 'text-yellow-400' : 'text-green-400');
+                    html += '<div class="bg-[#21262d] border border-[#30363d] rounded-lg p-3 mb-4">';
+                    html += '<div class="flex items-center justify-between">';
+                    html += '<div><span class="text-[#8b949e] text-sm">Rake (rear − front):</span> <span class="font-bold ' + rakeColor + '">' + suspensionAnalysis.rake.toFixed(1) + 'mm</span></div>';
+                    html += '<div class="text-sm text-[#8b949e]">Front avg: ' + (suspensionAnalysis.frontAvgRH || 0).toFixed(1) + 'mm | Rear avg: ' + (suspensionAnalysis.rearAvgRH || 0).toFixed(1) + 'mm</div>';
+                    html += '</div>';
+                    html += '</div>';
+                }
+            }
+            
+            // Shock Deflection summary
+            if (suspensionAnalysis.hasShockDefl) {
+                html += '<h4 class="text-sm font-semibold text-[#8b949e] mb-2 mt-4">Shock Deflection (Travel Range)</h4>';
+                html += '<div class="grid grid-cols-4 gap-3 mb-4">';
+                ['lf', 'rf', 'lr', 'rr'].forEach(function(corner) {
+                    var sd = suspensionAnalysis.corners[corner] ? suspensionAnalysis.corners[corner].shockDefl : null;
+                    if (sd) {
+                        var isExcessive = sd.range > 50;
+                        var bgColor = isExcessive ? 'bg-yellow-900/20' : 'bg-[#30363d]';
+                        html += '<div class="' + bgColor + ' rounded-lg p-3 text-center">';
+                        html += '<div class="text-lg font-bold text-[#f0f6fc]">' + sd.range.toFixed(1) + '<span class="text-xs text-[#8b949e]">mm</span></div>';
+                        html += '<div class="text-[#8b949e] text-xs">' + corner.toUpperCase() + ' range</div>';
+                        html += '<div class="text-[10px] text-[#6e7681] mt-1">avg ' + sd.avg.toFixed(1) + 'mm</div>';
+                        html += '</div>';
+                    }
+                });
+                html += '</div>';
+            }
+            
+            // Shock Velocity histogram summary
+            if (suspensionAnalysis.hasShockVel) {
+                html += '<h4 class="text-sm font-semibold text-[#8b949e] mb-2 mt-4">Damper Velocity Summary</h4>';
+                html += '<div class="grid grid-cols-4 gap-3 mb-4">';
+                ['lf', 'rf', 'lr', 'rr'].forEach(function(corner) {
+                    var sv = suspensionAnalysis.corners[corner] ? suspensionAnalysis.corners[corner].shockVel : null;
+                    if (sv) {
+                        var highSpeedColor = sv.pctHighSpeed > 25 ? 'text-yellow-400' : 'text-green-400';
+                        html += '<div class="bg-[#30363d] rounded-lg p-3 text-center">';
+                        html += '<div class="text-xs text-[#8b949e] mb-1">' + corner.toUpperCase() + '</div>';
+                        html += '<div class="text-[10px] text-[#6e7681]">Bump: ' + (sv.avgBump !== null ? Math.abs(sv.avgBump).toFixed(0) : '—') + ' mm/s</div>';
+                        html += '<div class="text-[10px] text-[#6e7681]">Rebound: ' + (sv.avgRebound !== null ? sv.avgRebound.toFixed(0) : '—') + ' mm/s</div>';
+                        html += '<div class="text-[10px] mt-1 ' + highSpeedColor + '">High-spd: ' + sv.pctHighSpeed.toFixed(0) + '%</div>';
+                        html += '</div>';
+                    }
+                });
+                html += '</div>';
+            }
+            
+            // Ride Height graph placeholder
+            html += '</div>'; // Close padding div for now
+            
+            // Ride Height graph - full width
+            if (suspensionAnalysis.hasRideHeight) {
+                html += '<div class="mb-4">';
+                html += '<div id="ride-height-graph" style="height: 280px; width: 100%;"></div>';
+                html += '</div>';
+            }
+            
+            // Shock velocity histogram - full width
+            if (suspensionAnalysis.hasShockVel) {
+                html += '<div class="mb-4">';
+                html += '<div id="shock-histogram" style="height: 280px; width: 100%;"></div>';
+                html += '</div>';
+            }
+            
+            // Reopen padding for issues/recommendations
+            html += '<div class="p-6 pt-2">';
+            
+            // Issues
+            if (suspensionAnalysis.issues && suspensionAnalysis.issues.length > 0) {
+                html += '<div class="mt-2 mb-4">';
+                html += '<h4 class="text-sm font-semibold text-[#f0f6fc] mb-2"><i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>Suspension Issues (' + suspensionAnalysis.issues.length + ')</h4>';
+                suspensionAnalysis.issues.forEach(function(issue) {
+                    var color = issue.severity === 'high' ? 'text-red-400' : (issue.severity === 'medium' ? 'text-yellow-400' : 'text-blue-400');
+                    var icon = issue.severity === 'high' ? 'fa-times-circle' : (issue.severity === 'medium' ? 'fa-exclamation-circle' : 'fa-info-circle');
+                    html += '<div class="flex items-start gap-2 mb-1"><i class="fas ' + icon + ' ' + color + ' mt-0.5 text-xs"></i><span class="text-sm text-[#c9d1d9]">' + issue.issue + '</span></div>';
+                });
+                html += '</div>';
+            }
+            
+            // Recommendations
+            if (suspensionAnalysis.recommendations && suspensionAnalysis.recommendations.length > 0) {
+                html += '<div class="mb-4">';
+                html += '<h4 class="text-sm font-semibold text-[#f0f6fc] mb-2"><i class="fas fa-wrench text-green-400 mr-2"></i>Setup Recommendations</h4>';
+                suspensionAnalysis.recommendations.forEach(function(rec) {
+                    html += '<div class="flex items-start gap-2 mb-1"><i class="fas fa-chevron-right text-green-400 mt-0.5 text-xs"></i><span class="text-sm text-[#c9d1d9]">' + rec.action + '</span></div>';
+                });
+                html += '</div>';
+            }
+            
+            if (suspensionAnalysis.issues.length === 0 && suspensionAnalysis.recommendations.length === 0) {
+                html += '<div class="bg-green-900/20 border border-green-700 rounded-lg p-3 mb-4">';
+                html += '<p class="text-green-400 text-sm"><i class="fas fa-check-circle mr-2"></i>Suspension looks well-balanced. No major issues detected.</p>';
+                html += '</div>';
+            }
+            
+            html += '</div>'; // Close re-opened padding
+        }
+        
         html += '</div>'; // Close outer container
         return html;
     }
@@ -3616,6 +3744,419 @@ class TelemetryAnalysisApp {
         }
         
         console.log('Tire analysis result:', result);
+        return result;
+    }
+    
+    // ============================================
+    // RULE-BASED SUSPENSION / RIDE HEIGHT ANALYSIS
+    // ============================================
+    calculateSuspensionAnalysis() {
+        var self = this;
+        if (!this.referenceData || this.referenceData.length < 100) {
+            return { available: false };
+        }
+        
+        var sampleRow = this.referenceData[0];
+        var availableKeys = Object.keys(sampleRow);
+        
+        // Channel name patterns for iRacing suspension data
+        var patterns = {
+            rideHeight: {
+                lf: ['LFrideHeight', 'LFrideHeight[mm]', 'LFrideHeight[m]', 'Ride Height FL', 'RideHeightFL', 'LF Ride Height', 'LF ride height[mm]'],
+                rf: ['RFrideHeight', 'RFrideHeight[mm]', 'RFrideHeight[m]', 'Ride Height FR', 'RideHeightFR', 'RF Ride Height', 'RF ride height[mm]'],
+                lr: ['LRrideHeight', 'LRrideHeight[mm]', 'LRrideHeight[m]', 'Ride Height RL', 'RideHeightRL', 'LR Ride Height', 'LR ride height[mm]'],
+                rr: ['RRrideHeight', 'RRrideHeight[mm]', 'RRrideHeight[m]', 'Ride Height RR', 'RideHeightRR', 'RR Ride Height', 'RR ride height[mm]']
+            },
+            shockDefl: {
+                lf: ['LFshockDefl', 'LFshockDefl[mm]', 'LFshockDefl[m]', 'Damper Pos FL', 'Susp Pos FL', 'LF Shock Defl', 'LF shock deflection[mm]'],
+                rf: ['RFshockDefl', 'RFshockDefl[mm]', 'RFshockDefl[m]', 'Damper Pos FR', 'Susp Pos FR', 'RF Shock Defl', 'RF shock deflection[mm]'],
+                lr: ['LRshockDefl', 'LRshockDefl[mm]', 'LRshockDefl[m]', 'Damper Pos RL', 'Susp Pos RL', 'LR Shock Defl', 'LR shock deflection[mm]'],
+                rr: ['RRshockDefl', 'RRshockDefl[mm]', 'RRshockDefl[m]', 'Damper Pos RR', 'Susp Pos RR', 'RR Shock Defl', 'RR shock deflection[mm]']
+            },
+            shockVel: {
+                lf: ['LFshockVel', 'LFshockVel[m/s]', 'LFshockVel[mm/s]', 'LF Shock Vel', 'LF shock velocity[m/s]'],
+                rf: ['RFshockVel', 'RFshockVel[m/s]', 'RFshockVel[mm/s]', 'RF Shock Vel', 'RF shock velocity[m/s]'],
+                lr: ['LRshockVel', 'LRshockVel[m/s]', 'LRshockVel[mm/s]', 'LR Shock Vel', 'LR shock velocity[m/s]'],
+                rr: ['RRshockVel', 'RRshockVel[m/s]', 'RRshockVel[mm/s]', 'RR Shock Vel', 'RR shock velocity[m/s]']
+            }
+        };
+        
+        function findChannel(nameList) {
+            for (var i = 0; i < nameList.length; i++) {
+                if (availableKeys.indexOf(nameList[i]) !== -1) return nameList[i];
+            }
+            // Fuzzy match: check if any available key contains the pattern
+            for (var i = 0; i < nameList.length; i++) {
+                var lower = nameList[i].toLowerCase();
+                for (var j = 0; j < availableKeys.length; j++) {
+                    if (availableKeys[j].toLowerCase() === lower) return availableKeys[j];
+                }
+            }
+            return null;
+        }
+        
+        // Map channels
+        var channelMap = {
+            rideHeight: {}, shockDefl: {}, shockVel: {}
+        };
+        var hasRideHeight = false, hasShockDefl = false, hasShockVel = false;
+        
+        ['lf', 'rf', 'lr', 'rr'].forEach(function(corner) {
+            channelMap.rideHeight[corner] = findChannel(patterns.rideHeight[corner]);
+            channelMap.shockDefl[corner] = findChannel(patterns.shockDefl[corner]);
+            channelMap.shockVel[corner] = findChannel(patterns.shockVel[corner]);
+            if (channelMap.rideHeight[corner]) hasRideHeight = true;
+            if (channelMap.shockDefl[corner]) hasShockDefl = true;
+            if (channelMap.shockVel[corner]) hasShockVel = true;
+        });
+        
+        if (!hasRideHeight && !hasShockDefl && !hasShockVel) {
+            console.log('Suspension analysis: No suspension channels found');
+            console.log('Available channels with ride/shock/susp/damp:', availableKeys.filter(function(k) {
+                var kl = k.toLowerCase();
+                return kl.indexOf('ride') !== -1 || kl.indexOf('shock') !== -1 || kl.indexOf('susp') !== -1 || kl.indexOf('damp') !== -1;
+            }));
+            return { available: false };
+        }
+        
+        console.log('=== SUSPENSION ANALYSIS ===');
+        console.log('Ride height channels:', channelMap.rideHeight);
+        console.log('Shock defl channels:', channelMap.shockDefl);
+        console.log('Shock vel channels:', channelMap.shockVel);
+        
+        var data = this.referenceData;
+        
+        // Detect units - iRacing outputs ride height in meters, need to convert to mm
+        function detectAndConvertRH(channel, row) {
+            var val = parseFloat(row[channel]);
+            if (isNaN(val)) return null;
+            // iRacing outputs ride height in meters (values typically 0.02-0.10)
+            // If values are all < 1, likely meters → convert to mm
+            if (Math.abs(val) < 1) return val * 1000;
+            // If values are < 500, likely already mm
+            if (Math.abs(val) < 500) return val;
+            return val;
+        }
+        
+        function detectAndConvertSD(channel, row) {
+            var val = parseFloat(row[channel]);
+            if (isNaN(val)) return null;
+            // iRacing shock defl in meters → convert to mm
+            if (Math.abs(val) < 1) return val * 1000;
+            if (Math.abs(val) < 500) return val;
+            return val;
+        }
+        
+        function detectAndConvertSV(channel, row) {
+            var val = parseFloat(row[channel]);
+            if (isNaN(val)) return null;
+            // iRacing shock vel in m/s → convert to mm/s
+            if (Math.abs(val) < 5) return val * 1000;
+            return val;
+        }
+        
+        // Collect data across the lap
+        var stats = {
+            rideHeight: { lf: [], rf: [], lr: [], rr: [] },
+            shockDefl: { lf: [], rf: [], lr: [], rr: [] },
+            shockVel: { lf: [], rf: [], lr: [], rr: [] }
+        };
+        
+        data.forEach(function(row) {
+            ['lf', 'rf', 'lr', 'rr'].forEach(function(corner) {
+                if (channelMap.rideHeight[corner]) {
+                    var v = detectAndConvertRH(channelMap.rideHeight[corner], row);
+                    if (v !== null) stats.rideHeight[corner].push(v);
+                }
+                if (channelMap.shockDefl[corner]) {
+                    var v = detectAndConvertSD(channelMap.shockDefl[corner], row);
+                    if (v !== null) stats.shockDefl[corner].push(v);
+                }
+                if (channelMap.shockVel[corner]) {
+                    var v = detectAndConvertSV(channelMap.shockVel[corner], row);
+                    if (v !== null) stats.shockVel[corner].push(v);
+                }
+            });
+        });
+        
+        // Helper stats functions
+        function avg(arr) { return arr.length === 0 ? null : arr.reduce(function(a,b) { return a+b; }, 0) / arr.length; }
+        function min(arr) { return arr.length === 0 ? null : Math.min.apply(null, arr); }
+        function max(arr) { return arr.length === 0 ? null : Math.max.apply(null, arr); }
+        function stdDev(arr) {
+            if (arr.length < 2) return null;
+            var mean = avg(arr);
+            var sq = arr.reduce(function(a, v) { return a + (v - mean) * (v - mean); }, 0);
+            return Math.sqrt(sq / (arr.length - 1));
+        }
+        function percentile(arr, pct) {
+            if (arr.length === 0) return null;
+            var sorted = arr.slice().sort(function(a,b) { return a - b; });
+            var idx = Math.floor(sorted.length * pct / 100);
+            return sorted[Math.min(idx, sorted.length - 1)];
+        }
+        
+        var result = {
+            available: true,
+            hasRideHeight: hasRideHeight,
+            hasShockDefl: hasShockDefl,
+            hasShockVel: hasShockVel,
+            channelMap: channelMap,
+            corners: {},
+            issues: [],
+            recommendations: []
+        };
+        
+        // Calculate per-corner stats
+        ['lf', 'rf', 'lr', 'rr'].forEach(function(corner) {
+            var rh = stats.rideHeight[corner];
+            var sd = stats.shockDefl[corner];
+            var sv = stats.shockVel[corner];
+            
+            result.corners[corner] = {
+                rideHeight: rh.length > 0 ? {
+                    avg: avg(rh), min: min(rh), max: max(rh), 
+                    range: max(rh) - min(rh), stdDev: stdDev(rh),
+                    p5: percentile(rh, 5), p95: percentile(rh, 95)
+                } : null,
+                shockDefl: sd.length > 0 ? {
+                    avg: avg(sd), min: min(sd), max: max(sd),
+                    range: max(sd) - min(sd), stdDev: stdDev(sd)
+                } : null,
+                shockVel: sv.length > 0 ? {
+                    avg: avg(sv), min: min(sv), max: max(sv),
+                    avgBump: avg(sv.filter(function(v) { return v < 0; })),
+                    avgRebound: avg(sv.filter(function(v) { return v > 0; })),
+                    maxBump: min(sv),
+                    maxRebound: max(sv),
+                    pctHighSpeed: sv.filter(function(v) { return Math.abs(v) > 100; }).length / sv.length * 100
+                } : null
+            };
+        });
+        
+        // ============================================
+        // RULE-BASED ANALYSIS
+        // ============================================
+        
+        // 1. RIDE HEIGHT ANALYSIS
+        if (hasRideHeight) {
+            var frontAvgRH = null, rearAvgRH = null;
+            var lfRH = result.corners.lf.rideHeight;
+            var rfRH = result.corners.rf.rideHeight;
+            var lrRH = result.corners.lr.rideHeight;
+            var rrRH = result.corners.rr.rideHeight;
+            
+            if (lfRH && rfRH) frontAvgRH = (lfRH.avg + rfRH.avg) / 2;
+            if (lrRH && rrRH) rearAvgRH = (lrRH.avg + rrRH.avg) / 2;
+            
+            result.frontAvgRH = frontAvgRH;
+            result.rearAvgRH = rearAvgRH;
+            
+            // a) Rake analysis (rear - front ride height)
+            if (frontAvgRH !== null && rearAvgRH !== null) {
+                var rake = rearAvgRH - frontAvgRH;
+                result.rake = rake;
+                
+                if (rake < -5) {
+                    result.issues.push({
+                        type: 'rake',
+                        severity: 'high',
+                        issue: 'Negative rake detected (' + rake.toFixed(1) + 'mm) — front higher than rear. This hurts downforce and increases drag.'
+                    });
+                    result.recommendations.push({
+                        action: 'Increase rear ride height or lower front to achieve positive rake (rear 5-15mm higher than front)'
+                    });
+                } else if (rake < 2) {
+                    result.issues.push({
+                        type: 'rake',
+                        severity: 'medium',
+                        issue: 'Very low rake (' + rake.toFixed(1) + 'mm). Car may lack front downforce.'
+                    });
+                    result.recommendations.push({
+                        action: 'Consider increasing rake by 3-5mm for better aero balance'
+                    });
+                } else if (rake > 30) {
+                    result.issues.push({
+                        type: 'rake',
+                        severity: 'medium',
+                        issue: 'Excessive rake (' + rake.toFixed(1) + 'mm). May cause rear instability under braking.'
+                    });
+                    result.recommendations.push({
+                        action: 'Reduce rake — consider raising front or lowering rear ride height'
+                    });
+                }
+            }
+            
+            // b) Left-right ride height balance
+            ['front', 'rear'].forEach(function(axle) {
+                var leftRH = axle === 'front' ? lfRH : lrRH;
+                var rightRH = axle === 'front' ? rfRH : rrRH;
+                
+                if (leftRH && rightRH) {
+                    var diff = leftRH.avg - rightRH.avg;
+                    if (Math.abs(diff) > 8) {
+                        var highSide = diff > 0 ? 'Left' : 'Right';
+                        result.issues.push({
+                            type: 'rideHeight',
+                            severity: 'medium',
+                            issue: axle.charAt(0).toUpperCase() + axle.slice(1) + ' ride height imbalance: ' + highSide + ' side ' + Math.abs(diff).toFixed(1) + 'mm higher'
+                        });
+                        result.recommendations.push({
+                            action: 'Check ' + axle + ' spring perch offset or push rod lengths for ' + axle + ' L/R balance'
+                        });
+                    }
+                }
+            });
+            
+            // c) Bottoming out detection — ride height minimum
+            ['lf', 'rf', 'lr', 'rr'].forEach(function(corner) {
+                var rh = result.corners[corner].rideHeight;
+                if (rh && rh.min !== null) {
+                    var cornerName = corner.toUpperCase();
+                    if (rh.min < 5) {
+                        result.issues.push({
+                            type: 'bottoming',
+                            severity: 'high',
+                            issue: cornerName + ' bottoming out — min ride height ' + rh.min.toFixed(1) + 'mm. Car hitting the track surface.'
+                        });
+                        result.recommendations.push({
+                            action: 'Raise ' + cornerName + ' ride height, stiffen springs, or increase bump stop gap'
+                        });
+                    } else if (rh.min < 15) {
+                        result.issues.push({
+                            type: 'bottoming',
+                            severity: 'medium',
+                            issue: cornerName + ' ride height dropping to ' + rh.min.toFixed(1) + 'mm — close to bottoming'
+                        });
+                    }
+                    
+                    // Excessive ride height — car too high, losing downforce
+                    if (rh.avg > 80) {
+                        result.issues.push({
+                            type: 'rideHeight',
+                            severity: 'low',
+                            issue: cornerName + ' avg ride height ' + rh.avg.toFixed(1) + 'mm — running high, may be losing downforce'
+                        });
+                    }
+                }
+            });
+            
+            // d) Ride height range / consistency
+            ['lf', 'rf', 'lr', 'rr'].forEach(function(corner) {
+                var rh = result.corners[corner].rideHeight;
+                if (rh && rh.range > 40) {
+                    result.issues.push({
+                        type: 'rideHeight',
+                        severity: 'low',
+                        issue: corner.toUpperCase() + ' ride height variation: ' + rh.range.toFixed(1) + 'mm range — suspension may be too soft'
+                    });
+                }
+            });
+        }
+        
+        // 2. SHOCK DEFLECTION ANALYSIS
+        if (hasShockDefl) {
+            ['lf', 'rf', 'lr', 'rr'].forEach(function(corner) {
+                var sd = result.corners[corner].shockDefl;
+                if (sd) {
+                    var cornerName = corner.toUpperCase();
+                    
+                    // Check if shock is running out of travel (topping out or bottoming)
+                    if (sd.range > 50) {
+                        result.issues.push({
+                            type: 'shockTravel',
+                            severity: 'medium',
+                            issue: cornerName + ' shock travel range ' + sd.range.toFixed(1) + 'mm — suspension using excessive travel'
+                        });
+                        result.recommendations.push({
+                            action: 'Consider stiffer springs or more bump stop support at ' + cornerName
+                        });
+                    }
+                }
+            });
+            
+            // Front vs rear shock travel comparison
+            var frontDeflRange = null, rearDeflRange = null;
+            if (result.corners.lf.shockDefl && result.corners.rf.shockDefl) {
+                frontDeflRange = (result.corners.lf.shockDefl.range + result.corners.rf.shockDefl.range) / 2;
+            }
+            if (result.corners.lr.shockDefl && result.corners.rr.shockDefl) {
+                rearDeflRange = (result.corners.lr.shockDefl.range + result.corners.rr.shockDefl.range) / 2;
+            }
+            
+            if (frontDeflRange !== null && rearDeflRange !== null) {
+                result.frontDeflRange = frontDeflRange;
+                result.rearDeflRange = rearDeflRange;
+                
+                if (frontDeflRange > rearDeflRange * 1.5) {
+                    result.issues.push({
+                        type: 'balance',
+                        severity: 'medium',
+                        issue: 'Front suspension using significantly more travel than rear (' + frontDeflRange.toFixed(1) + 'mm vs ' + rearDeflRange.toFixed(1) + 'mm)'
+                    });
+                    result.recommendations.push({
+                        action: 'Front springs may be too soft relative to rear, or front ARB needs stiffening'
+                    });
+                } else if (rearDeflRange > frontDeflRange * 1.5) {
+                    result.issues.push({
+                        type: 'balance',
+                        severity: 'medium',
+                        issue: 'Rear suspension using significantly more travel than front (' + rearDeflRange.toFixed(1) + 'mm vs ' + frontDeflRange.toFixed(1) + 'mm)'
+                    });
+                    result.recommendations.push({
+                        action: 'Rear springs may be too soft relative to front, or rear ARB needs stiffening'
+                    });
+                }
+            }
+        }
+        
+        // 3. SHOCK VELOCITY ANALYSIS (Damper tuning insights)
+        if (hasShockVel) {
+            ['lf', 'rf', 'lr', 'rr'].forEach(function(corner) {
+                var sv = result.corners[corner].shockVel;
+                if (sv) {
+                    var cornerName = corner.toUpperCase();
+                    
+                    // High-speed shock events (>100 mm/s indicates bumps or aggressive inputs)
+                    if (sv.pctHighSpeed > 25) {
+                        result.issues.push({
+                            type: 'damper',
+                            severity: 'medium',
+                            issue: cornerName + ' shock spending ' + sv.pctHighSpeed.toFixed(0) + '% time in high-speed zone — bumpy surface or aggressive inputs'
+                        });
+                        result.recommendations.push({
+                            action: 'Consider adjusting ' + cornerName + ' high-speed compression/rebound for better bump absorption'
+                        });
+                    }
+                    
+                    // Rebound/Bump imbalance
+                    if (sv.avgBump !== null && sv.avgRebound !== null) {
+                        var ratio = Math.abs(sv.avgRebound) / (Math.abs(sv.avgBump) || 1);
+                        if (ratio > 1.8) {
+                            result.issues.push({
+                                type: 'damper',
+                                severity: 'low',
+                                issue: cornerName + ' rebound-dominant — avg rebound ' + Math.abs(sv.avgRebound).toFixed(0) + 'mm/s vs bump ' + Math.abs(sv.avgBump).toFixed(0) + 'mm/s'
+                            });
+                            result.recommendations.push({
+                                action: 'Increase ' + cornerName + ' rebound damping or decrease bump damping for better balance'
+                            });
+                        } else if (ratio < 0.55) {
+                            result.issues.push({
+                                type: 'damper',
+                                severity: 'low',
+                                issue: cornerName + ' bump-dominant — avg bump ' + Math.abs(sv.avgBump).toFixed(0) + 'mm/s vs rebound ' + Math.abs(sv.avgRebound).toFixed(0) + 'mm/s'
+                            });
+                            result.recommendations.push({
+                                action: 'Increase ' + cornerName + ' bump damping or decrease rebound damping'
+                            });
+                        }
+                    }
+                }
+            });
+        }
+        
+        console.log('Suspension analysis result:', result);
         return result;
     }
     
@@ -5175,12 +5716,16 @@ class TelemetryAnalysisApp {
         var tireAnalysis = this.calculateTireAnalysis();
         var brakeAnalysis = analysis.brakeAnalysis || {};
         var fuelAnalysis = analysis.fuelAnalysis || {};
+        var suspensionAnalysis = this.calculateSuspensionAnalysis();
         
         // Render the full setup section
-        container.innerHTML = this.renderSetupSection(tireAnalysis, brakeAnalysis, fuelAnalysis);
+        container.innerHTML = this.renderSetupSection(tireAnalysis, brakeAnalysis, fuelAnalysis, suspensionAnalysis);
         
         // Render tire temperature comparison graphs
         this.renderTireTempGraphs();
+        
+        // Render suspension graphs
+        this.renderSuspensionGraphs(suspensionAnalysis);
     }
     
     renderTireTempGraphs() {
@@ -5426,6 +5971,162 @@ class TelemetryAnalysisApp {
                 yaxis: Object.assign({}, layoutBase.yaxis, { range: [minTempRear - 5, maxTempRear + 10] })
             });
             Plotly.newPlot('tire-temp-graph-rear', rearTraces, rearLayout, { responsive: true, displayModeBar: false });
+        }
+    }
+    
+    renderSuspensionGraphs(suspAnalysis) {
+        var self = this;
+        if (!suspAnalysis || !suspAnalysis.available) return;
+        if (!this.referenceData || this.referenceData.length < 100) return;
+        
+        var data = this.referenceData;
+        var sampleRow = data[0];
+        var availableKeys = Object.keys(sampleRow);
+        
+        // Find distance channel
+        var distNames = ['Corrected Distance', 'Corrected Distance[m]', 'Lap Distance', 'Lap Distance[m]', 'Distance', 'distance'];
+        var distChannel = null;
+        for (var i = 0; i < distNames.length; i++) {
+            if (availableKeys.indexOf(distNames[i]) !== -1) { distChannel = distNames[i]; break; }
+        }
+        if (!distChannel) {
+            distChannel = availableKeys.find(function(k) { return k.toLowerCase().indexOf('distance') !== -1; });
+        }
+        
+        var cMap = suspAnalysis.channelMap;
+        
+        // ========== RIDE HEIGHT GRAPH ==========
+        if (suspAnalysis.hasRideHeight && document.getElementById('ride-height-graph')) {
+            var rhTraces = [];
+            var colors = { lf: '#00d4aa', rf: '#3b82f6', lr: '#f97316', rr: '#ef4444' };
+            var names = { lf: 'LF', rf: 'RF', lr: 'LR', rr: 'RR' };
+            var dashes = { lf: 'solid', rf: 'dash', lr: 'solid', rr: 'dash' };
+            
+            // Sample data for performance
+            var sampleRate = Math.max(1, Math.floor(data.length / 2000));
+            
+            ['lf', 'rf', 'lr', 'rr'].forEach(function(corner) {
+                var ch = cMap.rideHeight[corner];
+                if (!ch) return;
+                
+                var xArr = [], yArr = [];
+                for (var i = 0; i < data.length; i += sampleRate) {
+                    var row = data[i];
+                    var dist = distChannel ? parseFloat(row[distChannel]) : i;
+                    var val = parseFloat(row[ch]);
+                    if (isNaN(dist) || isNaN(val)) continue;
+                    // Convert m to mm if needed
+                    if (Math.abs(val) < 1) val *= 1000;
+                    xArr.push(dist);
+                    yArr.push(val);
+                }
+                
+                rhTraces.push({
+                    x: xArr, y: yArr,
+                    type: 'scatter', mode: 'lines',
+                    name: names[corner],
+                    line: { color: colors[corner], width: 1.5, dash: dashes[corner] }
+                });
+            });
+            
+            // Corner markers
+            var corners = self.getCorners();
+            var shapes = [], annotations = [];
+            if (corners && corners.length > 0) {
+                corners.forEach(function(c) {
+                    shapes.push({
+                        type: 'line', x0: c.distance, x1: c.distance,
+                        y0: 0, y1: 1, yref: 'paper',
+                        line: { color: '#444', width: 1, dash: 'dot' }
+                    });
+                    annotations.push({
+                        x: c.distance, y: 1.02, yref: 'paper',
+                        text: c.name, showarrow: false,
+                        font: { size: 9, color: '#6e7681' }
+                    });
+                });
+            }
+            
+            var rhLayout = {
+                title: { text: 'Ride Height Over Lap Distance', font: { size: 14, color: '#c9d1d9' } },
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: '#161b22',
+                font: { color: '#8b949e', size: 10 },
+                margin: { t: 50, b: 40, l: 50, r: 15 },
+                xaxis: { title: { text: 'Distance (m)', font: { size: 10 } }, color: '#6e7681', gridcolor: '#21262d' },
+                yaxis: { title: { text: 'Ride Height (mm)', font: { size: 10 } }, color: '#6e7681', gridcolor: '#21262d' },
+                legend: { orientation: 'h', y: 1.12, x: 0.5, xanchor: 'center', font: { size: 10 } },
+                shapes: shapes,
+                annotations: annotations
+            };
+            
+            Plotly.newPlot('ride-height-graph', rhTraces, rhLayout, { responsive: true, displayModeBar: false });
+        }
+        
+        // ========== SHOCK VELOCITY HISTOGRAM ==========
+        if (suspAnalysis.hasShockVel && document.getElementById('shock-histogram')) {
+            var histTraces = [];
+            var colors = { lf: '#00d4aa', rf: '#3b82f6', lr: '#f97316', rr: '#ef4444' };
+            var names = { lf: 'LF', rf: 'RF', lr: 'LR', rr: 'RR' };
+            
+            // Bin edges for velocity histogram (mm/s)
+            var binEdges = [-300, -200, -150, -100, -75, -50, -25, 0, 25, 50, 75, 100, 150, 200, 300];
+            var binLabels = binEdges.slice(0, -1).map(function(e, i) {
+                return e + ' to ' + binEdges[i + 1];
+            });
+            
+            var sampleRate = Math.max(1, Math.floor(data.length / 3000));
+            
+            ['lf', 'rf', 'lr', 'rr'].forEach(function(corner) {
+                var ch = cMap.shockVel[corner];
+                if (!ch) return;
+                
+                var counts = new Array(binEdges.length - 1).fill(0);
+                var total = 0;
+                
+                for (var i = 0; i < data.length; i += sampleRate) {
+                    var val = parseFloat(data[i][ch]);
+                    if (isNaN(val)) continue;
+                    // Convert m/s to mm/s if needed
+                    if (Math.abs(val) < 5) val *= 1000;
+                    
+                    for (var b = 0; b < binEdges.length - 1; b++) {
+                        if (val >= binEdges[b] && val < binEdges[b + 1]) {
+                            counts[b]++;
+                            break;
+                        }
+                    }
+                    total++;
+                }
+                
+                // Convert to percentages
+                var pcts = counts.map(function(c) { return total > 0 ? (c / total * 100) : 0; });
+                
+                histTraces.push({
+                    x: binLabels, y: pcts,
+                    type: 'bar',
+                    name: names[corner],
+                    marker: { color: colors[corner], opacity: 0.7 }
+                });
+            });
+            
+            var histLayout = {
+                title: { text: 'Shock Velocity Distribution', font: { size: 14, color: '#c9d1d9' } },
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: '#161b22',
+                font: { color: '#8b949e', size: 10 },
+                margin: { t: 50, b: 60, l: 50, r: 15 },
+                barmode: 'group',
+                xaxis: { 
+                    title: { text: 'Velocity Range (mm/s) — Bump ← → Rebound', font: { size: 10 } }, 
+                    color: '#6e7681', gridcolor: '#21262d',
+                    tickangle: -45, tickfont: { size: 8 }
+                },
+                yaxis: { title: { text: '% of Time', font: { size: 10 } }, color: '#6e7681', gridcolor: '#21262d' },
+                legend: { orientation: 'h', y: 1.12, x: 0.5, xanchor: 'center', font: { size: 10 } }
+            };
+            
+            Plotly.newPlot('shock-histogram', histTraces, histLayout, { responsive: true, displayModeBar: false });
         }
     }
     
