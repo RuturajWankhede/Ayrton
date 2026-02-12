@@ -2589,10 +2589,7 @@ class TelemetryAnalysisApp {
         var self = this;
         var trackSegments = analysis.trackSegments || [];
         
-        // Use rule-based tire analysis from telemetry data
-        var tireAnalysis = this.calculateTireAnalysis() || {};
-        var suspensionAnalysis = this.calculateSuspensionAnalysis() || {};
-        
+        // Use rule-based tire analysis from telemetry data (setup tab handles display)
         var brakeAnalysis = analysis.brakeAnalysis || {};
         var fuelAnalysis = analysis.fuelAnalysis || {};
         var brakingTechnique = analysis.brakingTechnique || {};
@@ -2641,13 +2638,7 @@ class TelemetryAnalysisApp {
         html += '</div>';
         html += '</div>';
         
-        // Sub-tabs
-        html += '<div class="flex space-x-4 mb-6 border-b border-[#30363d] pb-4">';
-        html += '<button id="driving-tab-btn" onclick="document.getElementById(\'driving-section\').classList.remove(\'hidden\');document.getElementById(\'setup-section\').classList.add(\'hidden\');this.classList.add(\'bg-red-600\',\'text-white\');this.classList.remove(\'bg-[#30363d]\',\'text-[#c9d1d9]\');document.getElementById(\'setup-tab-btn\').classList.remove(\'bg-red-600\',\'text-white\');document.getElementById(\'setup-tab-btn\').classList.add(\'bg-[#30363d]\',\'text-[#c9d1d9]\')" class="px-6 py-3 rounded-lg font-semibold bg-red-600 text-white transition"><i class="fas fa-steering-wheel mr-2"></i>Driving Analysis</button>';
-        html += '<button id="setup-tab-btn" onclick="document.getElementById(\'setup-section\').classList.remove(\'hidden\');document.getElementById(\'driving-section\').classList.add(\'hidden\');this.classList.add(\'bg-red-600\',\'text-white\');this.classList.remove(\'bg-[#30363d]\',\'text-[#c9d1d9]\');document.getElementById(\'driving-tab-btn\').classList.remove(\'bg-red-600\',\'text-white\');document.getElementById(\'driving-tab-btn\').classList.add(\'bg-[#30363d]\',\'text-[#c9d1d9]\')" class="px-6 py-3 rounded-lg font-semibold bg-[#30363d] text-[#c9d1d9] hover:bg-[#484f58] transition"><i class="fas fa-wrench mr-2"></i>Setup Recommendations</button>';
-        html += '</div>';
-        
-        // DRIVING SECTION
+        // DRIVING SECTION (no sub-tabs - Setup is in the main Setup tab)
         html += '<div id="driving-section">';
         
         // Summary card
@@ -2706,16 +2697,7 @@ class TelemetryAnalysisApp {
         
         html += '</div>'; // End driving section
         
-        // SETUP SECTION
-        html += '<div id="setup-section" class="hidden">';
-        html += this.renderSetupSection(tireAnalysis, brakeAnalysis, fuelAnalysis, suspensionAnalysis);
-        html += '</div>';
-        
         analysisTab.innerHTML = html;
-        
-        // Render graphs after HTML is in the DOM
-        this.renderTireTempGraphs();
-        this.renderSuspensionGraphs(suspensionAnalysis);
     }
     
     // ============================================
@@ -5407,7 +5389,7 @@ class TelemetryAnalysisApp {
         var layout = { 
             showlegend: true, legend: { x: 0, y: 1, bgcolor: 'rgba(0,0,0,0.7)', font: { color: '#fff', size: 11 } }, 
             xaxis: { visible: false, scaleanchor: 'y' }, yaxis: { visible: false }, 
-            margin: { t: 5, b: 5, l: 5, r: 5 }, paper_bgcolor: '#1f2937', plot_bgcolor: '#1f2937', autosize: true,
+            margin: { t: 5, b: 5, l: 5, r: 5 }, paper_bgcolor: '#161b22', plot_bgcolor: '#161b22', autosize: true,
             annotations: annotations
         };
         Plotly.newPlot('track-map', allTraces, layout, { responsive: true, displayModeBar: false });
@@ -5604,9 +5586,7 @@ class TelemetryAnalysisApp {
             corners.forEach(function(corner, idx) {
                 var dist = corner.distance || 0;
                 var hasIssues = corner.issues && corner.issues.length > 0;
-                var severityColor = corner.severity === 'heavy' ? 'rgba(239, 68, 68, 0.5)' : 
-                                   corner.severity === 'kink' ? 'rgba(251, 191, 36, 0.4)' : 
-                                   'rgba(34, 197, 94, 0.4)';
+                var severityColor = 'rgba(110, 118, 129, 0.5)';
                 var color = hasIssues ? 'rgba(239, 68, 68, 0.6)' : severityColor;
                 
                 // Vertical line at turn location
@@ -5614,7 +5594,7 @@ class TelemetryAnalysisApp {
                     type: 'line',
                     x0: dist, x1: dist,
                     y0: yMin, y1: yMax,
-                    line: { color: color, width: 2, dash: 'dot' }
+                    line: { color: '#6e7681', width: 1, dash: 'dot' }
                 });
                 
                 // Label at top
@@ -5623,17 +5603,20 @@ class TelemetryAnalysisApp {
                     y: yMax,
                     text: corner.name || ('T' + (idx + 1)),
                     showarrow: false,
-                    font: { color: hasIssues ? '#ef4444' : '#22c55e', size: 9, family: 'Arial' },
+                    font: { color: '#8b949e', size: 9, family: 'Arial' },
                     yshift: 10
                 });
             });
         }
         
         var layout = { 
-            xaxis: { title: 'Distance (m)', tickfont: { size: 10 } }, 
-            yaxis: { title: channelConfig.unit, tickfont: { size: 10 } }, 
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: '#161b22',
+            font: { color: '#8b949e', size: 10 },
+            xaxis: { title: { text: 'Distance (m)', font: { size: 10, color: '#8b949e' } }, tickfont: { size: 10, color: '#6e7681' }, gridcolor: '#30363d', zerolinecolor: '#30363d' }, 
+            yaxis: { title: { text: channelConfig.unit, font: { size: 10, color: '#8b949e' } }, tickfont: { size: 10, color: '#6e7681' }, gridcolor: '#30363d', zerolinecolor: '#30363d' }, 
             margin: { t: 20, b: 40, l: 50, r: 10 }, 
-            legend: { orientation: 'h', y: 1.1, x: 0.5, xanchor: 'center', font: { size: 10 } }, 
+            legend: { orientation: 'h', y: 1.1, x: 0.5, xanchor: 'center', font: { size: 10, color: '#8b949e' }, bgcolor: 'rgba(0,0,0,0)' }, 
             hovermode: 'x unified', 
             autosize: true,
             shapes: shapes,
@@ -5694,7 +5677,7 @@ class TelemetryAnalysisApp {
         var traces = [];
         if (refX.length > 0) traces.push({ x: refX, y: refY, mode: 'lines', name: 'Reference', line: { color: '#00d4aa', width: 1.5 } });
         if (currX.length > 0) traces.push({ x: currX, y: currY, mode: 'lines', name: 'Comparison', line: { color: '#ff6b9d', width: 2 } });
-        var layout = { xaxis: { title: 'Distance (m)', tickfont: { size: 10 } }, yaxis: { tickfont: { size: 10 } }, margin: { t: 10, b: 40, l: 50, r: 10 }, legend: { orientation: 'h', y: 1.05, x: 0.5, xanchor: 'center', font: { size: 10 } }, hovermode: 'x unified', autosize: true };
+        var layout = { paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: '#161b22', font: { color: '#8b949e', size: 10 }, xaxis: { title: 'Distance (m)', tickfont: { size: 10, color: '#6e7681' }, gridcolor: '#30363d' }, yaxis: { tickfont: { size: 10, color: '#6e7681' }, gridcolor: '#30363d' }, margin: { t: 10, b: 40, l: 50, r: 10 }, legend: { orientation: 'h', y: 1.05, x: 0.5, xanchor: 'center', font: { size: 10, color: '#8b949e' } }, hovermode: 'x unified', autosize: true };
         Plotly.newPlot(chartId, traces, layout, { responsive: true, displayModeBar: false });
     }
     
@@ -5706,7 +5689,7 @@ class TelemetryAnalysisApp {
         var timeDeltas = analysis.sectors.map(function(s) { return s.timeDelta !== undefined ? s.timeDelta : -(s.avgSpeedDelta || 0) * 0.02; });
         var colors = timeDeltas.map(function(t) { return t > 0 ? '#ef4444' : '#22c55e'; });
         var trace = { x: sectorLabels, y: timeDeltas, type: 'bar', marker: { color: colors }, text: timeDeltas.map(function(t) { return (t > 0 ? '+' : '') + t.toFixed(3) + 's'; }), textposition: 'outside' };
-        var layout = { yaxis: { title: 'Time Delta (s)', zeroline: true, zerolinewidth: 2, zerolinecolor: '#000' }, margin: { t: 30, b: 40, l: 60, r: 20 } };
+        var layout = { paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: '#161b22', font: { color: '#8b949e', size: 10 }, yaxis: { title: 'Time Delta (s)', zeroline: true, zerolinewidth: 2, zerolinecolor: '#444', gridcolor: '#30363d', color: '#6e7681' }, xaxis: { color: '#6e7681' }, margin: { t: 30, b: 40, l: 60, r: 20 } };
         Plotly.newPlot('sector-time-chart', [trace], layout, { responsive: true });
     }
     
@@ -5716,7 +5699,7 @@ class TelemetryAnalysisApp {
         if (!analysis.avgSpeedCurr) { container.innerHTML = '<p class="text-[#8b949e] text-center py-10">No speed data</p>'; return; }
         var yourTrace = { x: ['Average', 'Top', 'Min Corner'], y: [analysis.avgSpeedCurr || 0, analysis.maxSpeedCurr || 0, analysis.minSpeedCurr || 0], type: 'bar', name: 'Comparison', marker: { color: '#ff6b9d' } };
         var refTrace = { x: ['Average', 'Top', 'Min Corner'], y: [analysis.avgSpeedRef || 0, analysis.maxSpeedRef || 0, analysis.minSpeedRef || 0], type: 'bar', name: 'Reference', marker: { color: '#00d4aa' } };
-        var layout = { barmode: 'group', yaxis: { title: 'Speed (km/h)' }, margin: { t: 30, b: 40, l: 50, r: 20 }, legend: { orientation: 'h', y: -0.15 } };
+        var layout = { paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: '#161b22', font: { color: '#8b949e', size: 10 }, barmode: 'group', yaxis: { title: 'Speed (km/h)', gridcolor: '#30363d', color: '#6e7681' }, xaxis: { color: '#6e7681' }, margin: { t: 30, b: 40, l: 50, r: 20 }, legend: { orientation: 'h', y: -0.15, font: { color: '#8b949e' } } };
         Plotly.newPlot('speed-comparison', [yourTrace, refTrace], layout, { responsive: true });
     }
     
