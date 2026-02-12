@@ -3063,11 +3063,11 @@ class TelemetryAnalysisApp {
             html += '<h4 class="text-sm font-semibold text-[#8b949e] mb-2">Temperature Over Lap Distance</h4>';
             html += '</div>'; // Close padding div
             
-            // Graphs at full width - negative margins to break out of parent padding
-            html += '<div class="mb-4" style="margin-left: -24px; margin-right: -24px;">';
+            // Graphs at full width within the panel border (outside the p-6 padding div)
+            html += '<div class="mb-4">';
             html += '<div id="tire-temp-graph-front" style="height: 300px; width: 100%;"></div>';
             html += '</div>';
-            html += '<div class="mb-4" style="margin-left: -24px; margin-right: -24px;">';
+            html += '<div class="mb-4">';
             html += '<div id="tire-temp-graph-rear" style="height: 300px; width: 100%;"></div>';
             html += '</div>';
             
