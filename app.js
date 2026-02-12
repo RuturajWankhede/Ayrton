@@ -3052,21 +3052,27 @@ class TelemetryAnalysisApp {
     renderSetupSection(tireAnalysis, brakeAnalysis, fuelAnalysis) {
         var html = '';
         
-        html += '<div class="bg-[#161b22] rounded-xl p-6 mb-6 border border-[#30363d]">';
+        html += '<div class="bg-[#161b22] rounded-xl mb-6 border border-[#30363d]">';
+        html += '<div class="p-6 pb-0">';
         html += '<h2 class="text-xl font-bold mb-4 text-[#f0f6fc]"><i class="fas fa-cogs mr-2 text-green-400"></i>Setup Recommendations</h2>';
         html += '<p class="text-[#8b949e] mb-6">Rule-based analysis from tire temperatures, brake data, and telemetry patterns:</p>';
         
         // Tire section - Enhanced visualization
         if (tireAnalysis && tireAnalysis.available) {
-            html += '<div class="mb-6">';
             html += '<h3 class="text-lg font-semibold text-[#f0f6fc] mb-3"><i class="fas fa-circle text-yellow-500 mr-2"></i>Tire Temperature Analysis</h3>';
+            html += '<h4 class="text-sm font-semibold text-[#8b949e] mb-2">Temperature Over Lap Distance</h4>';
+            html += '</div>'; // Close padding div
             
-            // Tire temp comparison graphs - extend to full card width
-            html += '<div class="mb-6 space-y-4 -mx-6">';
-            html += '<h4 class="text-sm font-semibold text-[#8b949e] mb-2 px-6">Temperature Over Lap Distance</h4>';
-            html += '<div id="tire-temp-graph-front" style="height: 280px;"></div>';
-            html += '<div id="tire-temp-graph-rear" style="height: 280px;"></div>';
+            // Graphs at full width (no padding)
+            html += '<div class="mb-4">';
+            html += '<div id="tire-temp-graph-front" style="height: 280px; width: 100%;"></div>';
             html += '</div>';
+            html += '<div class="mb-4">';
+            html += '<div id="tire-temp-graph-rear" style="height: 280px; width: 100%;"></div>';
+            html += '</div>';
+            
+            // Reopen padding div for rest of content
+            html += '<div class="p-6 pt-2">';
             
             // Tire diagram - 2x2 grid showing car from above
             html += '<div class="grid grid-cols-2 gap-4 mb-4 max-w-lg mx-auto">';
@@ -3189,17 +3195,18 @@ class TelemetryAnalysisApp {
                 html += '</div>';
             }
             
-            html += '</div>';
+            // Don't close padding div yet - brake and fuel go inside
         } else {
+            // No tire data - keep padding consistent
             html += '<div class="bg-[#30363d] border border-[#30363d] rounded-lg p-4 mb-6">';
             html += '<p class="text-[#8b949e]"><i class="fas fa-info-circle mr-2"></i>No tire temperature data available in telemetry. ';
             html += 'Enable tire temp channels in your data export to get camber/pressure recommendations.</p>';
             html += '</div>';
         }
         
-        // Brake section
+        // Brake section (inside padding div)
         if (brakeAnalysis && brakeAnalysis.available) {
-            html += '<div class="mb-6">';
+            html += '<div class="mb-6 mt-6">';
             html += '<h3 class="text-lg font-semibold text-[#f0f6fc] mb-3"><i class="fas fa-compact-disc text-red-500 mr-2"></i>Brake Setup</h3>';
             html += '<div class="grid grid-cols-4 gap-4 mb-4">';
             if (brakeAnalysis.fl !== null) html += '<div class="bg-[#30363d] rounded-lg p-3 text-center"><div class="text-xl font-bold">' + Math.round(brakeAnalysis.fl) + '°C</div><div class="text-[#8b949e] text-sm">FL</div></div>';
@@ -3210,7 +3217,7 @@ class TelemetryAnalysisApp {
             html += '</div>';
         }
         
-        // Fuel section
+        // Fuel section (inside padding div)
         if (fuelAnalysis && fuelAnalysis.available && fuelAnalysis.fuelPerLap) {
             html += '<div class="mb-6">';
             html += '<h3 class="text-lg font-semibold text-[#f0f6fc] mb-3"><i class="fas fa-gas-pump text-blue-500 mr-2"></i>Fuel Strategy</h3>';
@@ -3224,7 +3231,8 @@ class TelemetryAnalysisApp {
             html += '</div>';
         }
         
-        html += '</div>';
+        html += '</div>'; // Close padding div
+        html += '</div>'; // Close outer container
         return html;
     }
     
@@ -5298,9 +5306,9 @@ class TelemetryAnalysisApp {
         // Dark theme layout - minimal margins for full width
         var layoutBase = {
             paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: '#0d1117',
+            plot_bgcolor: '#161b22',
             font: { color: '#8b949e', size: 10 },
-            margin: { t: 55, b: 45, l: 45, r: 15 },
+            margin: { t: 50, b: 40, l: 45, r: 5 },
             xaxis: { 
                 title: { text: 'Distance (m)', font: { size: 10 } },
                 gridcolor: '#30363d',
